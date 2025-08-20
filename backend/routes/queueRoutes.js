@@ -1,6 +1,7 @@
 const express = require("express");
 const queueController = require("../controllers/queueController");
 const queueManagementRoutes = require("./queueManagementRoutes");
+const queuePriorityRoutes = require("./queuePriorityRoutes");
 const scraperControlController = require('../controllers/scraperControlController');
 const adminAuth = require("../middleware/adminAuth");
 
@@ -41,10 +42,16 @@ router.post(
 
 // Queue Management Routes - Imported from separate file (ALL require admin auth)
 router.use("/queue-management", queueManagementRoutes);
+
+// Priority Queue Management Routes - Admin only
+router.use("/priority", queuePriorityRoutes);
+
+// Scraper Control Routes - Admin only
 router.post('/scraper/start', adminAuth, scraperControlController.startScraper);
 router.post('/scraper/stop', adminAuth, scraperControlController.stopScraper);
 router.post('/scraper/pause', adminAuth, scraperControlController.pauseScraper);
 router.post('/scraper/resume', adminAuth, scraperControlController.resumeScraper);
 router.get('/scraper/status', adminAuth, scraperControlController.getScraperStatus);
 router.get('/scraper/debug', adminAuth, scraperControlController.debugScraperStatus);
+
 module.exports = router;

@@ -20,8 +20,6 @@ const BrandProcessingQueue = ({ onPageChange }) => {
     }
   };
 
-  // Removed useEffect - parent Dashboard component handles the API call
-  // This prevents duplicate API calls
 
   if (loading && !brandProcessingQueue) {
     return (

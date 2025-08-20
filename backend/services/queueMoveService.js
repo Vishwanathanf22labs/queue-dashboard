@@ -35,11 +35,8 @@ async function movePendingToFailed(queueId) {
     await redis.lrem(QUEUES.PENDING_BRANDS, 1, pendingBrands[brandIndex]);
 
     const failedBrandData = {
-      ...brandToMove,
-      failed_at: new Date().toISOString(),
-      error_message: "Manually moved to failed queue",
-      moved_from_pending: true,
-      original_queue_id: queueId,
+      id: brandToMove.id || brandToMove.brand_id || brandToMove.queue_id,
+      page_id: brandToMove.page_id
     };
 
     await redis.lpush(QUEUES.FAILED_BRANDS, JSON.stringify(failedBrandData));
@@ -98,12 +95,7 @@ async function moveFailedToPending(brandId) {
 
     const pendingBrandData = {
       id: brandToMove.id || brandToMove.brand_id || brandToMove.queue_id,
-      page_id: brandToMove.page_id,
-      brand_name: brandToMove.brand_name,
-      moved_from_failed: true,
-      moved_at: new Date().toISOString(),
-      original_failed_id: brandId,
-      added_at: new Date().toISOString(),
+      page_id: brandToMove.page_id
     };
 
     await redis.rpush(QUEUES.PENDING_BRANDS, JSON.stringify(pendingBrandData));
@@ -146,12 +138,8 @@ async function moveAllPendingToFailed() {
         const brandData = JSON.parse(pendingBrand);
 
         const failedBrandData = {
-          ...brandData,
-          failed_at: new Date().toISOString(),
-          error_message: "Bulk moved to failed queue",
-          moved_from_pending: true,
-          bulk_moved: true,
-          original_queue_id: brandData.id,
+          id: brandData.id || brandData.brand_id || brandData.queue_id,
+          page_id: brandData.page_id
         };
 
         pipeline.lpush(QUEUES.FAILED_BRANDS, JSON.stringify(failedBrandData));
@@ -202,13 +190,7 @@ async function moveAllFailedToPending() {
 
         const pendingBrandData = {
           id: brandData.id || brandData.brand_id || brandData.queue_id,
-          page_id: brandData.page_id,
-          brand_name: brandData.brand_name,
-          moved_from_failed: true,
-          moved_at: new Date().toISOString(),
-          bulk_moved: true,
-          original_failed_id: brandData.id,
-          added_at: new Date().toISOString(),
+          page_id: brandData.page_id
         };
 
         pipeline.rpush(QUEUES.PENDING_BRANDS, JSON.stringify(pendingBrandData));

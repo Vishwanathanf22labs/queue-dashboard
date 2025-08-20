@@ -201,7 +201,7 @@ const Input = forwardRef(({
 
   return (
     <div className={`${fullWidth ? 'w-full' : ''} ${containerClassName}`}>
-      {/* Label */}
+
       {label && (
         <label 
           htmlFor={id || name} 
@@ -212,21 +212,20 @@ const Input = forwardRef(({
         </label>
       )}
 
-      {/* Description */}
       {description && (
         <p className="text-xs text-gray-500 mb-2">{description}</p>
       )}
 
-      {/* Input Container */}
+
       <div className="relative">
-        {/* Left Icon */}
+  
         {leftIcon && (
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-400">
             {leftIcon}
           </div>
         )}
 
-        {/* Input Field */}
+    
         <input
           ref={finalRef}
           id={id || name}
@@ -269,7 +268,6 @@ const Input = forwardRef(({
           `}
         />
 
-        {/* Right Icon or Status */}
         {(rightIcon || showPasswordToggle || loading || error || success) && (
           <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
             {getStatusIcon()}
@@ -277,7 +275,6 @@ const Input = forwardRef(({
         )}
       </div>
 
-      {/* Error Message */}
       {error && (
         <div className="mt-1 text-xs text-red-500 flex items-center">
           <AlertCircle className={`${getIconSize()} mr-1 flex-shrink-0`} />
@@ -285,7 +282,7 @@ const Input = forwardRef(({
         </div>
       )}
 
-      {/* Success Message */}
+
       {success && (
         <div className="mt-1 text-xs text-green-500 flex items-center">
           <CheckCircle className={`${getIconSize()} mr-1 flex-shrink-0`} />
@@ -293,7 +290,6 @@ const Input = forwardRef(({
         </div>
       )}
 
-      {/* Character Count */}
       {maxLength && (
         <div className="mt-1 text-xs text-gray-400 text-right">
           {internalValue.length}/{maxLength}

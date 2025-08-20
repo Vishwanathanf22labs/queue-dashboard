@@ -14,13 +14,12 @@ function App() {
   const location = useLocation();
 
   useEffect(() => {
-    // Skip admin status check on read-only pages that don't need admin access
+    
     const readOnlyPages = ['/', '/pending-queue', '/failed-queue'];
     
     if (!readOnlyPages.includes(location.pathname)) {
       checkAdminStatus();
     } else {
-      console.log(`${location.pathname} page - skipping admin status check (read-only page)`);
     }
   }, [location.pathname]); // Run when location changes
 

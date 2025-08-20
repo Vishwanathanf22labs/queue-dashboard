@@ -141,16 +141,15 @@ const SearchInput = ({
 
   return (
     <div className={`relative ${containerClassName}`}>
-      {/* Search Input Container */}
+ 
       <div className="relative">
-        {/* Left Icon */}
+      
         {leftIcon && (
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
             {leftIcon}
           </div>
         )}
 
-        {/* Input Field */}
         <input
           ref={inputRef}
           id={id}
@@ -177,7 +176,6 @@ const SearchInput = ({
           `}
         />
 
-        {/* Right Icon or Clear Button */}
         <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
           {loading ? (
             <div className={`animate-spin rounded-full border-2 border-gray-300 border-t-blue-500 ${getIconSize()}`} />
@@ -196,14 +194,14 @@ const SearchInput = ({
         </div>
       </div>
 
-      {/* Error Message */}
+      
       {error && (
         <div className="mt-1 text-xs text-red-500 flex items-center">
           <span className="truncate">{error}</span>
         </div>
       )}
 
-      {/* Stats Display */}
+
       {showStats && stats && (
         <div className="mt-2 flex items-center justify-between text-xs text-gray-600">
           <span>Total: {stats.total}</span>
@@ -211,7 +209,7 @@ const SearchInput = ({
         </div>
       )}
 
-      {/* Min Length Warning */}
+   
       {minLength > 0 && internalValue && internalValue.length < minLength && (
         <div className="mt-1 text-xs text-gray-400 flex items-center">
           <Search className={`${getIconSize()} mr-1`} />
