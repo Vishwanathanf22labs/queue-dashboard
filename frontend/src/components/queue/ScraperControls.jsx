@@ -9,7 +9,7 @@ const ScraperControls = ({ onStatusChange, onStatusDataChange, className = '' })
   const [error, setError] = useState(null);
   const [statusData, setStatusData] = useState(null);
 
-  // Memoized function to get scraper status - won't recreate on every render
+
   const fetchScraperStatus = useCallback(async () => {
     try {
       const response = await queueAPI.getScraperStatus();
@@ -140,7 +140,7 @@ const ScraperControls = ({ onStatusChange, onStatusDataChange, className = '' })
           loading={isLoading && lastAction?.action === 'start'}
           className="w-full"
         >
-          ▶️ Start
+          Start
         </Button>
 
         <Button
@@ -151,7 +151,7 @@ const ScraperControls = ({ onStatusChange, onStatusDataChange, className = '' })
           loading={isLoading && lastAction?.action === 'pause'}
           className="w-full"
         >
-          ⏸️ Pause
+          Pause
         </Button>
 
         <Button
@@ -162,7 +162,7 @@ const ScraperControls = ({ onStatusChange, onStatusDataChange, className = '' })
           loading={isLoading && lastAction?.action === 'resume'}
           className="w-full"
         >
-          ▶️ Resume
+          Resume
         </Button>
 
         <Button
@@ -173,7 +173,7 @@ const ScraperControls = ({ onStatusChange, onStatusDataChange, className = '' })
           loading={isLoading && lastAction?.action === 'stop'}
           className="w-full"
         >
-          ⏹️ Stop
+          Stop
         </Button>
       </div>
     </div>

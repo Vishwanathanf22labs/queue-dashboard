@@ -105,7 +105,7 @@ const ScrapedStats = () => {
           <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4 sm:mb-6">Daily Breakdown</h3>
           {dailyStats && dailyStats.length > 0 ? (
             <>
-              {/* Desktop Table View */}
+   
               <div className="hidden lg:block">
                 <Table
                   data={dailyStats}
@@ -164,7 +164,7 @@ const ScrapedStats = () => {
                 />
               </div>
 
-              {/* Mobile Card View */}
+
               <div className="lg:hidden space-y-3">
                 {dailyStats.map((stat, index) => (
                   <div key={index} className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">

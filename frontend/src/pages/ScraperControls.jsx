@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Card from '../components/ui/Card';
 import ScraperControls from '../components/queue/ScraperControls';
+import PriorityQueueManager from '../components/queue/PriorityQueueManager';
 import useAdminStore from '../stores/adminStore';
 import { Shield } from 'lucide-react';
 
@@ -75,6 +76,9 @@ const ScraperControlsPage = () => {
               setStatusData(data);
             }}
           />
+
+          {/* Priority Queue Manager */}
+          <PriorityQueueManager />
 
           {/* Live Scraper Status Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -68,7 +68,11 @@ export const queueAPI = {
   pauseScraper: () => api.post('/queue/scraper/pause'),
   resumeScraper: () => api.post('/queue/scraper/resume'),
   getScraperStatus: () => api.get('/queue/scraper/status'),
-  debugScraperStatus: () => api.get('/queue/scraper/debug')
+  debugScraperStatus: () => api.get('/queue/scraper/debug'),
+
+  // Priority Queue Management
+  changeBrandPriority: (queueType, brandName, newPosition) => 
+    api.post('/queue/priority/change', { queueType, brandName, newPosition })
 };
 
 export const adminAPI = {
