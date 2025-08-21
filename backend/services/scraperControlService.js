@@ -8,11 +8,23 @@ async function initializeScraperStatus() {
     const currentStatus = await redis.get('scraper:status');
     
     if (!currentStatus) {
-      // Set default status to 'stopped' if no status exists
-      await redis.set('scraper:status', 'stopped', 'EX', 86400);
-      await redis.set('scraper:stopped_at', new Date().toISOString(), 'EX', 86400);
-      logger.info('Initialized scraper status to stopped');
-      return 'stopped';
+      // Check if queues are empty
+      const pendingCount = await redis.llen(QUEUES.PENDING_BRANDS);
+      const failedCount = await redis.llen(QUEUES.FAILED_BRANDS);
+      
+      if (pendingCount === 0 && failedCount === 0) {
+        // If queues are empty, set to running state
+        await redis.set('scraper:status', 'running', 'EX', 86400);
+        await redis.set('scraper:started_at', new Date().toISOString(), 'EX', 86400);
+        logger.info('Queues are empty - setting scraper to running state');
+        return 'running';
+      } else {
+        // If queues have brands, set to stopped state
+        await redis.set('scraper:status', 'stopped', 'EX', 86400);
+        await redis.set('scraper:stopped_at', new Date().toISOString(), 'EX', 86400);
+        logger.info('Queues have brands - setting scraper to stopped state');
+        return 'stopped';
+      }
     }
     
     return currentStatus;

@@ -52,6 +52,6 @@ router.post('/scraper/stop', adminAuth, scraperControlController.stopScraper);
 router.post('/scraper/pause', adminAuth, scraperControlController.pauseScraper);
 router.post('/scraper/resume', adminAuth, scraperControlController.resumeScraper);
 router.get('/scraper/status', adminAuth, scraperControlController.getScraperStatus);
-router.get('/scraper/debug', adminAuth, scraperControlController.debugScraperStatus);
+
 
 module.exports = router;

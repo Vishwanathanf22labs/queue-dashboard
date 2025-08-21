@@ -9,6 +9,7 @@ import Pagination from '../components/ui/Pagination';
 import toast from 'react-hot-toast';
 
 import useQueueStore from '../stores/queueStore';
+import { queueAPI } from '../services/api';
 import { Clock, Search, Users, Hash, Tag, RefreshCw } from 'lucide-react';
 import SearchInput from '../components/ui/SearchInput';
 
@@ -18,26 +19,45 @@ const PendingQueue = () => {
     searchTerm: '',
     currentPage: 1,
     itemsPerPage: 10,
-    isRefreshing: false
+    isRefreshing: false,
+    brands: [],
+    pagination: {},
+    isSearching: false
   });
 
   // Destructure for easier access
-  const { searchTerm, currentPage, itemsPerPage, isRefreshing } = queueState;
+  const { searchTerm, currentPage, itemsPerPage, isRefreshing, brands, pagination, isSearching } = queueState;
 
   // Helper function to update grouped state
   const updateQueueState = (updates) => {
     setQueueState(prev => ({ ...prev, ...updates }));
   };
 
-  useEffect(() => {
-    const loadPendingBrands = async () => {
-      try {
-        await fetchPendingBrands(currentPage, itemsPerPage);
-      } catch (error) {
-        toast.error(`Failed to load pending brands: ${error.message || error}`);
+  // Load brands with server-side search
+  const loadPendingBrands = async (searchTerm = null) => {
+    try {
+      // If searching, set searching state
+      if (searchTerm) {
+        updateQueueState({ isSearching: true });
       }
-    };
+      
+      // If searching, always search from page 1 to get all results
+      const pageToLoad = searchTerm ? 1 : currentPage;
+      const response = await queueAPI.getPendingBrands(pageToLoad, itemsPerPage, searchTerm);
+      
+      updateQueueState({
+        brands: response.data.data?.brands || [],
+        pagination: response.data.data?.pagination || {},
+        currentPage: searchTerm ? 1 : currentPage, // Reset to page 1 when searching
+        isSearching: false
+      });
+    } catch (error) {
+      updateQueueState({ isSearching: false });
+      toast.error(`Failed to load pending brands: ${error.message || error}`);
+    }
+  };
 
+  useEffect(() => {
     loadPendingBrands();
   }, [currentPage, itemsPerPage]);
 
@@ -46,7 +66,7 @@ const PendingQueue = () => {
     
     updateQueueState({ isRefreshing: true });
     try {
-      await fetchPendingBrands(currentPage, itemsPerPage);
+      await loadPendingBrands();
       toast.success('Pending queue refreshed successfully');
     } catch (error) {
       toast.error(`Failed to refresh pending queue: ${error.message || error}`);
@@ -55,16 +75,34 @@ const PendingQueue = () => {
     }
   };
 
+  // Handle search with server-side implementation
+  const handleSearch = (searchTerm) => {
+    updateQueueState({ searchTerm });
+    
+    // If search is cleared, reset to page 1 and load all brands
+    if (!searchTerm || searchTerm.trim() === '') {
+      updateQueueState({ currentPage: 1 });
+      loadPendingBrands();
+      return;
+    }
+    
+    // Reset to page 1 when searching
+    if (searchTerm !== queueState.searchTerm) {
+      updateQueueState({ currentPage: 1 });
+    }
+    // Load brands with search term
+    loadPendingBrands(searchTerm);
+  };
 
-  const brands = pendingBrands?.brands || [];
-  const pagination = pendingBrands?.pagination || {};
+  // Clear search function
+  const clearSearch = () => {
+    updateQueueState({ searchTerm: '', currentPage: 1 });
+    loadPendingBrands();
+  };
+
+  // Use the brands directly since search is now server-side
+  const filteredBrands = brands;
   
-  const filteredBrands = brands.filter(brand => 
-    brand.brand_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    brand.page_id?.includes(searchTerm) ||
-    brand.queue_id?.toString().includes(searchTerm)
-  );
-
   const totalPages = pagination.total_pages || 1;
 
   if (error) {
@@ -149,17 +187,31 @@ const PendingQueue = () => {
           <div className="flex-1 max-w-md">
             <SearchInput
               value={searchTerm}
-              onChange={(value) => updateQueueState({ searchTerm: value })}
+              onChange={(value) => handleSearch(value)}
               placeholder="Search brands by name, ID, or page ID..."
               leftIcon={<Search className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />}
               size="md"
               variant="default"
               showClearButton={true}
+              onClear={clearSearch}
+              disabled={loading || isSearching}
             />
           </div>
           <div className="flex items-center space-x-3 sm:space-x-4 text-xs sm:text-sm text-gray-600">
             <span>Total: {pagination.total_items || 0}</span>
             <span>Showing: {filteredBrands.length}</span>
+            {searchTerm && (
+              <span className="text-blue-600">
+                {isSearching ? (
+                  <span className="flex items-center">
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-1"></div>
+                    Searching: "{searchTerm}"
+                  </span>
+                ) : (
+                  `Searching: "${searchTerm}"`
+                )}
+              </span>
+            )}
           </div>
         </div>
       </Card>
@@ -168,6 +220,18 @@ const PendingQueue = () => {
       <Card>
         {loading && !pendingBrands ? (
           <LoadingState size="lg" message="Loading pending brands..." />
+        ) : isSearching ? (
+          <div className="text-center py-12 sm:py-16">
+            <div className="flex flex-col items-center space-y-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              <div className="text-center">
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Searching...</h3>
+                <p className="text-sm text-gray-500">
+                  Searching for "{searchTerm}" across all pages
+                </p>
+              </div>
+            </div>
+          </div>
         ) : filteredBrands.length === 0 ? (
           <div className="text-center py-6 sm:py-8 lg:py-12">
             <Clock className="h-8 w-8 sm:h-12 sm:w-12 lg:h-16 lg:w-16 text-gray-300 mx-auto mb-2 sm:mb-3 lg:mb-4" />

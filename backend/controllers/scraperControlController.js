@@ -96,54 +96,12 @@ async function getScraperStatus(req, res) {
   }
 }
 
-async function debugScraperStatus(req, res) {
-  try {
-    const redis = require('../config/redis');
-    
-    // Get all scraper-related keys
-    const scraperStatus = await redis.get('scraper:status');
-    const startedAt = await redis.get('scraper:started_at');
-    const pausedAt = await redis.get('scraper:paused_at');
-    const stoppedAt = await redis.get('scraper:stopped_at');
-    
-    // Force initialize if no status exists
-    if (!scraperStatus) {
-      await scraperControlService.initializeScraperStatus();
-      logger.info('Forced initialization of scraper status');
-    }
-    
-    const finalStatus = await scraperControlService.getScraperStatus();
-    
-    res.status(200).json({
-      success: true,
-      message: 'Scraper debug info retrieved successfully',
-      data: {
-        current_status: finalStatus,
-        redis_keys: {
-          'scraper:status': scraperStatus,
-          'scraper:started_at': startedAt,
-          'scraper:paused_at': pausedAt,
-          'scraper:stopped_at': stoppedAt
-        },
-        action_taken: !scraperStatus ? 'Initialized missing status' : 'Status already exists'
-      },
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    logger.error('Error debugging scraper status:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to debug scraper status',
-      error: error.message
-    });
-  }
-}
+
 
 module.exports = {
   startScraper,
   stopScraper,
   pauseScraper,
   resumeScraper,
-  getScraperStatus,
-  debugScraperStatus
+  getScraperStatus
 };

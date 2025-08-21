@@ -1,15 +1,6 @@
 const queuePriorityService = require("../services/queuePriorityService");
 const logger = require("../utils/logger");
 
-/**
- * Change brand priority in queue - Single endpoint for all priority operations
- * POST /api/queue/priority/change
- * 
- * Supports:
- * - Move to specific position (newPosition: any number)
- * - Move to top (newPosition: 1)
- * - Move to bottom (newPosition: queue length)
- */
 async function changeBrandPriority(req, res) {
   try {
     const { queueType, brandName, newPosition } = req.body;
@@ -18,15 +9,15 @@ async function changeBrandPriority(req, res) {
     if (!queueType || !brandName || newPosition === undefined) {
       return res.status(400).json({
         success: false,
-        message: "Missing required fields: queueType, brandName, newPosition"
+        message: "Missing required fields: queueType, brandName, newPosition",
       });
     }
 
     // Validate queueType
-    if (!['pending', 'failed'].includes(queueType)) {
+    if (!["pending", "failed"].includes(queueType)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid queueType. Must be 'pending' or 'failed'"
+        message: "Invalid queueType. Must be 'pending' or 'failed'",
       });
     }
 
@@ -34,7 +25,7 @@ async function changeBrandPriority(req, res) {
     if (!brandName || brandName.trim().length < 2) {
       return res.status(400).json({
         success: false,
-        message: "brandName must be at least 2 characters long"
+        message: "brandName must be at least 2 characters long",
       });
     }
 
@@ -42,37 +33,36 @@ async function changeBrandPriority(req, res) {
     if (!Number.isInteger(newPosition) || newPosition < 1) {
       return res.status(400).json({
         success: false,
-        message: "newPosition must be a positive integer"
+        message: "newPosition must be a positive integer",
       });
     }
 
-    logger.info(`Priority change request: ${queueType} queue, brand "${brandName}" to position ${newPosition}`);
+    logger.info(
+      `Priority change request: ${queueType} queue, brand "${brandName}" to position ${newPosition}`
+    );
 
-    const result = await queuePriorityService.changeBrandPriority(queueType, brandName, newPosition);
+    const result = await queuePriorityService.changeBrandPriority(
+      queueType,
+      brandName,
+      newPosition
+    );
 
     res.json({
       success: true,
       message: "Brand priority changed successfully",
-      data: result
+      data: result,
     });
-
   } catch (error) {
     logger.error("Error in changeBrandPriority controller:", error);
-    
+
     res.status(500).json({
       success: false,
       message: error.message || "Failed to change brand priority",
-      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: process.env.NODE_ENV === "development" ? error.stack : undefined,
     });
   }
 }
 
-
-
-
-
-
-
 module.exports = {
-  changeBrandPriority
+  changeBrandPriority,
 };
