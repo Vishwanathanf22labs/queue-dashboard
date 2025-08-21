@@ -48,7 +48,8 @@ async function enrichBrandsWithDBInfo(brandItems) {
 
 async function getPendingBrands(
   page = PAGINATION.DEFAULT_PAGE,
-  limit = PAGINATION.DEFAULT_LIMIT
+  limit = PAGINATION.DEFAULT_LIMIT,
+  search = null
 ) {
   try {
     const validPage = Math.max(1, parseInt(page));
@@ -57,6 +58,39 @@ async function getPendingBrands(
       PAGINATION.MAX_LIMIT
     );
 
+    // If searching, we need to get ALL brands first to search through them
+    if (search && search.trim()) {
+      const searchTerm = search.toLowerCase().trim();
+      
+      // Get ALL brands from the queue for searching
+      const allBrandItems = await redis.lrange(QUEUES.PENDING_BRANDS, 0, -1);
+      const allEnrichedBrands = await enrichBrandsWithDBInfo(allBrandItems);
+      
+      // Filter brands based on search term
+      const matchingBrands = allEnrichedBrands.filter(brand => 
+        brand.brand_name?.toLowerCase().includes(searchTerm) ||
+        brand.queue_id?.toString().includes(searchTerm) ||
+        brand.page_id?.toString().includes(searchTerm)
+      );
+      
+      // Apply pagination to search results
+      const totalCount = matchingBrands.length;
+      const startIndex = (validPage - 1) * validLimit;
+      const endIndex = startIndex + validLimit;
+      const paginatedBrands = matchingBrands.slice(startIndex, endIndex);
+      
+      return {
+        brands: paginatedBrands,
+        pagination: {
+          current_page: validPage,
+          per_page: validLimit,
+          total_items: totalCount,
+          total_pages: Math.ceil(totalCount / validLimit),
+        },
+      };
+    }
+
+    // Normal pagination without search
     const totalCount = await redis.llen(QUEUES.PENDING_BRANDS);
     const startIndex = (validPage - 1) * validLimit;
     const endIndex = startIndex + validLimit - 1;
@@ -98,7 +132,8 @@ async function getPendingBrands(
 
 async function getFailedBrands(
   page = PAGINATION.DEFAULT_PAGE,
-  limit = PAGINATION.DEFAULT_LIMIT
+  limit = PAGINATION.DEFAULT_LIMIT,
+  search = null
 ) {
   try {
     const validPage = Math.max(1, parseInt(page));
@@ -107,6 +142,39 @@ async function getFailedBrands(
       PAGINATION.MAX_LIMIT
     );
 
+    // If searching, we need to get ALL brands first to search through them
+    if (search && search.trim()) {
+      const searchTerm = search.toLowerCase().trim();
+      
+      // Get ALL brands from the queue for searching
+      const allBrandItems = await redis.lrange(QUEUES.FAILED_BRANDS, 0, -1);
+      const allEnrichedBrands = await enrichBrandsWithDBInfo(allBrandItems);
+      
+      // Filter brands based on search term
+      const matchingBrands = allEnrichedBrands.filter(brand => 
+        brand.brand_name?.toLowerCase().includes(searchTerm) ||
+        brand.queue_id?.toString().includes(searchTerm) ||
+        brand.page_id?.toString().includes(searchTerm)
+      );
+      
+      // Apply pagination to search results
+      const totalCount = matchingBrands.length;
+      const startIndex = (validPage - 1) * validLimit;
+      const endIndex = startIndex + validLimit;
+      const paginatedBrands = matchingBrands.slice(startIndex, endIndex);
+      
+      return {
+        brands: paginatedBrands,
+        pagination: {
+          current_page: validPage,
+          per_page: validLimit,
+          total_items: totalCount,
+          total_pages: Math.ceil(totalCount / validLimit),
+        },
+      };
+    }
+
+    // Normal pagination without search
     const totalCount = await redis.llen(QUEUES.FAILED_BRANDS);
     const startIndex = (validPage - 1) * validLimit;
     const endIndex = startIndex + validLimit - 1;

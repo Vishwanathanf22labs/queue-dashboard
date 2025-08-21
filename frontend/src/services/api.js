@@ -4,9 +4,21 @@ export const queueAPI = {
  
   getOverview: () => api.get('/queue/overview'),
  
-  getPendingBrands: (page = 1, limit = 100) => api.get(`/queue/pending?page=${page}&limit=${limit}`),
+  getPendingBrands: (page = 1, limit = 100, search = null) => {
+    const params = new URLSearchParams();
+    params.append('page', page);
+    params.append('limit', limit);
+    if (search && search.trim()) params.append('search', search);
+    return api.get(`/queue/pending?${params.toString()}`);
+  },
 
-  getFailedBrands: (page = 1, limit = 100) => api.get(`/queue/failed?page=${page}&limit=${limit}`),
+  getFailedBrands: (page = 1, limit = 100, search = null) => {
+    const params = new URLSearchParams();
+    params.append('page', page);
+    params.append('limit', limit);
+    if (search && search.trim()) params.append('search', search);
+    return api.get(`/queue/failed?${params.toString()}`);
+  },
   
   
   getCurrentlyProcessing: () => api.get('/queue/currently-processing'),
@@ -68,7 +80,7 @@ export const queueAPI = {
   pauseScraper: () => api.post('/queue/scraper/pause'),
   resumeScraper: () => api.post('/queue/scraper/resume'),
   getScraperStatus: () => api.get('/queue/scraper/status'),
-  debugScraperStatus: () => api.get('/queue/scraper/debug'),
+
 
   // Priority Queue Management
   changeBrandPriority: (queueType, brandName, newPosition) => 

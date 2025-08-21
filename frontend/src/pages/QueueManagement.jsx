@@ -44,7 +44,8 @@ const QueueManagement = () => {
     searchTerm: '',
     itemsPerPage: 10,
     totalCount: 0,
-    error: null
+    error: null,
+    isSearching: false
   });
 
   // State for failed queue
@@ -55,7 +56,8 @@ const QueueManagement = () => {
     searchTerm: '',
     itemsPerPage: 10,
     totalCount: 0,
-    error: null
+    error: null,
+    isSearching: false
   });
 
   // State for admin actions
@@ -71,7 +73,8 @@ const QueueManagement = () => {
     searchTerm: pendingSearchTerm, 
     itemsPerPage: pendingItemsPerPage, 
     totalCount: pendingTotalCount, 
-    error: pendingError 
+    error: pendingError,
+    isSearching: pendingIsSearching
   } = pendingState;
 
   const { 
@@ -81,7 +84,8 @@ const QueueManagement = () => {
     searchTerm: failedSearchTerm, 
     itemsPerPage: failedItemsPerPage, 
     totalCount: failedTotalCount, 
-    error: failedError 
+    error: failedError,
+    isSearching: failedIsSearching
   } = failedState;
 
   const { isProcessingAction } = adminState;
@@ -100,16 +104,25 @@ const QueueManagement = () => {
   };
 
   // Load real data from your backend APIs
-  const loadPendingBrands = async () => {
+  const loadPendingBrands = async (searchTerm = null) => {
     updatePendingState({ loading: true, error: null });
     try {
-      const response = await queueAPI.getPendingBrands(pendingCurrentPage, pendingItemsPerPage);
+      // If searching, set searching state
+      if (searchTerm) {
+        updatePendingState({ isSearching: true });
+      }
+      
+      // If searching, always search from page 1 to get all results
+      const pageToLoad = searchTerm ? 1 : pendingCurrentPage;
+      const response = await queueAPI.getPendingBrands(pageToLoad, pendingItemsPerPage, searchTerm);
       updatePendingState({
         brands: response.data.data?.brands || [],
-        totalCount: response.data.data?.pagination?.total_items || 0
+        totalCount: response.data.data?.pagination?.total_items || 0,
+        currentPage: searchTerm ? 1 : pendingCurrentPage, // Reset to page 1 when searching
+        isSearching: false
       });
     } catch (error) {
-      updatePendingState({ error: error.message || 'Failed to load pending brands' });
+      updatePendingState({ error: error.message || 'Failed to load pending brands', isSearching: false });
       toast.error('Failed to load pending brands');
       console.error('Error loading pending brands:', error);
     } finally {
@@ -117,16 +130,25 @@ const QueueManagement = () => {
     }
   };
 
-  const loadFailedBrands = async () => {
+  const loadFailedBrands = async (searchTerm = null) => {
     updateFailedState({ loading: true, error: null });
     try {
-      const response = await queueAPI.getFailedBrands(failedCurrentPage, failedItemsPerPage);
+      // If searching, set searching state
+      if (searchTerm) {
+        updateFailedState({ isSearching: true });
+      }
+      
+      // If searching, always search from page 1 to get all results
+      const pageToLoad = searchTerm ? 1 : failedCurrentPage;
+      const response = await queueAPI.getFailedBrands(pageToLoad, failedItemsPerPage, searchTerm);
       updateFailedState({
         brands: response.data.data?.brands || [],
-        totalCount: response.data.data?.pagination?.total_items || 0
+        totalCount: response.data.data?.pagination?.total_items || 0,
+        currentPage: searchTerm ? 1 : failedCurrentPage, // Reset to page 1 when searching
+        isSearching: false
       });
     } catch (error) {
-      updateFailedState({ error: error.message || 'Failed to load failed brands' });
+      updateFailedState({ error: error.message || 'Failed to load failed brands', isSearching: false });
       toast.error('Failed to load failed brands');
       console.error('Error loading failed brands:', error);
     } finally {
@@ -142,6 +164,54 @@ const QueueManagement = () => {
   useEffect(() => {
     loadFailedBrands();
   }, [failedCurrentPage]);
+
+  // Handle search with debouncing
+  const handlePendingSearch = (searchTerm) => {
+    updatePendingState({ searchTerm });
+    
+    // If search is cleared, reset to page 1 and load all brands
+    if (!searchTerm || searchTerm.trim() === '') {
+      updatePendingState({ currentPage: 1 });
+      loadPendingBrands();
+      return;
+    }
+    
+    // Reset to page 1 when searching
+    if (searchTerm !== pendingSearchTerm) {
+      updatePendingState({ currentPage: 1 });
+    }
+    // Load brands with search term
+    loadPendingBrands(searchTerm);
+  };
+
+  const handleFailedSearch = (searchTerm) => {
+    updateFailedState({ searchTerm });
+    
+    // If search is cleared, reset to page 1 and load all brands
+    if (!searchTerm || searchTerm.trim() === '') {
+      updateFailedState({ currentPage: 1 });
+      loadFailedBrands();
+      return;
+    }
+    
+    // Reset to page 1 when searching
+    if (searchTerm !== failedSearchTerm) {
+      updateFailedState({ currentPage: 1 });
+    }
+    // Load brands with search term
+    loadFailedBrands(searchTerm);
+  };
+
+  // Clear search functions
+  const clearPendingSearch = () => {
+    updatePendingState({ searchTerm: '', currentPage: 1 });
+    loadPendingBrands();
+  };
+
+  const clearFailedSearch = () => {
+    updateFailedState({ searchTerm: '', currentPage: 1 });
+    loadFailedBrands();
+  };
 
   // Refresh all data
   const handleRefresh = async () => {
@@ -256,18 +326,22 @@ const QueueManagement = () => {
     }
   };
 
-  // Filter brands based on search term
-  const filteredPendingBrands = pendingBrands.filter(brand =>
-    brand.brand_name?.toLowerCase().includes(pendingSearchTerm.toLowerCase()) ||
-    brand.queue_id?.toString().includes(pendingSearchTerm) ||
-    brand.page_id?.toString().includes(pendingSearchTerm)
-  );
+  // Filter brands based on search term - REMOVED: Now using server-side search
+  // const filteredPendingBrands = pendingBrands.filter(brand =>
+  //   brand.brand_name?.toLowerCase().includes(pendingSearchTerm.toLowerCase()) ||
+  //   brand.queue_id?.toString().includes(pendingSearchTerm) ||
+  //   brand.page_id?.toString().includes(pendingSearchTerm)
+  // );
 
-  const filteredFailedBrands = failedBrands.filter(brand =>
-    brand.brand_name?.toLowerCase().includes(failedSearchTerm.toLowerCase()) ||
-    brand.queue_id?.toString().includes(failedSearchTerm) ||
-    brand.page_id?.toString().includes(failedSearchTerm)
-  );
+  // const filteredFailedBrands = failedBrands.filter(brand =>
+  //   brand.brand_name?.toLowerCase().includes(failedSearchTerm.toLowerCase()) ||
+  //   brand.queue_id?.toString().includes(failedSearchTerm) ||
+  //   brand.page_id?.toString().includes(failedSearchTerm)
+  // );
+
+  // Use the brands directly since search is now server-side
+  const filteredPendingBrands = pendingBrands;
+  const filteredFailedBrands = failedBrands;
 
   const pendingTotalPages = Math.ceil(pendingTotalCount / pendingItemsPerPage);
 
@@ -465,17 +539,31 @@ const QueueManagement = () => {
                 <div className="flex-1 max-w-md">
                   <SearchInput
                     value={pendingSearchTerm}
-                    onChange={(value) => updatePendingState({ searchTerm: value })}
+                    onChange={(value) => handlePendingSearch(value)}
                     placeholder="Search pending brands by name, ID, or page ID..."
                     leftIcon={<Search className="h-4 w-4 text-gray-400" />}
                     size="md"
                     variant="default"
                     showClearButton={true}
+                    onClear={clearPendingSearch}
+                    disabled={pendingLoading || pendingIsSearching}
                   />
                 </div>
                 <div className="flex items-center space-x-3 sm:space-x-4 text-xs sm:text-sm text-gray-600">
                   <span>Total: {pendingTotalCount}</span>
                   <span>Showing: {filteredPendingBrands.length}</span>
+                  {pendingSearchTerm && (
+                    <span className="text-blue-600">
+                      {pendingIsSearching ? (
+                        <span className="flex items-center">
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-1"></div>
+                          Searching: "{pendingSearchTerm}"
+                        </span>
+                      ) : (
+                        `Searching: "${pendingSearchTerm}"`
+                      )}
+                    </span>
+                  )}
                 </div>
               </div>
             </Card>
@@ -488,6 +576,18 @@ const QueueManagement = () => {
                 </ErrorDisplay>
               ) : pendingLoading && !pendingBrands.length ? (
                 <LoadingState size="lg" message="Loading pending brands..." />
+              ) : pendingIsSearching ? (
+                <div className="text-center py-12 sm:py-16">
+                  <div className="flex flex-col items-center space-y-4">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                    <div className="text-center">
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Searching...</h3>
+                      <p className="text-sm text-gray-500">
+                        Searching for "{pendingSearchTerm}" across all pages
+                      </p>
+                    </div>
+                  </div>
+                </div>
               ) : filteredPendingBrands.length === 0 ? (
                 <div className="text-center py-8 sm:py-12">
                   <Users className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-3 sm:mb-4" />
@@ -613,17 +713,31 @@ const QueueManagement = () => {
                 <div className="flex-1 max-w-md">
                   <SearchInput
                     value={failedSearchTerm}
-                    onChange={(value) => updateFailedState({ searchTerm: value })}
+                    onChange={(value) => handleFailedSearch(value)}
                     placeholder="Search failed brands by name, ID, or page ID..."
                     leftIcon={<Search className="h-4 w-4 text-gray-400" />}
                     size="md"
                     variant="default"
                     showClearButton={true}
+                    onClear={clearFailedSearch}
+                    disabled={failedLoading || failedIsSearching}
                   />
                 </div>
                 <div className="flex items-center space-x-3 sm:space-x-4 text-xs sm:text-sm text-gray-600">
                   <span>Total: {failedTotalCount}</span>
                   <span>Showing: {filteredFailedBrands.length}</span>
+                  {failedSearchTerm && (
+                    <span className="text-red-600">
+                      {failedIsSearching ? (
+                        <span className="flex items-center">
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-600 mr-1"></div>
+                          Searching: "{failedSearchTerm}"
+                        </span>
+                      ) : (
+                        `Searching: "${failedSearchTerm}"`
+                      )}
+                    </span>
+                  )}
                 </div>
               </div>
             </Card>
@@ -636,6 +750,18 @@ const QueueManagement = () => {
                 </ErrorDisplay>
               ) : failedLoading && !failedBrands.length ? (
                 <LoadingState size="lg" message="Loading failed brands..." />
+              ) : failedIsSearching ? (
+                <div className="text-center py-12 sm:py-16">
+                  <div className="flex flex-col items-center space-y-4">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+                    <div className="text-center">
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Searching...</h3>
+                      <p className="text-sm text-gray-500">
+                        Searching for "{failedSearchTerm}" across all pages
+                      </p>
+                    </div>
+                  </div>
+                </div>
               ) : filteredFailedBrands.length === 0 ? (
                 <div className="text-center py-8 sm:py-12">
                   <AlertTriangle className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-3 sm:mb-4" />

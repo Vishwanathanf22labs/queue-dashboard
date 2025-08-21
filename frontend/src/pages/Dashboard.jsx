@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import ScrapedStats from '../components/queue/ScrapedStats';
 import BrandProcessingQueue from '../components/queue/BrandProcessingQueue';
 import useQueueStore from '../stores/queueStore';
+import { queueAPI } from '../services/api';
 import { 
   ArrowRight, 
   Clock, 
@@ -17,7 +18,9 @@ import {
   Play, 
   Eye,
   RefreshCw,
-  ChevronDown
+  ChevronDown,
+  Pause,
+  Square
 } from 'lucide-react';
 
 const Dashboard = () => {
@@ -41,6 +44,10 @@ const Dashboard = () => {
   const processedAdsToday = overview?.today_stats?.ads_processed || 0;
   const today = new Date().toLocaleDateString();
 
+  // Scraper status state
+  const [scraperStatus, setScraperStatus] = useState('unknown');
+  const [scraperStatusLoading, setScraperStatusLoading] = useState(false);
+
   // Auto-refresh state
   const [refreshState, setRefreshState] = useState({
     interval: 0, // Default to Off (no auto-refresh)
@@ -61,6 +68,36 @@ const Dashboard = () => {
   // Helper function to update grouped state
   const updateRefreshState = (updates) => {
     setRefreshState(prev => ({ ...prev, ...updates }));
+  };
+
+  // Fetch scraper status
+  const fetchScraperStatus = async () => {
+    try {
+      setScraperStatusLoading(true);
+      const response = await queueAPI.getScraperStatus();
+      if (response.data?.success) {
+        setScraperStatus(response.data.data?.status || 'unknown');
+      }
+    } catch (error) {
+      console.error('Failed to fetch scraper status:', error);
+      setScraperStatus('unknown');
+    } finally {
+      setScraperStatusLoading(false);
+    }
+  };
+
+  // Get scraper status badge variant and icon
+  const getScraperStatusInfo = (status) => {
+    switch (status) {
+      case 'running':
+        return { variant: 'success', icon: Play, label: 'Running' };
+      case 'paused':
+        return { variant: 'warning', icon: Pause, label: 'Paused' };
+      case 'stopped':
+        return { variant: 'error', icon: Square, label: 'Stopped' };
+      default:
+        return { variant: 'secondary', icon: Clock, label: 'Unknown' };
+    }
   };
 
   const refreshIntervals = [
@@ -113,7 +150,8 @@ const Dashboard = () => {
         fetchOverview(), // This includes: queue counts, currently_processing, today_stats
         fetchNextBrand(), // Get the next brand in line
         fetchBrandProcessingQueue(1, 10), // Get brands in queue for pagination
-        fetchScrapedStats(null, 7) // Default to 7 days
+        fetchScrapedStats(null, 7), // Default to 7 days
+        fetchScraperStatus() // Also fetch scraper status
       ]);
       toast.success('Dashboard refreshed successfully');
     } catch (error) {
@@ -207,6 +245,7 @@ const Dashboard = () => {
   // Initial data load
   useEffect(() => {
     loadData();
+    fetchScraperStatus(); // Also fetch scraper status
   }, []);
 
   // Cleanup effect to reset timestamp when component unmounts
@@ -377,13 +416,44 @@ const Dashboard = () => {
                     </p>
                   </div>
                 </div>
-                <Badge variant="success" className="self-start sm:self-auto">Active</Badge>
+                <div className="flex flex-col items-end space-y-2">
+                  {/* Brand Status Badge */}
+                  <Badge variant="success" className="self-start sm:self-auto">Active</Badge>
+                  {/* Scraper Status Badge */}
+                  {!scraperStatusLoading && (
+                    (() => {
+                      const statusInfo = getScraperStatusInfo(scraperStatus);
+                      const StatusIcon = statusInfo.icon;
+                      return (
+                        <Badge variant={statusInfo.variant} className="flex items-center space-x-1">
+                          <StatusIcon className="h-3 w-3" />
+                          <span>{statusInfo.label}</span>
+                        </Badge>
+                      );
+                    })()
+                  )}
+                </div>
               </div>
             </div>
           ) : (
             <div className="text-center py-6 sm:py-8">
               <Play className="h-8 w-8 sm:h-12 sm:w-12 text-gray-300 mx-auto mb-2 sm:mb-3" />
               <p className="text-gray-500 text-sm sm:text-base">No brand currently processing</p>
+              {/* Show scraper status even when no brand is processing */}
+              {!scraperStatusLoading && (
+                <div className="mt-3">
+                  {(() => {
+                    const statusInfo = getScraperStatusInfo(scraperStatus);
+                    const StatusIcon = statusInfo.icon;
+                    return (
+                      <Badge variant={statusInfo.variant} className="inline-flex items-center space-x-1">
+                        <StatusIcon className="h-3 w-3" />
+                        <span>{statusInfo.label}</span>
+                      </Badge>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           )}
         </Card>

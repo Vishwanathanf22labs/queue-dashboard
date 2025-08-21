@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import Button from '../ui/Button';
 import { queueAPI } from '../../services/api';
+import { ChevronDown } from 'lucide-react';
 
 const PriorityQueueManager = () => {
   const [formData, setFormData] = useState({
@@ -10,6 +11,7 @@ const PriorityQueueManager = () => {
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [showQueueDropdown, setShowQueueDropdown] = useState(false);
 
   const handleInputChange = useCallback((e) => {
     const { name, value } = e.target;
@@ -17,6 +19,14 @@ const PriorityQueueManager = () => {
       ...prev,
       [name]: value
     }));
+  }, []);
+
+  const handleQueueTypeChange = useCallback((queueType) => {
+    setFormData(prev => ({
+      ...prev,
+      queueType
+    }));
+    setShowQueueDropdown(false);
   }, []);
 
   const handleSubmit = useCallback(async (e) => {
@@ -67,6 +77,10 @@ const PriorityQueueManager = () => {
     setMessage({ type: '', text: '' });
   }, []);
 
+  const getQueueTypeLabel = (type) => {
+    return type === 'pending' ? 'Pending Queue' : 'Failed Queue';
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <div className="mb-6">
@@ -85,16 +99,42 @@ const PriorityQueueManager = () => {
             <label htmlFor="queueType" className="block text-sm font-medium text-gray-700 mb-1">
               Queue Type
             </label>
-            <select
-              id="queueType"
-              name="queueType"
-              value={formData.queueType}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="pending">Pending Queue</option>
-              <option value="failed">Failed Queue</option>
-            </select>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowQueueDropdown(!showQueueDropdown)}
+                className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+              >
+                <span>{getQueueTypeLabel(formData.queueType)}</span>
+                <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform duration-200 ${
+                  showQueueDropdown ? 'rotate-180' : ''
+                }`} />
+              </button>
+              
+              {/* Dropdown Menu */}
+              {showQueueDropdown && (
+                <div className="absolute right-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                  <button
+                    type="button"
+                    onClick={() => handleQueueTypeChange('pending')}
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
+                      formData.queueType === 'pending' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                    }`}
+                  >
+                    Pending Queue
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQueueTypeChange('failed')}
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
+                      formData.queueType === 'failed' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                    }`}
+                  >
+                    Failed Queue
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           <div>

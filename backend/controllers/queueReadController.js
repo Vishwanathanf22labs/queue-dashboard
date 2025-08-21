@@ -21,10 +21,11 @@ async function getQueueOverview(req, res) {
 
 async function getPendingBrands(req, res) {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 10, search = null } = req.query;
     const pendingBrands = await queueService.getPendingBrands(
       parseInt(page),
-      parseInt(limit)
+      parseInt(limit),
+      search
     );
 
     res.status(200).json({
@@ -44,10 +45,11 @@ async function getPendingBrands(req, res) {
 
 async function getFailedBrands(req, res) {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 10, search = null } = req.query;
     const failedBrands = await queueService.getFailedBrands(
       parseInt(page),
-      parseInt(limit)
+      parseInt(limit),
+      search
     );
 
     res.status(200).json({
