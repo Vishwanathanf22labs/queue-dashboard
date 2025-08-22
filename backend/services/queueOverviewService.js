@@ -98,20 +98,17 @@ async function getCurrentlyProcessing() {
         return null;
       }
 
-      // Check if this brand already has a started_at timestamp
-      let startedAt = brandData.started_at;
+      // Use separate Redis key for timestamp instead of modifying queue item
+      const timestampKey = `processing:started_at:${brandId}`;
+      let startedAt = await redis.get(timestampKey);
       
       // Only set started_at if it doesn't exist (first time this brand becomes next in queue)
       if (!startedAt) {
         const currentTime = new Date().toISOString();
         startedAt = currentTime;
         
-        // Update the timestamp in Redis only once when brand first becomes next in queue
-        await redis.lset(
-          QUEUES.PENDING_BRANDS,
-          0,
-          JSON.stringify({ ...brandData, started_at: currentTime })
-        );
+        // Store timestamp in separate Redis key with expiration (24 hours)
+        await redis.setex(timestampKey, 86400, currentTime);
       }
 
       const result = {
@@ -149,20 +146,17 @@ async function getCurrentlyProcessing() {
         });
 
         if (brand) {
-          // Check if this brand already has a started_at timestamp
-          let startedAt = brandData.started_at;
+          // Use separate Redis key for timestamp instead of modifying queue item
+          const timestampKey = `processing:started_at:${brandId}`;
+          let startedAt = await redis.get(timestampKey);
           
           // Only set started_at if it doesn't exist (first time this brand becomes next in queue)
           if (!startedAt) {
             const currentTime = new Date().toISOString();
             startedAt = currentTime;
             
-            // Update the timestamp in Redis only once when brand first becomes next in queue
-            await redis.lset(
-              QUEUES.FAILED_BRANDS,
-              0,
-              JSON.stringify({ ...brandData, started_at: currentTime })
-            );
+            // Store timestamp in separate Redis key with expiration (24 hours)
+            await redis.setex(timestampKey, 86400, currentTime);
           }
           
           return {
