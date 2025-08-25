@@ -166,14 +166,22 @@ async function addBulkBrandsFromCSVToQueue(brandsData) {
   }
 }
 
-async function addAllBrandsToQueue() {
+async function addAllBrandsToQueue(statusFilter = null) {
   try {
-    const allBrands = await Brand.findAll({
-      where: {
-        page_id: {
-          [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: "" }],
-        },
+    // Build where clause
+    const whereClause = {
+      page_id: {
+        [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: "" }],
       },
+    };
+
+    // Add status filter if provided
+    if (statusFilter && ['Active', 'Inactive'].includes(statusFilter)) {
+      whereClause.status = statusFilter;
+    }
+
+    const allBrands = await Brand.findAll({
+      where: whereClause,
       attributes: ["id", "page_id"],
       raw: true,
     });
@@ -181,7 +189,7 @@ async function addAllBrandsToQueue() {
     if (allBrands.length === 0) {
       return {
         success: true,
-        message: "No brands found in database",
+        message: `No ${statusFilter ? statusFilter.toLowerCase() : ''} brands found in database`,
         results: {
           total_brands: 0,
           added_count: 0,
@@ -220,12 +228,12 @@ async function addAllBrandsToQueue() {
     }
 
     logger.info(
-      `Added all brands to queue: ${addedCount} added, ${skippedCount} skipped`
+      `Added ${statusFilter ? statusFilter.toLowerCase() : 'all'} brands to queue: ${addedCount} added, ${skippedCount} skipped`
     );
 
     return {
       success: true,
-      message: "All brands operation completed",
+      message: `${statusFilter ? statusFilter : 'All'} brands operation completed`,
       results: {
         total_brands: totalBrands,
         added_count: addedCount,
@@ -325,9 +333,52 @@ async function searchBrands(query, limit = 8) {
   }
 }
 
+async function getBrandCountsByStatus() {
+  try {
+    const [totalCount, activeCount, inactiveCount] = await Promise.all([
+      Brand.count({
+        where: {
+          page_id: {
+            [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: "" }],
+          },
+        },
+      }),
+      Brand.count({
+        where: {
+          page_id: {
+            [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: "" }],
+          },
+          status: 'Active',
+        },
+      }),
+      Brand.count({
+        where: {
+          page_id: {
+            [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: "" }],
+          },
+          status: 'Inactive',
+        },
+      }),
+    ]);
+
+    return {
+      success: true,
+      data: {
+        total: totalCount,
+        active: activeCount,
+        inactive: inactiveCount,
+      },
+    };
+  } catch (error) {
+    logger.error("Error in getBrandCountsByStatus:", error);
+    throw error;
+  }
+}
+
 module.exports = {
   addSingleBrandToQueue,
   addAllBrandsToQueue,
   addBulkBrandsToQueue: addBulkBrandsFromCSVToQueue,
-  searchBrands
+  searchBrands,
+  getBrandCountsByStatus
 };

@@ -36,25 +36,51 @@ async function addSingleBrand(req, res) {
 
 async function addAllBrands(req, res) {
   try {
-    const result = await queueService.addAllBrandsToQueue();
+    const { status } = req.query; // Get status filter from query params
+    
+    // Validate status filter if provided
+    if (status && !['Active', 'Inactive'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid status filter. Must be 'Active' or 'Inactive'"
+      });
+    }
 
-    res.status(201).json({
+    const result = await queueService.addAllBrandsToQueue(status);
+    
+    res.json({
       success: true,
       message: result.message,
-      data: result.results,
-      timestamp: new Date().toISOString(),
+      data: result.results
     });
   } catch (error) {
     logger.error("Error in addAllBrands:", error);
     res.status(500).json({
       success: false,
-      message: error.message,
-      timestamp: new Date().toISOString(),
+      message: error.message || 'Failed to add all brands'
+    });
+  }
+}
+
+async function getBrandCounts(req, res) {
+  try {
+    const result = await queueService.getBrandCountsByStatus();
+    
+    res.json({
+      success: true,
+      data: result.data
+    });
+  } catch (error) {
+    logger.error("Error in getBrandCounts:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to get brand counts'
     });
   }
 }
 
 module.exports = {
   addSingleBrand,
-  addAllBrands
+  addAllBrands,
+  getBrandCounts
 };

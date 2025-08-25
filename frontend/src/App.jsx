@@ -7,6 +7,7 @@ import FailedQueue from './pages/FailedQueue';
 import AddBrands from './pages/AddBrands';
 import QueueManagement from './pages/QueueManagement';
 import ScraperControlsPage from './pages/ScraperControls';
+import Proxies from './pages/Proxies';
 import useAdminStore from './stores/adminStore';
 
 function App() {
@@ -19,9 +20,8 @@ function App() {
     
     if (!readOnlyPages.includes(location.pathname)) {
       checkAdminStatus();
-    } else {
     }
-  }, [location.pathname]); // Run when location changes
+  }, [location.pathname, checkAdminStatus]); // Run when location changes
 
   return (
     <Layout>
@@ -32,6 +32,7 @@ function App() {
         <Route path="/add-brands" element={<AddBrands />} />
         <Route path="/queue-management" element={<QueueManagement />} />
         <Route path="/scraper-controls" element={<ScraperControlsPage />} />
+        <Route path="/proxies" element={<Proxies />} />
       </Routes>
     </Layout>
   );
