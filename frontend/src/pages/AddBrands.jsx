@@ -7,11 +7,12 @@ import AdminLoginModal from '../components/ui/AdminLoginModal';
 import useQueueStore from '../stores/queueStore';
 import useAdminStore from '../stores/adminStore';
 import { validateSingleBrand } from '../utils/validation';
-import { Plus, Users, RefreshCw, Check, Shield, LogOut, FileText, Upload, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { queueAPI } from '../services/api';
+import { Plus, Users, RefreshCw, Check, Shield, LogOut, FileText, Upload, X, CheckCircle, AlertCircle, ChevronDown } from 'lucide-react';
 import { tabs } from '../constants/data';
 
 const AddBrands = () => {
-  const { addSingleBrand, addAllBrands, addBulkBrandsFromCSV, loading } = useQueueStore();
+  const { loading } = useQueueStore();
   const { isAdmin, isLoading: adminLoading, logout } = useAdminStore();
 
   // State declarations
@@ -19,6 +20,13 @@ const AddBrands = () => {
     activeTab: 'single',
     isSubmitting: false
   });
+  
+  // Add All Brands filter state
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  
+  // Brand counts state
+  const [brandCounts, setBrandCounts] = useState(null);
   
   // CSV Upload State
   const [csvState, setCsvState] = useState({
@@ -56,6 +64,27 @@ const AddBrands = () => {
     localStorage.setItem('addBrands_activeTab', activeTab);
   }, [activeTab]);
 
+  // Fetch brand counts when component mounts
+  useEffect(() => {
+    if (isAdmin) {
+      fetchBrandCounts();
+    }
+  }, [isAdmin]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showStatusDropdown && !event.target.closest('.status-filter-dropdown')) {
+        setShowStatusDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showStatusDropdown]);
+
   // Initialize CSV upload result from localStorage
   useEffect(() => {
     try {
@@ -87,6 +116,18 @@ const AddBrands = () => {
     } else {
       localStorage.removeItem('addBrands_csvUploadResult');
       updateCsvState({ uploadResult: null });
+    }
+  };
+  
+  // Fetch brand counts
+  const fetchBrandCounts = async () => {
+    try {
+      const response = await queueAPI.getBrandCounts();
+      if (response.data.success) {
+        setBrandCounts(response.data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch brand counts:', error);
     }
   };
   
@@ -205,7 +246,7 @@ const AddBrands = () => {
       updateFormState({ isSubmitting: true });
       updateCsvState({ uploadStatus: { type: 'uploading', message: 'Uploading CSV file...' } });
       
-      const result = await addBulkBrandsFromCSV(csvFile);
+      const result = await queueAPI.addBulkBrandsFromCSV(csvFile);
       
       // Handle successful upload
       if (result && result.data) {
@@ -223,13 +264,11 @@ const AddBrands = () => {
           // Some brands were added successfully
           toast.success(successMessage);
         } else if (duplicates > 0) {
-
           toast.error(successMessage);
         } else if (totalErrors > 0) {
-
           toast.error(successMessage);
         } else {
-          toast.warning(successMessage);
+          toast(successMessage);
         }
         
 
@@ -332,7 +371,7 @@ const AddBrands = () => {
 
     try {
       updateFormState({ isSubmitting: true });
-      const result = await addSingleBrand(validation.data);
+      const result = await queueAPI.addSingleBrand(validation.data);
       toast.success(result.message || 'Brand added successfully');
       clearSearchInputs();
     } catch (error) {
@@ -343,17 +382,19 @@ const AddBrands = () => {
   };
 
   const handleAddAllBrands = async () => {
-    if (isSubmitting || loading) {
-      toast.error('Please wait, brands are already being processed.');
-      return;
-    }
-    
     try {
       updateFormState({ isSubmitting: true });
-      const result = await addAllBrands();
-      toast.success(result.message || 'All brands added successfully');
+      
+      // Only pass status if it's not 'all'
+      const statusParam = statusFilter === 'all' ? null : statusFilter;
+      const result = await queueAPI.addAllBrands(statusParam);
+      
+      toast.success(result.message || 'Brands added successfully');
+      
+      // Refresh brand counts after adding brands
+      await fetchBrandCounts();
     } catch (error) {
-      toast.error(error.message || 'Failed to add all brands');
+      toast.error(error.message || 'Failed to add brands');
     } finally {
       updateFormState({ isSubmitting: false });
     }
@@ -725,28 +766,103 @@ const AddBrands = () => {
                 <div className="space-y-3 sm:space-y-4 lg:space-y-6">
                   <div>
                     <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2 sm:mb-3 lg:mb-4">Add All Brands</h3>
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
-                      <div className="flex flex-col sm:flex-row sm:items-start space-y-2 sm:space-y-0 sm:space-x-3">
-                        <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 sm:mr-3 sm:mt-0.5 flex-shrink-0" />
-                        <div>
-                          <h4 className="font-medium text-blue-900 text-sm sm:text-base">Add All Available Brands</h4>
-                          <p className="text-blue-700 text-xs sm:text-sm mt-1">
-                            This will add all brands from the database to the pending queue. 
-                            This action may take some time depending on the number of brands.
-                          </p>
+                    
+                    {/* Brand Counts Display */}
+                    {brandCounts && (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                        <div className="bg-gray-50 rounded-lg p-3 text-center">
+                          <div className="text-lg font-semibold text-gray-900">{brandCounts.total}</div>
+                          <div className="text-xs text-gray-600">Total Brands</div>
+                        </div>
+                        <div className="bg-green-50 rounded-lg p-3 text-center">
+                          <div className="text-lg font-semibold text-green-600">{brandCounts.active}</div>
+                          <div className="text-xs text-green-600">Active Brands</div>
+                        </div>
+                        <div className="bg-red-50 rounded-lg p-3 text-center">
+                          <div className="text-lg font-semibold text-red-600">{brandCounts.inactive}</div>
+                          <div className="text-xs text-red-600">Inactive Brands</div>
                         </div>
                       </div>
+                    )}
+                    
+                    {/* Status Filter Dropdown */}
+                    <div className="relative status-filter-dropdown w-full max-w-xs mb-4">
+                      <button
+                        type="button"
+                        onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                        className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      >
+                        <span>
+                          {statusFilter === 'all' 
+                            ? 'All Brands' 
+                            : statusFilter === 'Active' 
+                              ? 'Active Brands Only' 
+                              : 'Inactive Brands Only'
+                          }
+                        </span>
+                        <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform duration-200 ${
+                          showStatusDropdown ? 'rotate-180' : ''
+                        }`} />
+                      </button>
+                      
+                      {showStatusDropdown && (
+                        <div className="absolute right-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStatusFilter('all');
+                              setShowStatusDropdown(false);
+                            }}
+                            className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
+                              statusFilter === 'all' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                            }`}
+                          >
+                            All Brands {brandCounts ? `(${brandCounts.total})` : ''}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStatusFilter('Active');
+                              setShowStatusDropdown(false);
+                            }}
+                            className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
+                              statusFilter === 'Active' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                            }`}
+                          >
+                            Active Brands Only {brandCounts ? `(${brandCounts.active})` : ''}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStatusFilter('Inactive');
+                              setShowStatusDropdown(false);
+                            }}
+                            className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
+                              statusFilter === 'Inactive' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                            }`}
+                          >
+                            Inactive Brands Only {brandCounts ? `(${brandCounts.inactive})` : ''}
+                          </button>
+                        </div>
+                      )}
                     </div>
+                    
+                    {/* Action Button */}
+                    <Button
+                      onClick={handleAddAllBrands}
+                      variant="primary"
+                      disabled={loading || isSubmitting}
+                      className="w-full"
+                    >
+                      <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                      {isSubmitting 
+                        ? 'Adding Brands...' 
+                        : statusFilter === 'all' 
+                          ? 'Add All Brands to Queue' 
+                          : `Add ${statusFilter} Brands to Queue`
+                      }
+                    </Button>
                   </div>
-                  <Button
-                    onClick={handleAddAllBrands}
-                    variant="primary"
-                    disabled={loading || isSubmitting}
-                    className="w-full"
-                  >
-                    <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                    {isSubmitting ? 'Adding All Brands...' : 'Add All Brands to Queue'}
-                  </Button>
                 </div>
               )}
             </Card>

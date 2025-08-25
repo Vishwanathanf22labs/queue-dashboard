@@ -2,6 +2,7 @@ const express = require("express");
 const queueController = require("../controllers/queueController");
 const queueManagementRoutes = require("./queueManagementRoutes");
 const queuePriorityRoutes = require("./queuePriorityRoutes");
+const proxyManagementRoutes = require("./proxyManagementRoutes");
 const scraperControlController = require('../controllers/scraperControlController');
 const adminAuth = require("../middleware/adminAuth");
 
@@ -19,6 +20,9 @@ router.get("/scraped-stats", queueController.getBrandsScrapedStats);
 
 // Brand search endpoint (READ operation - no auth required)
 router.get("/search-brands", queueController.searchBrands);
+
+// Get brand counts by status (READ operation - no auth required)
+router.get("/brand-counts", queueController.getBrandCounts);
 
 // ADMIN ONLY: Brand addition routes (POST methods - require admin auth)
 router.post(
@@ -45,6 +49,9 @@ router.use("/queue-management", queueManagementRoutes);
 
 // Priority Queue Management Routes - Admin only
 router.use("/priority", queuePriorityRoutes);
+
+// Proxy Management Routes - Admin only
+router.use("/proxy", proxyManagementRoutes);
 
 // Scraper Control Routes - Admin only
 router.post('/scraper/start', adminAuth, scraperControlController.startScraper);

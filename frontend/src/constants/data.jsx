@@ -1,4 +1,4 @@
-import { AlertTriangle, Clock, Home, Plus, RefreshCw, Settings, FileText, Building2, Play} from "lucide-react";
+import { AlertTriangle, Clock, Home, Plus, RefreshCw, Settings, FileText, Building2, Play, Globe} from "lucide-react";
 
 export const navItems = [
     { to: "/", icon: Home, label: "Dashboard" },
@@ -6,7 +6,8 @@ export const navItems = [
     { to: "/failed-queue", icon: AlertTriangle, label: "Failed Queue" },
     { to: "/add-brands", icon: Building2, label: "Add Brands" },
     { to: "/queue-management", icon: Settings, label: "Q Management" },
-    { to: "/scraper-controls", icon: Play, label: "Scraper Controls" }
+    { to: "/scraper-controls", icon: Play, label: "Scraper Controls" },
+    { to: "/proxies", icon: Globe, label: "Proxy Controls" }
   ];
 
 export const columns = [

@@ -20,7 +20,8 @@ import {
   RefreshCw,
   ChevronDown,
   Pause,
-  Square
+  Square,
+  Globe
 } from 'lucide-react';
 
 const Dashboard = () => {
@@ -491,7 +492,7 @@ const Dashboard = () => {
 
       <Card>
         <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <Link
             to="/pending-queue"
             className="flex items-center p-3 sm:p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
@@ -514,6 +515,18 @@ const Dashboard = () => {
               <p className="text-xs sm:text-sm text-red-600">{failedCount} brands failed</p>
             </div>
             <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 ml-auto flex-shrink-0" />
+          </Link>
+
+          <Link
+            to="/proxies"
+            className="flex items-center p-3 sm:p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
+          >
+            <Globe className="h-5 w-5 sm:h-6 sm:w-6 text-green-600 mr-2 sm:mr-3 flex-shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-green-900 text-sm sm:text-base">Manage Proxies</p>
+              <p className="text-xs sm:text-sm text-green-600">Configure & monitor</p>
+            </div>
+            <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 ml-auto flex-shrink-0" />
           </Link>
         </div>
       </Card>

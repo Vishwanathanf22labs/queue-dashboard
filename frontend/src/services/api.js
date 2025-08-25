@@ -53,10 +53,16 @@ export const queueAPI = {
     });
   },
 
-  addAllBrands: () => api.post('/queue/add-all'),
+  addAllBrands: (status = null) => {
+    const params = status ? `?status=${status}` : '';
+    return api.post(`/queue/add-all${params}`);
+  },
 
   // Brand search functionality
-  searchBrands: (query, limit = 8) => api.get(`/queue/search-brands?query=${encodeURIComponent(query)}&limit=${limit}`),
+  searchBrands: (query) => api.get(`/queue/search-brands?query=${encodeURIComponent(query)}`),
+  
+  // Get brand counts by status
+  getBrandCounts: () => api.get('/queue/brand-counts'),
 
   // Admin Queue Management APIs
   clearAllQueues: () => api.delete('/queue/queue-management/clear-all'),
@@ -92,6 +98,43 @@ export const adminAPI = {
   login: (credentials) => api.post('/admin/login', credentials),
   logout: () => api.post('/admin/logout'),
   checkStatus: () => api.get('/admin/status'),
+};
+
+export const proxyAPI = {
+  // Proxy CRUD operations
+  addProxy: (proxyData) => api.post('/queue/proxy/add', proxyData),
+  removeProxy: (proxyId) => api.delete(`/queue/proxy/remove/${proxyId}`),
+  updateProxy: (proxyId, updates) => api.put(`/queue/proxy/update/${proxyId}`, updates),
+  clearAllProxies: () => api.delete('/queue/proxy/clear-all'),
+  
+  // Proxy queries
+  getProxies: (page = 1, limit = 10, filter = 'all', search = '') => {
+    const params = new URLSearchParams();
+    params.append('page', page);
+    params.append('limit', limit);
+    params.append('filter', filter);
+    if (search && search.trim()) params.append('search', search);
+    return api.get(`/queue/proxy/list?${params.toString()}`);
+  },
+  getAvailableProxies: () => api.get('/queue/proxy/available'),
+  getLastMonthProxies: () => api.get('/queue/proxy/last-month'),
+  getNextProxy: () => api.get('/queue/proxy/next'),
+  
+  // Proxy stats and health
+  getProxyStats: () => api.get('/queue/proxy/stats'),
+  getSystemHealth: () => api.get('/queue/proxy/health'),
+  updateProxyStatus: (proxyId, isWorking) => api.put(`/queue/proxy/status/${proxyId}`, { isWorking }),
+  
+  // Proxy switching and rotation
+  switchToNextWorkingProxy: (failedProxyId) => api.post(`/queue/proxy/switch/${failedProxyId}`),
+  getProxyRotationHistory: () => api.get('/queue/proxy/rotation-history'),
+  forceRotateToProxy: (proxyId) => api.post(`/queue/proxy/rotate/${proxyId}`),
+  getFailoverRecommendations: () => api.get('/queue/proxy/failover-recommendations'),
+  
+  // Proxy performance and metrics
+  getPerformanceMetrics: () => api.get('/queue/proxy/performance'),
+  bulkUpdateStatus: (updates) => api.put('/queue/proxy/bulk-status', { updates }),
+  searchProxies: (query, criteria = 'all') => api.get(`/queue/proxy/search?query=${encodeURIComponent(query)}&criteria=${criteria}`)
 };
 
 export default api;

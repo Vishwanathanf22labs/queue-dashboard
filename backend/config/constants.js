@@ -16,6 +16,8 @@ module.exports = {
     BULL_PROCESSING_ID: "bull:brand-processing:id",
     BRAND_PROCESSING_PATTERN: "bull:brand-processing:[0-9]*",
     STATS_PREFIX: "stats:",
+    PROXY_IPS: "proxy:ips",
+    PROXY_STATS: "proxy:stats",
   },
   JOB_FETCH_LIMIT: 1000, // Limit for fetching jobs from BullMQ
   MILLISECONDS_PER_DAY: 24 * 60 * 60 * 1000, // Milliseconds in a day
