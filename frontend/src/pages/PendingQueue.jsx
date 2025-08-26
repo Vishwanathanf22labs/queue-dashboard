@@ -7,14 +7,12 @@ import ErrorDisplay from '../components/ui/ErrorDisplay';
 import Table from '../components/ui/Table';
 import Pagination from '../components/ui/Pagination';
 import toast from 'react-hot-toast';
-
 import useQueueStore from '../stores/queueStore';
-import { queueAPI } from '../services/api';
 import { Clock, Search, Users, Hash, Tag, RefreshCw } from 'lucide-react';
 import SearchInput from '../components/ui/SearchInput';
 
 const PendingQueue = () => {
-  const { pendingBrands, loading, error, fetchPendingBrands } = useQueueStore();
+  const { fetchPendingBrands } = useQueueStore();
   const [queueState, setQueueState] = useState({
     searchTerm: '',
     currentPage: 1,
@@ -25,30 +23,106 @@ const PendingQueue = () => {
     isSearching: false
   });
 
-  // Destructure for easier access
   const { searchTerm, currentPage, itemsPerPage, isRefreshing, brands, pagination, isSearching } = queueState;
 
-  // Helper function to update grouped state
   const updateQueueState = (updates) => {
     setQueueState(prev => ({ ...prev, ...updates }));
   };
 
-  // Load brands with server-side search
+  const columns = [
+    {
+      key: 'position',
+      label: 'Position',
+      render: (value, row, rowIndex) => {
+        const page = Number(currentPage) || 1;
+        const itemsPerPageNum = Number(itemsPerPage) || 10;
+        const rowIndexNum = Number(rowIndex) || 0;
+        const position = (page - 1) * itemsPerPageNum + rowIndexNum + 1;
+
+        return (
+          <div className="flex items-center">
+            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center">
+              <span className="text-xs sm:text-sm font-medium text-blue-600">
+                {position}
+              </span>
+            </div>
+          </div>
+        );
+      },
+      className: 'hidden sm:table-cell'
+    },
+    {
+      key: 'brand_name',
+      label: 'Brand Name',
+      render: (value, row) => (
+        <div className="flex items-center">
+          <Users className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
+          <div className="text-xs font-medium text-gray-900 max-w-[80px] sm:max-w-none truncate">
+            {value || 'Unknown Brand'}
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'queue_id',
+      label: 'Brand ID',
+      render: (value, row) => (
+        <div className="flex items-center">
+          <Hash className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
+          <span className="text-xs font-mono text-gray-900 max-w-[60px] sm:max-w-none truncate">
+            {value || row.brand_id || 'N/A'}
+          </span>
+        </div>
+      )
+    },
+    {
+      key: 'page_id',
+      label: 'Page ID',
+      render: (value) => (
+        <div className="flex items-center">
+          <Tag className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
+          <span className="text-xs font-mono text-gray-900 max-w-[70px] sm:max-w-none truncate">
+            {value || 'N/A'}
+          </span>
+        </div>
+      )
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: () => <Badge variant="info">Pending</Badge>,
+      className: 'hidden sm:table-cell'
+    }
+  ];
+
   const loadPendingBrands = async (searchTerm = null) => {
     try {
-      // If searching, set searching state
       if (searchTerm) {
         updateQueueState({ isSearching: true });
       }
-      
-      // If searching, always search from page 1 to get all results
+
       const pageToLoad = searchTerm ? 1 : currentPage;
-      const response = await queueAPI.getPendingBrands(pageToLoad, itemsPerPage, searchTerm);
-      
+      const response = await fetchPendingBrands(pageToLoad, itemsPerPage, searchTerm);
+
+      let brands = [];
+      let pagination = {};
+
+      if (response.brands && response.pagination) {
+        brands = response.brands;
+        pagination = response.pagination;
+      } else if (response.data) {
+        brands = response.data.brands || response.data || [];
+        pagination = response.data.pagination || {};
+      } else {
+        brands = response || [];
+        pagination = {};
+      }
+
+
       updateQueueState({
-        brands: response.data.data?.brands || [],
-        pagination: response.data.data?.pagination || {},
-        currentPage: searchTerm ? 1 : currentPage, // Reset to page 1 when searching
+        brands,
+        pagination,
+        currentPage: pageToLoad,
         isSearching: false
       });
     } catch (error) {
@@ -58,12 +132,24 @@ const PendingQueue = () => {
   };
 
   useEffect(() => {
-    loadPendingBrands();
+    if (!searchTerm) {
+      loadPendingBrands();
+    }
   }, [currentPage, itemsPerPage]);
 
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchTerm && searchTerm.trim() !== '') {
+        loadPendingBrands(searchTerm);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
   const handleRefresh = async () => {
-    if (isRefreshing) return; 
-    
+    if (isRefreshing) return;
+
     updateQueueState({ isRefreshing: true });
     try {
       await loadPendingBrands();
@@ -75,43 +161,22 @@ const PendingQueue = () => {
     }
   };
 
-  // Handle search with server-side implementation
   const handleSearch = (searchTerm) => {
     updateQueueState({ searchTerm });
-    
-    // If search is cleared, reset to page 1 and load all brands
+
     if (!searchTerm || searchTerm.trim() === '') {
       updateQueueState({ currentPage: 1 });
       loadPendingBrands();
-      return;
     }
-    
-    // Reset to page 1 when searching
-    if (searchTerm !== queueState.searchTerm) {
-      updateQueueState({ currentPage: 1 });
-    }
-    // Load brands with search term
-    loadPendingBrands(searchTerm);
   };
 
-  // Clear search function
   const clearSearch = () => {
     updateQueueState({ searchTerm: '', currentPage: 1 });
     loadPendingBrands();
   };
 
-  // Use the brands directly since search is now server-side
   const filteredBrands = brands;
-  
   const totalPages = pagination.total_pages || 1;
-
-  if (error) {
-    return (
-      <ErrorDisplay title="Error Loading Pending Queue" message={error}>
-        <Button onClick={() => window.location.reload()}>Retry</Button>
-      </ErrorDisplay>
-    );
-  }
 
   return (
     <div className="space-y-3 sm:space-y-4 lg:space-y-6 xl:space-y-8">
@@ -136,7 +201,6 @@ const PendingQueue = () => {
           </Button>
         </div>
       </div>
-
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-3 sm:mb-4 lg:mb-6">
         <Card>
@@ -194,7 +258,7 @@ const PendingQueue = () => {
               variant="default"
               showClearButton={true}
               onClear={clearSearch}
-              disabled={loading || isSearching}
+              disabled={isSearching}
             />
           </div>
           <div className="flex items-center space-x-3 sm:space-x-4 text-xs sm:text-sm text-gray-600">
@@ -216,11 +280,8 @@ const PendingQueue = () => {
         </div>
       </Card>
 
-
       <Card>
-        {loading && !pendingBrands ? (
-          <LoadingState size="lg" message="Loading pending brands..." />
-        ) : isSearching ? (
+        {isSearching ? (
           <div className="text-center py-12 sm:py-16">
             <div className="flex flex-col items-center space-y-4">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -243,72 +304,9 @@ const PendingQueue = () => {
         ) : (
           <Table
             data={filteredBrands}
-            columns={[
-              {
-                key: 'position',
-                label: 'Position',
-                render: (value, row, rowIndex) => {
-                  const page = Number(currentPage) || 1;
-                  const itemsPerPageNum = Number(itemsPerPage) || 10;
-                  const rowIndexNum = Number(rowIndex) || 0;
-                  const position = (page - 1) * itemsPerPageNum + rowIndexNum + 1;
-                  
-                  return (
-                    <div className="flex items-center">
-                      <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-xs sm:text-sm font-medium text-blue-600">
-                          {position}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                },
-                className: 'hidden sm:table-cell'
-              },
-              {
-                key: 'brand_name',
-                label: 'Brand Name',
-                render: (value, row) => (
-                  <div className="flex items-center">
-                    <Users className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
-                    <div className="text-xs font-medium text-gray-900 max-w-[80px] sm:max-w-none truncate">
-                      {value || 'Unknown Brand'}
-                    </div>
-                  </div>
-                )
-              },
-              {
-                key: 'queue_id',
-                label: 'Brand ID',
-                render: (value, row) => (
-                  <div className="flex items-center">
-                    <Hash className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
-                    <span className="text-xs font-mono text-gray-900 max-w-[60px] sm:max-w-none truncate">
-                      {value || row.brand_id || 'N/A'}
-                    </span>
-                  </div>
-                )
-              },
-              {
-                key: 'page_id',
-                label: 'Page ID',
-                render: (value) => (
-                  <div className="flex items-center">
-                    <Tag className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
-                    <span className="text-xs font-mono text-gray-900 max-w-[70px] sm:max-w-none truncate">
-                      {value || 'N/A'}
-                    </span>
-                  </div>
-                )
-              },
-              {
-                key: 'status',
-                label: 'Status',
-                render: () => <Badge variant="info">Pending</Badge>,
-                className: 'hidden sm:table-cell'
-              }
-            ]}
+            columns={columns}
             emptyMessage="No pending brands found"
+            className="shadow-md rounded-lg"
           />
         )}
       </Card>

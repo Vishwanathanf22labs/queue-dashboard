@@ -1,11 +1,11 @@
 import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
 import Button from './Button';
 
-const Pagination = ({ 
-  currentPage, 
-  totalPages, 
-  onPageChange, 
-  totalItems, 
+const Pagination = ({
+  currentPage,
+  totalPages,
+  onPageChange,
+  totalItems,
   itemsPerPage,
   showPageInfo = true,
   className = ''
@@ -14,7 +14,7 @@ const Pagination = ({
   if (totalPages <= 1) return null;
 
   const getVisiblePages = () => {
-    const delta = 2; 
+    const delta = 2;
     const range = [];
     const rangeWithDots = [];
 
@@ -43,7 +43,7 @@ const Pagination = ({
 
   return (
     <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 ${className}`}>
-     
+
       {showPageInfo && (
         <div className="text-sm text-gray-700">
           Showing{' '}
@@ -60,9 +60,9 @@ const Pagination = ({
         </div>
       )}
 
-   
+
       <div className="flex items-center gap-1">
-    
+
         <Button
           variant="pagination"
           size="sm"
@@ -73,7 +73,7 @@ const Pagination = ({
           <ChevronLeft className="w-4 h-4" />
         </Button>
 
-    
+
         {visiblePages.map((page, index) => (
           <div key={index}>
             {page === '...' ? (

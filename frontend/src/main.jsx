@@ -5,24 +5,24 @@ import { BrowserRouter } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 
 createRoot(document.getElementById('root')).render(
-    <BrowserRouter>
-        <App />
-        <Toaster 
-          position="top-right" 
-          reverseOrder={false} 
-          toastOptions={{
-            style: {
-              backgroundColor: "black", 
-              color: "white", 
-              paddingRight: "20px", 
-              paddingLeft: "20px"
-            }, 
-            duration: 2000
-          }}
-          containerStyle={{
-            top: 20,
-            right: 20
-          }}
-        />
-    </BrowserRouter>
+  <BrowserRouter>
+    <App />
+    <Toaster
+      position="top-right"
+      reverseOrder={false}
+      toastOptions={{
+        style: {
+          backgroundColor: "black",
+          color: "white",
+          paddingRight: "20px",
+          paddingLeft: "20px"
+        },
+        duration: 2000
+      }}
+      containerStyle={{
+        top: 20,
+        right: 20
+      }}
+    />
+  </BrowserRouter>
 )

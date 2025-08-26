@@ -1,85 +1,109 @@
 import { useState, useCallback } from 'react';
 import Button from '../ui/Button';
+import Input from '../ui/Input';
+import CustomDropdown from '../ui/CustomDropdown';
 import { queueAPI } from '../../services/api';
-import { ChevronDown } from 'lucide-react';
 
 const PriorityQueueManager = () => {
-  const [formData, setFormData] = useState({
-    queueType: 'pending',
-    brandName: '',
-    newPosition: ''
+  const [state, setState] = useState({
+    formData: {
+      queueType: 'pending',
+      brandName: '',
+      newScore: ''
+    },
+    loading: false,
+    message: { type: '', text: '' }
   });
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
-  const [showQueueDropdown, setShowQueueDropdown] = useState(false);
 
-  const handleInputChange = useCallback((e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
+  const handleInputChange = useCallback((name, value) => {
+    setState(prev => ({
       ...prev,
-      [name]: value
+      formData: {
+        ...prev.formData,
+        [name]: value
+      }
     }));
   }, []);
 
   const handleQueueTypeChange = useCallback((queueType) => {
-    setFormData(prev => ({
+    setState(prev => ({
       ...prev,
-      queueType
+      formData: {
+        ...prev.formData,
+        queueType
+      },
+      showQueueDropdown: false
     }));
-    setShowQueueDropdown(false);
   }, []);
 
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
-    
-    if (!formData.brandName.trim() || !formData.newPosition.trim()) {
-      setMessage({ type: 'error', text: 'Please fill in all fields' });
+
+    if (!state.formData.brandName.trim() || !state.formData.newScore.trim()) {
+      setState(prev => ({
+        ...prev,
+        message: { type: 'error', text: 'Please fill in all fields' }
+      }));
       return;
     }
 
-    const position = parseInt(formData.newPosition);
-    if (isNaN(position) || position < 1) {
-      setMessage({ type: 'error', text: 'Position must be a positive number' });
+    const score = parseFloat(state.formData.newScore);
+    if (isNaN(score)) {
+      setState(prev => ({
+        ...prev,
+        message: { type: 'error', text: 'Score must be a valid number' }
+      }));
       return;
     }
 
-    setLoading(true);
-    setMessage({ type: '', text: '' });
+    setState(prev => ({
+      ...prev,
+      loading: true,
+      message: { type: '', text: '' }
+    }));
 
     try {
-      const response = await queueAPI.changeBrandPriority(
-        formData.queueType,
-        formData.brandName.trim(),
-        position
+      const response = await queueAPI.changeBrandScore(
+        state.formData.queueType,
+        state.formData.brandName.trim(),
+        score
       );
 
-      setMessage({ 
-        type: 'success', 
-        text: `Successfully moved brand "${formData.brandName}" to position ${position} in ${formData.queueType} queue` 
-      });
-
-      // Reset form
-      setFormData({
-        queueType: 'pending',
-        brandName: '',
-        newPosition: ''
-      });
+      setState(prev => ({
+        ...prev,
+        message: {
+          type: 'success',
+          text: `Successfully updated brand "${state.formData.brandName}" score to ${score} in ${state.formData.queueType} queue`
+        },
+        formData: {
+          queueType: 'pending',
+          brandName: '',
+          newScore: ''
+        }
+      }));
 
     } catch (error) {
       const errorMessage = error.response?.data?.message || error.message || 'Failed to change brand priority';
-      setMessage({ type: 'error', text: errorMessage });
+      setState(prev => ({
+        ...prev,
+        message: { type: 'error', text: errorMessage }
+      }));
     } finally {
-      setLoading(false);
+      setState(prev => ({
+        ...prev,
+        loading: false
+      }));
     }
-  }, [formData]);
+  }, [state.formData]);
 
   const clearMessage = useCallback(() => {
-    setMessage({ type: '', text: '' });
+    setState(prev => ({
+      ...prev,
+      message: { type: '', text: '' }
+    }));
   }, []);
 
-  const getQueueTypeLabel = (type) => {
-    return type === 'pending' ? 'Pending Queue' : 'Failed Queue';
-  };
+
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
@@ -88,7 +112,7 @@ const PriorityQueueManager = () => {
           Priority Queue Manager
         </h3>
         <p className="text-sm text-gray-600">
-          Change the position of brands in pending or failed queues by searching for the brand name and specifying a new position.
+          Change the score of brands in pending or failed queues by searching for the brand name and specifying a new score.
         </p>
       </div>
 
@@ -96,76 +120,42 @@ const PriorityQueueManager = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
           <div>
-            <label htmlFor="queueType" className="block text-sm font-medium text-gray-700 mb-1">
-              Queue Type
-            </label>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowQueueDropdown(!showQueueDropdown)}
-                className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-              >
-                <span>{getQueueTypeLabel(formData.queueType)}</span>
-                <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform duration-200 ${
-                  showQueueDropdown ? 'rotate-180' : ''
-                }`} />
-              </button>
-              
-              {/* Dropdown Menu */}
-              {showQueueDropdown && (
-                <div className="absolute right-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                  <button
-                    type="button"
-                    onClick={() => handleQueueTypeChange('pending')}
-                    className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
-                      formData.queueType === 'pending' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
-                    }`}
-                  >
-                    Pending Queue
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQueueTypeChange('failed')}
-                    className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
-                      formData.queueType === 'failed' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
-                    }`}
-                  >
-                    Failed Queue
-                  </button>
-                </div>
-              )}
-            </div>
+            <CustomDropdown
+              label="Queue Type"
+              value={state.formData.queueType}
+              onChange={handleQueueTypeChange}
+              options={[
+                { value: 'pending', label: 'Pending Queue' },
+                { value: 'failed', label: 'Failed Queue' }
+              ]}
+              className="w-full"
+            />
           </div>
 
           <div>
-            <label htmlFor="brandName" className="block text-sm font-medium text-gray-700 mb-1">
-              Brand Name
-            </label>
-            <input
+            <Input
               type="text"
               id="brandName"
               name="brandName"
-              value={formData.brandName}
-              onChange={handleInputChange}
+              label="Brand Name"
+              value={state.formData.brandName}
+              onChange={(value) => handleInputChange('brandName', value)}
               placeholder="Enter brand name to search"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full"
             />
           </div>
 
 
           <div>
-            <label htmlFor="newPosition" className="block text-sm font-medium text-gray-700 mb-1">
-              New Position
-            </label>
-            <input
-              type="number"
-              id="newPosition"
-              name="newPosition"
-              value={formData.newPosition}
-              onChange={handleInputChange}
-              placeholder="Enter position number"
-              min="1"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            <Input
+              type="text"
+              id="newScore"
+              name="newScore"
+              label="New Score"
+              value={state.formData.newScore}
+              onChange={(value) => handleInputChange('newScore', value)}
+              placeholder="Enter score (e.g., 1 for priority, 0 for normal)"
+              className="w-full"
             />
           </div>
         </div>
@@ -174,29 +164,30 @@ const PriorityQueueManager = () => {
           <Button
             type="submit"
             variant="primary"
-            disabled={loading}
+            disabled={state.loading}
             className="min-w-[120px]"
           >
-            {loading ? 'Updating...' : 'Update Priority'}
+            {state.loading ? 'Updating...' : 'Update Score'}
           </Button>
         </div>
       </form>
 
 
-      {message.text && (
-        <div className={`mt-4 p-3 rounded-md ${
-          message.type === 'success' 
-            ? 'bg-green-50 border border-green-200 text-green-800' 
-            : 'bg-red-50 border border-red-200 text-red-800'
-        }`}>
+      {state.message.text && (
+        <div className={`mt-4 p-3 rounded-md ${state.message.type === 'success'
+          ? 'bg-green-50 border border-green-200 text-green-800'
+          : 'bg-red-50 border border-red-200 text-red-800'
+          }`}>
           <div className="flex justify-between items-center">
-            <span>{message.text}</span>
-            <button
+            <span>{state.message.text}</span>
+            <Button
+              type="button"
+              variant="ghost"
               onClick={clearMessage}
-              className="text-gray-400 hover:text-gray-600"
+              className="text-gray-400 hover:text-gray-600 p-1"
             >
               ×
-            </button>
+            </Button>
           </div>
         </div>
       )}

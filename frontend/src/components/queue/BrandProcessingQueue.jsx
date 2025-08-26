@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Card from '../ui/Card';
 import LoadingState from '../ui/LoadingState';
 import ErrorDisplay from '../ui/ErrorDisplay';
@@ -14,12 +14,10 @@ const BrandProcessingQueue = ({ onPageChange }) => {
 
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage);
-    // Call the parent's page change handler instead of making API call directly
     if (onPageChange) {
       onPageChange(newPage);
     }
   };
-
 
   if (loading && !brandProcessingQueue) {
     return (
@@ -51,12 +49,49 @@ const BrandProcessingQueue = ({ onPageChange }) => {
   const totalPages = pagination?.total_pages || 1;
   const totalItems = pagination?.total_items || 0;
 
+  const columns = [
+    {
+      key: 'brand',
+      label: 'Brand',
+      render: (value, brand) => (
+        <div>
+          <div className="text-sm font-medium text-gray-900 max-w-[115px] sm:max-w-none truncate">
+            {brand.brand_name || brand.page_name || 'Unknown'}
+          </div>
+          <div className="text-sm text-gray-500 max-w-[115px] sm:max-w-none truncate">
+            ID: {brand.brand_id} | Page: {brand.page_id}
+          </div>
+          {brand.page_category && (
+            <div className="text-xs text-gray-400 max-w-[115px] sm:max-w-none truncate">
+              {brand.page_category}
+            </div>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'total_ads',
+      label: 'Ads Count',
+      render: (value) => (
+        <div className="text-sm text-gray-900">{value || 0}</div>
+      )
+    },
+    {
+      key: 'created_at',
+      label: 'Created',
+      render: (value) => (
+        <div className="text-sm text-gray-500 max-w-[80px] sm:max-w-none truncate">
+          {value ? new Date(value).toLocaleDateString() : 'N/A'}
+        </div>
+      )
+    }
+  ];
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <div>
         <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">Brands Scrapped Queue</h2>
       </div>
-
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
         <Card>
@@ -86,7 +121,6 @@ const BrandProcessingQueue = ({ onPageChange }) => {
         </Card>
       </div>
 
-
       <Card>
         <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mb-3 sm:mb-4">
           <h3 className="text-base sm:text-lg font-semibold text-gray-900">Brands in Queue</h3>
@@ -108,44 +142,9 @@ const BrandProcessingQueue = ({ onPageChange }) => {
         ) : brands && brands.length > 0 ? (
           <Table
             data={brands}
-            columns={[
-              {
-                key: 'brand',
-                label: 'Brand',
-                render: (value, brand) => (
-                  <div>
-                    <div className="text-sm font-medium text-gray-900 max-w-[115px] sm:max-w-none truncate">
-                      {brand.brand_name || brand.page_name || 'Unknown'}
-                    </div>
-                    <div className="text-sm text-gray-500 max-w-[115px] sm:max-w-none truncate">
-                      ID: {brand.brand_id} | Page: {brand.page_id}
-                    </div>
-                    {brand.page_category && (
-                      <div className="text-xs text-gray-400 max-w-[115px] sm:max-w-none truncate">
-                        {brand.page_category}
-                      </div>
-                    )}
-                  </div>
-                )
-              },
-              {
-                key: 'total_ads',
-                label: 'Ads Count',
-                render: (value) => (
-                  <div className="text-sm text-gray-900">{value || 0}</div>
-                )
-              },
-              {
-                key: 'created_at',
-                label: 'Created',
-                render: (value) => (
-                  <div className="text-sm text-gray-500 max-w-[80px] sm:max-w-none truncate">
-                    {value ? new Date(value).toLocaleDateString() : 'N/A'}
-                  </div>
-                )
-              }
-            ]}
+            columns={columns}
             emptyMessage="No brands in queue"
+            className="shadow-md rounded-lg"
           />
         ) : (
           <div className="text-center py-6 sm:py-8">
@@ -154,7 +153,7 @@ const BrandProcessingQueue = ({ onPageChange }) => {
           </div>
         )}
 
-    
+
         {totalPages > 1 && (
           <div className="mt-6">
             <Pagination

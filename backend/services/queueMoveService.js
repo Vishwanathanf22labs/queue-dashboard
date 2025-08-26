@@ -8,31 +8,39 @@ async function movePendingToFailed(queueId) {
       `Moving brand with queue ID ${queueId} from pending to failed queue`
     );
 
-    const pendingBrands = await redis.lrange(QUEUES.PENDING_BRANDS, 0, -1);
+    // Get all pending brands with scores from sorted set
+    const pendingBrands = await redis.zrange(QUEUES.PENDING_BRANDS, 0, -1, 'WITHSCORES');
 
     let brandToMove = null;
-    let brandIndex = -1;
+    let brandMember = null;
 
-    for (let i = 0; i < pendingBrands.length; i++) {
+    // pendingBrands is [member1, score1, member2, score2, ...]
+    for (let i = 0; i < pendingBrands.length; i += 2) {
       try {
-        const brandData = JSON.parse(pendingBrands[i]);
+        const member = pendingBrands[i];
+        const score = pendingBrands[i + 1];
+        
+        if (!member) continue;
+        
+        const brandData = JSON.parse(member);
         if (brandData.id === queueId) {
           brandToMove = brandData;
-          brandIndex = i;
+          brandMember = member;
           break;
         }
       } catch (parseError) {
-        logger.error(`Error parsing brand data at index ${i}:`, parseError);
+        logger.error(`Error parsing brand data:`, parseError);
       }
     }
 
-    if (brandIndex === -1) {
+    if (!brandMember) {
       throw new Error(
         `Brand with queue ID ${queueId} not found in pending queue`
       );
     }
 
-    await redis.lrem(QUEUES.PENDING_BRANDS, 1, pendingBrands[brandIndex]);
+    // Remove from pending sorted set
+    await redis.zrem(QUEUES.PENDING_BRANDS, brandMember);
 
     const failedBrandData = {
       id: brandToMove.id || brandToMove.brand_id || brandToMove.queue_id,
@@ -98,7 +106,9 @@ async function moveFailedToPending(brandId) {
       page_id: brandToMove.page_id
     };
 
-    await redis.rpush(QUEUES.PENDING_BRANDS, JSON.stringify(pendingBrandData));
+    // Add to pending sorted set with current timestamp (newest first)
+    const timestamp = Date.now();
+    await redis.zadd(QUEUES.PENDING_BRANDS, timestamp, JSON.stringify(pendingBrandData));
 
     logger.info(
       `Successfully moved brand ${
@@ -121,7 +131,7 @@ async function moveAllPendingToFailed() {
   try {
     logger.info("Moving ALL pending brands to failed queue");
 
-    const pendingBrands = await redis.lrange(QUEUES.PENDING_BRANDS, 0, -1);
+    const pendingBrands = await redis.zrange(QUEUES.PENDING_BRANDS, 0, -1, 'WITHSCORES');
 
     if (pendingBrands.length === 0) {
       return {
@@ -133,9 +143,15 @@ async function moveAllPendingToFailed() {
     const movedBrands = [];
     const pipeline = redis.pipeline();
 
-    for (const pendingBrand of pendingBrands) {
+    // pendingBrands is [member1, score1, member2, score2, ...]
+    for (let i = 0; i < pendingBrands.length; i += 2) {
       try {
-        const brandData = JSON.parse(pendingBrand);
+        const member = pendingBrands[i];
+        const score = pendingBrands[i + 1];
+        
+        if (!member) continue;
+        
+        const brandData = JSON.parse(member);
 
         const failedBrandData = {
           id: brandData.id || brandData.brand_id || brandData.queue_id,
@@ -193,7 +209,9 @@ async function moveAllFailedToPending() {
           page_id: brandData.page_id
         };
 
-        pipeline.rpush(QUEUES.PENDING_BRANDS, JSON.stringify(pendingBrandData));
+        // Add to pending sorted set with current timestamp (newest first)
+        const timestamp = Date.now();
+        pipeline.zadd(QUEUES.PENDING_BRANDS, timestamp, JSON.stringify(pendingBrandData));
         movedBrands.push(pendingBrandData);
       } catch (parseError) {
         logger.error(`Error parsing failed brand data:`, parseError);

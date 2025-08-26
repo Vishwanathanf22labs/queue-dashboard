@@ -202,6 +202,52 @@ async function searchBrands(req, res) {
   }
 }
 
+async function changeBrandScore(req, res) {
+  try {
+    const { queueType, brandName, newScore } = req.body;
+
+    if (!queueType || !brandName || newScore === undefined || newScore === null) {
+      return res.status(400).json({
+        success: false,
+        message: "Queue type, brand name, and new score are required",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    if (queueType !== 'pending' && queueType !== 'failed') {
+      return res.status(400).json({
+        success: false,
+        message: "Queue type must be 'pending' or 'failed'",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    if (isNaN(parseFloat(newScore))) {
+      return res.status(400).json({
+        success: false,
+        message: "New score must be a valid number",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const result = await queueService.changeBrandScore(queueType, brandName, parseFloat(newScore));
+
+    res.status(200).json({
+      success: true,
+      data: result,
+      message: `Successfully updated brand "${brandName}" score to ${newScore} in ${queueType} queue`,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error("Error in changeBrandScore:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to change brand score",
+      error: error.message,
+    });
+  }
+}
+
 module.exports = {
   getQueueOverview,
   getPendingBrands,
@@ -212,4 +258,5 @@ module.exports = {
   getBrandProcessingQueue,
   getBrandsScrapedStats,
   searchBrands,
+  changeBrandScore,
 };

@@ -6,19 +6,18 @@ import Badge from '../components/ui/Badge';
 import LoadingState from '../components/ui/LoadingState';
 import ErrorDisplay from '../components/ui/ErrorDisplay';
 import toast from 'react-hot-toast';
-
 import ScrapedStats from '../components/queue/ScrapedStats';
 import BrandProcessingQueue from '../components/queue/BrandProcessingQueue';
+import CustomDropdown from '../components/ui/CustomDropdown';
 import useQueueStore from '../stores/queueStore';
 import { queueAPI } from '../services/api';
-import { 
-  ArrowRight, 
-  Clock, 
-  AlertTriangle, 
-  Play, 
+import {
+  ArrowRight,
+  Clock,
+  AlertTriangle,
+  Play,
   Eye,
   RefreshCw,
-  ChevronDown,
   Pause,
   Square,
   Globe
@@ -28,7 +27,6 @@ const Dashboard = () => {
   const {
     overview,
     nextBrand,
-    brandProcessingQueue,
     loading,
     error,
     fetchOverview,
@@ -37,7 +35,8 @@ const Dashboard = () => {
     fetchScrapedStats
   } = useQueueStore();
 
-  // Get data from overview instead of separate states
+
+
   const currentlyProcessing = overview?.currently_processing;
   const pendingCount = overview?.queue_counts?.pending || 0;
   const failedCount = overview?.queue_counts?.failed || 0;
@@ -45,49 +44,54 @@ const Dashboard = () => {
   const processedAdsToday = overview?.today_stats?.ads_processed || 0;
   const today = new Date().toLocaleDateString();
 
-  // Scraper status state
-  const [scraperStatus, setScraperStatus] = useState('unknown');
-  const [scraperStatusLoading, setScraperStatusLoading] = useState(false);
-
-  // Auto-refresh state
-  const [refreshState, setRefreshState] = useState({
-    interval: 0, // Default to Off (no auto-refresh)
-    isRefreshing: false,
-    showIntervalDropdown: false,
-    formattedStartTime: 'N/A'
+  const [state, setState] = useState({
+    scraperStatus: 'unknown',
+    scraperStatusLoading: false,
+    refreshState: {
+      interval: 0,
+      isRefreshing: false,
+      formattedStartTime: 'N/A'
+    },
+    originalStartTime: null
   });
-  
-  const intervalRef = useRef(null);
-  const dropdownRef = useRef(null);
 
-  // Add this state to store the original timestamp
-  const [originalStartTime, setOriginalStartTime] = useState(null);
+  const refs = useRef({
+    interval: null
+  });
 
-  // Destructure for easier access
-  const { interval: refreshInterval, isRefreshing, showIntervalDropdown, formattedStartTime } = refreshState;
 
-  // Helper function to update grouped state
-  const updateRefreshState = (updates) => {
-    setRefreshState(prev => ({ ...prev, ...updates }));
+  const { interval: refreshInterval, isRefreshing, formattedStartTime } = state.refreshState;
+  const { scraperStatus, scraperStatusLoading } = state;
+
+
+  const updateState = (updates) => {
+    setState(prev => ({ ...prev, ...updates }));
   };
 
-  // Fetch scraper status
+  const updateRefreshState = (updates) => {
+    setState(prev => ({
+      ...prev,
+      refreshState: { ...prev.refreshState, ...updates }
+    }));
+  };
+
+
   const fetchScraperStatus = async () => {
     try {
-      setScraperStatusLoading(true);
+      updateState({ scraperStatusLoading: true });
       const response = await queueAPI.getScraperStatus();
       if (response.data?.success) {
-        setScraperStatus(response.data.data?.status || 'unknown');
+        updateState({ scraperStatus: response.data.data?.status || 'unknown' });
       }
     } catch (error) {
       console.error('Failed to fetch scraper status:', error);
-      setScraperStatus('unknown');
+      updateState({ scraperStatus: 'unknown' });
     } finally {
-      setScraperStatusLoading(false);
+      updateState({ scraperStatusLoading: false });
     }
   };
 
-  // Get scraper status badge variant and icon
+
   const getScraperStatusInfo = (status) => {
     switch (status) {
       case 'running':
@@ -111,49 +115,52 @@ const Dashboard = () => {
     { value: 1800, label: '30min' }
   ];
 
-  // Format start time when currentlyProcessing changes
+
   useEffect(() => {
     if (currentlyProcessing) {
       const brandId = currentlyProcessing.brand_id;
-      
-      if (!originalStartTime || originalStartTime.brandId !== brandId) {
-        // New brand or first time - set the timestamp
+
+      if (!state.originalStartTime || state.originalStartTime.brandId !== brandId) {
+
         const timestamp = currentlyProcessing.started_at || currentlyProcessing.added_at;
         if (timestamp) {
           const startTime = new Date(timestamp);
-          setOriginalStartTime({ 
-            brandId: brandId, 
-            timestamp: startTime 
+          updateState({
+            originalStartTime: {
+              brandId: brandId,
+              timestamp: startTime
+            }
           });
-          // Force IST timezone to match scraper time
+
           updateRefreshState({ formattedStartTime: startTime.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }) });
         } else {
           updateRefreshState({ formattedStartTime: 'N/A' });
-          setOriginalStartTime(null);
+          updateState({ originalStartTime: null });
         }
       } else {
-        // Same brand - use cached timestamp, don't update
-        updateRefreshState({ 
-          formattedStartTime: originalStartTime.timestamp.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }) 
+        updateRefreshState({
+          formattedStartTime: state.originalStartTime.timestamp.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })
         });
       }
     } else {
-      setOriginalStartTime(null);
+      updateState({ originalStartTime: null });
       updateRefreshState({ formattedStartTime: 'N/A' });
     }
-  }, [currentlyProcessing?.brand_id]); // Only run when brand_id changes, not timestamp
+  }, [currentlyProcessing?.brand_id, state.originalStartTime]);
 
-  // Load data function
+
   const loadData = async () => {
     try {
       updateRefreshState({ isRefreshing: true });
-      await Promise.all([
-        fetchOverview(), // This includes: queue counts, currently_processing, today_stats
-        fetchNextBrand(), // Get the next brand in line
-        fetchBrandProcessingQueue(1, 10), // Get brands in queue for pagination
-        fetchScrapedStats(null, 7), // Default to 7 days
-        fetchScraperStatus() // Also fetch scraper status
-      ]);
+      const promises = [
+        fetchOverview(),
+        fetchNextBrand(),
+        fetchBrandProcessingQueue(1, 10),
+        fetchScrapedStats(null, 7),
+        fetchScraperStatus()
+      ];
+
+      await Promise.all(promises);
       toast.success('Dashboard refreshed successfully');
     } catch (error) {
       toast.error(`Failed to refresh dashboard: ${error.message || error}`);
@@ -162,7 +169,7 @@ const Dashboard = () => {
     }
   };
 
-  // Handle pagination change for brand processing queue
+
   const handleQueuePageChange = async (newPage) => {
     try {
       await fetchBrandProcessingQueue(newPage, 10);
@@ -171,94 +178,81 @@ const Dashboard = () => {
     }
   };
 
-  // Manual refresh function
+
   const handleManualRefresh = () => {
     loadData();
   };
 
-  // Change refresh interval and start auto-refresh
+
   const changeRefreshInterval = (interval) => {
-    updateRefreshState({ 
-      interval: interval, 
-      showIntervalDropdown: false 
+    updateRefreshState({
+      interval: interval
     });
-    
-    // Stop any existing interval
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+
+
+    if (refs.current.interval) {
+      clearInterval(refs.current.interval);
+      refs.current.interval = null;
     }
-    
-    // If interval is 0 (Off), don't start auto-refresh
+
+
     if (interval > 0) {
       startAutoRefresh(interval);
     }
   };
 
-  // Start auto-refresh
+
   const startAutoRefresh = (interval) => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+    if (refs.current.interval) {
+      clearInterval(refs.current.interval);
+      refs.current.interval = null;
     }
-    
-    // Only start if interval is greater than 0
+
     if (interval > 0) {
-      intervalRef.current = setInterval(() => {
+      refs.current.interval = setInterval(() => {
         loadData();
       }, interval * 1000);
     }
   };
 
-  // Stop auto-refresh
   const stopAutoRefresh = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+    if (refs.current.interval) {
+      clearInterval(refs.current.interval);
+      refs.current.interval = null;
     }
   };
 
-  // Handle click outside dropdown
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        updateRefreshState({ showIntervalDropdown: false });
-      }
-    };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
 
-  // Start auto-refresh when component mounts
+
+
   useEffect(() => {
     if (refreshInterval > 0) {
       startAutoRefresh(refreshInterval);
     }
-    
+
     return () => {
       stopAutoRefresh();
     };
   }, [refreshInterval]);
 
-  // Initial data load
+
   useEffect(() => {
     loadData();
-    fetchScraperStatus(); // Also fetch scraper status
   }, []);
 
-  // Cleanup effect to reset timestamp when component unmounts
+
   useEffect(() => {
     return () => {
-      setOriginalStartTime(null);
+      updateState({ originalStartTime: null });
     };
   }, []);
 
   if (loading && !overview) {
     return <LoadingState size="lg" message="Loading dashboard..." />;
   }
+
+
 
   if (error) {
     return (
@@ -283,62 +277,38 @@ const Dashboard = () => {
             <h1 className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-900">Madangles Queues</h1>
             <p className="text-xs sm:text-sm lg:text-base text-gray-600">Monitor your brand processing queue</p>
           </div>
-          
+
 
           <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-3">
 
-            <div className="relative flex items-center border border-gray-300 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow w-full sm:w-auto" ref={dropdownRef}>
 
+
+            <div className="relative flex items-center border border-gray-300 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow w-full sm:w-auto">
               <button
                 onClick={handleManualRefresh}
                 disabled={isRefreshing}
-                className="flex items-center px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50 border-r border-gray-300 rounded-l-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex-1 sm:flex-none"
+                className="flex items-center px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50 border-r border-gray-300 rounded-l-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex-1 sm:flex-none"
                 title="Click to refresh now"
               >
                 <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
                 <span className="hidden xs:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
                 <span className="xs:hidden">Refresh</span>
               </button>
-              
-              {/* Interval Dropdown */}
-              <button
-                onClick={() => updateRefreshState({ showIntervalDropdown: !showIntervalDropdown })}
-                className={`flex items-center justify-between px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-r-lg transition-all duration-200 flex-1 sm:flex-none min-w-[3rem] ${
-                  intervalRef.current ? 'bg-blue-50 text-blue-600 border-l border-blue-200' : ''
-                }`}
-                title="Select refresh interval to start auto-refresh"
-              >
-                <span className="text-center flex-1">
-                  {refreshInterval === 0 ? 'Off' : refreshInterval >= 60 ? `${Math.floor(refreshInterval / 60)} min` : `${refreshInterval}s`}
-                </span>
-                <ChevronDown className={`h-3 w-3 sm:h-4 sm:w-4 ml-1 flex-shrink-0 transition-transform duration-200 ${
-                  showIntervalDropdown ? 'rotate-180' : ''
-                } ${intervalRef.current ? 'text-blue-500' : 'text-gray-500'}`} />
-              </button>
-              
-              {/* Dropdown Menu */}
-              {showIntervalDropdown && (
-                <div className="absolute right-0 top-full mt-1 w-20 sm:w-24 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                  {refreshIntervals.map((interval) => (
-                    <button
-                      key={interval.value}
-                      onClick={() => changeRefreshInterval(interval.value)}
-                      className={`w-full px-2 sm:px-3 py-2 text-left text-xs sm:text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
-                        refreshInterval === interval.value ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
-                      }`}
-                    >
-                      {interval.label}
-                    </button>
-                  ))}
-                </div>
-              )}
+
+              <CustomDropdown
+                options={refreshIntervals}
+                value={refreshInterval}
+                onChange={changeRefreshInterval}
+                placeholder="Off"
+                className="[&>div>button]:border-0 [&>div>button]:rounded-none [&>div>button]:rounded-r-lg [&>div>button]:bg-transparent [&>div>button]:py-1.5 w-16 sm:w-20"
+              />
             </div>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-     
+
         <Card>
           <div className="flex items-center">
             <div className="p-2 sm:p-3 bg-yellow-100 rounded-lg">
@@ -413,14 +383,42 @@ const Dashboard = () => {
                       ID: {currentlyProcessing.brand_id} | Page: {currentlyProcessing.page_id}
                     </p>
                     <p className="text-xs sm:text-sm text-gray-500">
+                      Status: {currentlyProcessing.status || 'Unknown'}
+                    </p>
+                    <p className="text-xs sm:text-sm text-gray-500">
                       Started at {formattedStartTime}
                     </p>
+                    {currentlyProcessing.processing_duration > 0 && (
+                      <p className="text-xs sm:text-sm text-gray-500">
+                        Duration: {Math.round(currentlyProcessing.processing_duration / 1000)}s
+                      </p>
+                    )}
+                    {currentlyProcessing.total_ads > 0 && (
+                      <p className="text-xs sm:text-sm text-gray-500">
+                        Total Ads: {currentlyProcessing.total_ads}
+                      </p>
+                    )}
+                    {currentlyProcessing.proxy && (
+                      <div className="space-y-1">
+                        <p className="text-xs sm:text-sm text-gray-500">
+                          IP: {currentlyProcessing.proxy.proxy?.host}
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-500">
+                          Port: {currentlyProcessing.proxy.proxy?.port}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-col items-end space-y-2">
-                  {/* Brand Status Badge */}
-                  <Badge variant="success" className="self-start sm:self-auto">Active</Badge>
-                  {/* Scraper Status Badge */}
+
+                  <Badge 
+                    variant={currentlyProcessing.status === 'complete' ? 'success' : 'info'} 
+                    className="self-start sm:self-auto"
+                  >
+                    {currentlyProcessing.status === 'complete' ? 'Completed' : 'Active'}
+                  </Badge>
+
                   {!scraperStatusLoading && (
                     (() => {
                       const statusInfo = getScraperStatusInfo(scraperStatus);
@@ -440,7 +438,7 @@ const Dashboard = () => {
             <div className="text-center py-6 sm:py-8">
               <Play className="h-8 w-8 sm:h-12 sm:w-12 text-gray-300 mx-auto mb-2 sm:mb-3" />
               <p className="text-gray-500 text-sm sm:text-base">No brand currently processing</p>
-              {/* Show scraper status even when no brand is processing */}
+
               {!scraperStatusLoading && (
                 <div className="mt-3">
                   {(() => {
@@ -459,7 +457,7 @@ const Dashboard = () => {
           )}
         </Card>
 
-  
+
         <Card>
           <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Next in Line</h3>
           {nextBrand ? (

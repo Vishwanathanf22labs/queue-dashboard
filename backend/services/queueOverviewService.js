@@ -5,7 +5,7 @@ const { QUEUES } = require("../config/constants");
 
 async function getQueueOverview() {
   try {
-    const pendingCount = await redis.llen(QUEUES.PENDING_BRANDS);
+    const pendingCount = await redis.zcard(QUEUES.PENDING_BRANDS);
 
     // Use same Redis approach as pending count for consistency
     const failedCount = await redis.llen(QUEUES.FAILED_BRANDS);
@@ -66,118 +66,61 @@ async function getQueueOverview() {
 
 async function getCurrentlyProcessing() {
   try {
-    // Get scraper status - use the correct Redis key that exists
-    const scraperStatus = await redis.get('scraper:status');
+    // Get the currently processing brand from Redis key
+    const currentlyProcessingBrand = await redis.lindex('currently_processing_brand', 0);
     
-    // If scraper is not running, return null (no brand currently processing)
-    if (scraperStatus !== 'running') {
+    if (!currentlyProcessingBrand) {
       return null;
     }
-    
-    // First Priority: Check pending_brands queue
-    const pendingLength = await redis.llen(QUEUES.PENDING_BRANDS);
-    
-    if (pendingLength > 0) {
-      // Get first item from pending queue
-      const firstItem = await redis.lindex(QUEUES.PENDING_BRANDS, 0);
+
+    try {
+      const processingData = JSON.parse(currentlyProcessingBrand);
       
-      if (!firstItem) {
-        return null;
-      }
-
-      const brandData = JSON.parse(firstItem);
-      const { id: brandId } = brandData;
-
+      // Get brand details from database
       const brand = await Brand.findOne({
-        where: { id: parseInt(brandId) },
+        where: { id: parseInt(processingData.brandId) },
         attributes: ["actual_name", "page_id", "status"],
         raw: true,
       });
 
       if (!brand) {
+        logger.warn(`Brand with ID ${processingData.brandId} not found in database`);
         return null;
       }
 
-      // Use separate Redis key for timestamp instead of modifying queue item
-      const timestampKey = `processing:started_at:${brandId}`;
-      let startedAt = await redis.get(timestampKey);
-      
-      // Only set started_at if it doesn't exist (first time this brand becomes next in queue)
-      if (!startedAt) {
-        const currentTime = new Date().toISOString();
-        startedAt = currentTime;
-        
-        // Store timestamp in separate Redis key with expiration (24 hours)
-        await redis.setex(timestampKey, 86400, currentTime);
+      // Parse proxy information if available
+      let proxyInfo = null;
+      if (processingData.proxy) {
+        try {
+          proxyInfo = JSON.parse(processingData.proxy);
+        } catch (proxyParseError) {
+          logger.warn(`Failed to parse proxy data: ${proxyParseError.message}`);
+        }
       }
 
       const result = {
-        brand_id: parseInt(brandId),
-        job_id: `pending-${brandId}`,
+        brand_id: parseInt(processingData.brandId),
+        job_id: `processing-${processingData.brandId}`,
         brand_name: brand.actual_name || "Unknown",
-        page_id: brand.page_id || "Unknown",
-        status: brand.status || "Unknown",
-        started_at: startedAt, // Use existing timestamp or newly created one
-        processing_duration: 0,
+        page_id: processingData.pageId || brand.page_id || "Unknown",
+        status: processingData.status || brand.status || "Unknown",
+        started_at: processingData.startAt || new Date().toISOString(),
+        processing_duration: processingData.duration || 0,
         queue_position: 1,
-        is_processing: true, // Always true when scraper is running
-        processing_status: "pending_queue",
-        note: "Next brand to be processed from pending queue"
+        is_processing: true,
+        processing_status: processingData.status || "processing",
+        note: "Currently processing brand",
+        // Additional fields from Redis
+        total_ads: processingData.totalAds || 0,
+        proxy: proxyInfo,
+        raw_proxy: processingData.proxy
       };
 
       return result;
+    } catch (parseError) {
+      logger.error("Error parsing currently processing brand data:", parseError);
+      return null;
     }
-
-    // Second Priority: Check failed_brands queue if pending is empty
-    const failedLength = await redis.llen(QUEUES.FAILED_BRANDS);
-    
-    if (failedLength > 0) {
-      // Get first item from failed queue
-      const firstFailedItem = await redis.lindex(QUEUES.FAILED_BRANDS, 0);
-      
-      if (firstFailedItem) {
-        const brandData = JSON.parse(firstFailedItem);
-        const { id: brandId } = brandData;
-
-        const brand = await Brand.findOne({
-          where: { id: parseInt(brandId) },
-          attributes: ["actual_name", "page_id", "status"],
-          raw: true,
-        });
-
-        if (brand) {
-          // Use separate Redis key for timestamp instead of modifying queue item
-          const timestampKey = `processing:started_at:${brandId}`;
-          let startedAt = await redis.get(timestampKey);
-          
-          // Only set started_at if it doesn't exist (first time this brand becomes next in queue)
-          if (!startedAt) {
-            const currentTime = new Date().toISOString();
-            startedAt = currentTime;
-            
-            // Store timestamp in separate Redis key with expiration (24 hours)
-            await redis.setex(timestampKey, 86400, currentTime);
-          }
-          
-          return {
-            brand_id: parseInt(brandId),
-            job_id: `failed-retry-${brandId}`,
-            brand_name: brand.actual_name || "Unknown",
-            page_id: brand.page_id || "Unknown",
-            status: brand.status || "Unknown",
-            started_at: startedAt, // Use existing timestamp or newly created one
-            processing_duration: 0,
-            queue_position: 1,
-            is_processing: true, // Always true when scraper is running
-            processing_status: "failed_retry",
-            note: "Next brand to be retried from failed queue"
-          };
-        }
-      }
-    }
-
-    // No brands in either queue
-    return null;
   } catch (error) {
     logger.error("Error in getCurrentlyProcessing:", error);
     return null;
@@ -186,7 +129,7 @@ async function getCurrentlyProcessing() {
 
 async function getQueueStatistics() {
   try {
-    const pendingCount = await redis.llen(QUEUES.PENDING_BRANDS);
+    const pendingCount = await redis.zcard(QUEUES.PENDING_BRANDS);
 
     const failedCount = await redis.llen(QUEUES.FAILED_BRANDS);
 

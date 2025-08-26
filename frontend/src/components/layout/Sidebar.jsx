@@ -35,20 +35,19 @@ const Sidebar = () => {
 
 
       {isMobileMenuOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 z-[9998] md:hidden"
           onClick={closeMobileMenu}
         />
       )}
 
 
-      <div className={`fixed left-0 bottom-0 top-0 min-h-screen w-64 bg-gray-900 shadow-lg z-[9999] transform transition-transform duration-300 ease-in-out ${
-        isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-      }`}>
+      <div className={`fixed left-0 bottom-0 top-0 min-h-screen w-64 bg-gray-900 shadow-lg z-[9999] transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        }`}>
         <div className="flex items-center justify-center h-16 bg-gray-800">
           <h1 className="text-xl font-bold text-yellow-400">Queue Dashboard</h1>
         </div>
-        
+
         <div className="p-6">
           <nav className="space-y-2">
             {navItems.map((item) => {
@@ -59,10 +58,9 @@ const Sidebar = () => {
                   to={item.to}
                   onClick={closeMobileMenu}
                   className={({ isActive }) =>
-                    `flex items-center px-4 py-3 rounded-lg transition-colors ${
-                      isActive
-                        ? 'bg-yellow-500 text-gray-900'
-                        : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                    `flex items-center px-4 py-3 rounded-lg transition-colors ${isActive
+                      ? 'bg-yellow-500 text-gray-900'
+                      : 'text-gray-300 hover:bg-gray-800 hover:text-white'
                     }`
                   }
                 >
