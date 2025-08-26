@@ -5,9 +5,8 @@ import { Lock, User, X } from 'lucide-react';
 import useAdminStore from '../../stores/adminStore';
 import toast from 'react-hot-toast';
 
-const AdminLoginModal = ({ isOpen, onClose }) => {
+const AdminLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
   const { login } = useAdminStore();
-
 
   const [formState, setFormState] = useState({
     username: '',
@@ -18,20 +17,22 @@ const AdminLoginModal = ({ isOpen, onClose }) => {
 
   const { username, password, isSubmitting } = formState;
 
- 
   const updateFormState = (updates) => {
     setFormState(prev => ({ ...prev, ...updates }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!username.trim() || !password.trim()) return;
 
     try {
       updateFormState({ isSubmitting: true });
       await login({ username: username.trim(), password: password.trim() });
       onClose();
+      if (onLoginSuccess) {
+        onLoginSuccess();
+      }
     } catch (error) {
       toast.error(error.message || 'Login failed. Please try again.');
     } finally {
@@ -44,7 +45,6 @@ const AdminLoginModal = ({ isOpen, onClose }) => {
       onClose();
     }
   };
-
 
   useEffect(() => {
     if (isOpen) {
@@ -61,7 +61,7 @@ const AdminLoginModal = ({ isOpen, onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div 
+      <div
         className="bg-white rounded-lg shadow-xl w-full max-w-md mx-auto"
         onKeyDown={handleKeyDown}
       >
@@ -86,9 +86,8 @@ const AdminLoginModal = ({ isOpen, onClose }) => {
           </Button>
         </div>
 
- 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
- 
+
           <Input
             label="Username"
             id="username"
@@ -117,7 +116,6 @@ const AdminLoginModal = ({ isOpen, onClose }) => {
             variant="default"
           />
 
- 
           <Button
             type="submit"
             variant="primary"

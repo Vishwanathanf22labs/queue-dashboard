@@ -6,36 +6,42 @@ async function removePendingBrand(brandId) {
   try {
     logger.info(`Removing brand with ID ${brandId} from pending queue`);
 
-    const pendingBrands = await redis.lrange(QUEUES.PENDING_BRANDS, 0, -1);
+    const pendingBrands = await redis.zrange(QUEUES.PENDING_BRANDS, 0, -1, 'WITHSCORES');
 
     let brandToRemove = null;
-    let brandIndex = -1;
+    let brandMember = null;
 
-    for (let i = 0; i < pendingBrands.length; i++) {
+    // pendingBrands is [member1, score1, member2, score2, ...]
+    for (let i = 0; i < pendingBrands.length; i += 2) {
       try {
-        const brandData = JSON.parse(pendingBrands[i]);
+        const member = pendingBrands[i];
+        const score = pendingBrands[i + 1];
+        
+        if (!member) continue;
+        
+        const brandData = JSON.parse(member);
         if (
           brandData.id === brandId ||
           brandData.brand_id === brandId ||
           brandData.queue_id === brandId
         ) {
           brandToRemove = brandData;
-          brandIndex = i;
+          brandMember = member;
           break;
         }
       } catch (parseError) {
         logger.error(
-          `Error parsing pending brand data at index ${i}:`,
+          `Error parsing pending brand data:`,
           parseError
         );
       }
     }
 
-    if (brandIndex === -1) {
+    if (!brandMember) {
       throw new Error(`Brand with ID ${brandId} not found in pending queue`);
     }
 
-    await redis.lrem(QUEUES.PENDING_BRANDS, 1, pendingBrands[brandIndex]);
+    await redis.zrem(QUEUES.PENDING_BRANDS, brandMember);
 
     logger.info(
       `Successfully removed brand ${

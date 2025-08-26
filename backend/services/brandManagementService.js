@@ -5,24 +5,28 @@ const { QUEUES, BATCH_SIZE } = require("../config/constants");
 const { Op } = require("sequelize");
 
 async function getExistingPageIds() {
-  const existingItems = await redis.lrange(QUEUES.PENDING_BRANDS, 0, -1);
+  const existingItems = await redis.zrange(QUEUES.PENDING_BRANDS, 0, -1, 'WITHSCORES');
   const existingPageIds = new Set();
 
-  existingItems.forEach((item) => {
+  // existingItems is [member1, score1, member2, score2, ...]
+  for (let i = 0; i < existingItems.length; i += 2) {
     try {
-      const parsed = JSON.parse(item);
+      const member = existingItems[i];
+      if (!member) continue;
+      
+      const parsed = JSON.parse(member);
       existingPageIds.add(parsed.page_id);
     } catch (parseError) {
       logger.warn(`Failed to parse Redis item: ${parseError.message}`);
     }
-  });
+  }
 
   return existingPageIds;
 }
 
 async function addSingleBrandToQueue(brandData) {
   try {
-    const { id, page_id } = brandData;
+    const { id, page_id, score } = brandData;
 
     if (!id || !page_id) {
       throw new Error("Both id and page_id are required");
@@ -47,12 +51,14 @@ async function addSingleBrandToQueue(brandData) {
 
     const queueItem = JSON.stringify({
       id,
-      page_id,
-      added_at: new Date().toISOString(), // Add timestamp when brand is first added
+      page_id
     });
     // Use pipeline for consistency, even for single item
     const pipeline = redis.pipeline();
-    pipeline.rpush(QUEUES.PENDING_BRANDS, queueItem);
+    // Add to sorted set with user-provided score (or default to 0)
+    const queueScore = score !== undefined && score !== null ? score : 0;
+    logger.info(`Adding brand to pending queue: ${JSON.stringify({ id, page_id, score: queueScore, queueItem })}`);
+    pipeline.zadd(QUEUES.PENDING_BRANDS, queueScore, queueItem);
     await pipeline.exec();
 
     logger.info(`Added single brand to queue: ${page_id}`);
@@ -96,7 +102,7 @@ async function addBulkBrandsFromCSVToQueue(brandsData) {
 
     for (const brandData of brandsData) {
       try {
-        const { id, page_id } = brandData;
+        const { id, page_id, score } = brandData;
 
         if (!id || !page_id) {
           results.failed.push({
@@ -124,10 +130,11 @@ async function addBulkBrandsFromCSVToQueue(brandsData) {
 
         const queueItem = JSON.stringify({
           id,
-          page_id,
-          added_at: new Date().toISOString(), // Add timestamp when brand is first added
+          page_id
         });
-        pipeline.rpush(QUEUES.PENDING_BRANDS, queueItem);
+        // Add to sorted set with user-provided score (or default to 0)
+        const queueScore = score !== undefined && score !== null ? parseFloat(score) : 0;
+        pipeline.zadd(QUEUES.PENDING_BRANDS, queueScore, queueItem);
 
         existingPageIds.add(page_id);
         results.success.push({ id, page_id });
@@ -214,9 +221,11 @@ async function addAllBrandsToQueue(statusFilter = null) {
         if (!existingPageIds.has(brand.page_id)) {
           const queueItem = JSON.stringify({
             id: brand.id,
-            page_id: brand.page_id,
+            page_id: brand.page_id
           });
-          pipeline.rpush(QUEUES.PENDING_BRANDS, queueItem);
+          // Add to sorted set with default score 0 (normal priority)
+          const defaultScore = 0;
+          pipeline.zadd(QUEUES.PENDING_BRANDS, defaultScore, queueItem);
           existingPageIds.add(brand.page_id);
           addedCount++;
         } else {

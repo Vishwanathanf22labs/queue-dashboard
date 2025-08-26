@@ -7,14 +7,12 @@ import ErrorDisplay from '../components/ui/ErrorDisplay';
 import Table from '../components/ui/Table';
 import Pagination from '../components/ui/Pagination';
 import toast from 'react-hot-toast';
-
 import useQueueStore from '../stores/queueStore';
-import { queueAPI } from '../services/api';
 import { AlertCircle, Search, Users, Hash, Tag, XCircle, RefreshCw } from 'lucide-react';
 import SearchInput from '../components/ui/SearchInput';
 
 const FailedQueue = () => {
-  const { failedBrands, loading, fetchFailedBrands, error } = useQueueStore();
+  const { fetchFailedBrands } = useQueueStore();
   const [queueState, setQueueState] = useState({
     searchTerm: '',
     currentPage: 1,
@@ -25,30 +23,129 @@ const FailedQueue = () => {
     isSearching: false
   });
 
-  // Destructure for easier access
   const { searchTerm, currentPage, itemsPerPage, isRefreshing, brands, pagination, isSearching } = queueState;
 
-  // Helper function to update grouped state
   const updateQueueState = (updates) => {
     setQueueState(prev => ({ ...prev, ...updates }));
   };
 
-  // Load brands with server-side search
+  const columns = [
+    {
+      key: 'position',
+      label: 'Position',
+      render: (value, row, rowIndex) => {
+        const page = Number(currentPage) || 1;
+        const itemsPerPageNum = Number(itemsPerPage) || 10;
+        const rowIndexNum = Number(rowIndex) || 0;
+        const position = (page - 1) * itemsPerPageNum + rowIndexNum + 1;
+
+        return (
+          <div className="flex items-center">
+            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-red-100 rounded-full flex items-center justify-center">
+              <span className="text-xs sm:text-sm font-medium text-red-600">
+                {position}
+              </span>
+            </div>
+          </div>
+        );
+      },
+      className: 'hidden sm:table-cell'
+    },
+    {
+      key: 'brand_name',
+      label: 'Brand Name',
+      render: (value, row) => {
+        const brandName = value || row.brand_name || row.name || row.brandName || 'Unknown Brand';
+        return (
+          <div className="flex items-center">
+            <Users className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
+            <div className="text-xs font-medium text-gray-900 max-w-[80px] sm:max-w-none truncate">
+              {brandName}
+            </div>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'brand_id',
+      label: 'Brand ID',
+      render: (value, row) => {
+        const brandId = value || row.brand_id || row.id || row.queue_id || row.brandId || 'N/A';
+        return (
+          <div className="flex items-center">
+            <Hash className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
+            <span className="text-xs font-mono text-gray-900 max-w-[60px] sm:max-w-none truncate">
+              {brandId}
+            </span>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'page_id',
+      label: 'Page ID',
+      render: (value, row) => {
+        const pageId = value || row.page_id || row.pageId || row.page_id || 'N/A';
+        return (
+          <div className="flex items-center">
+            <Tag className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
+            <span className="text-xs font-mono text-gray-900 max-w-[70px] sm:max-w-none truncate">
+              {pageId}
+            </span>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: () => <Badge variant="error">Failed</Badge>,
+      className: 'hidden sm:table-cell'
+    },
+    {
+      key: 'error_message',
+      label: 'Error Message',
+      render: (value, row) => {
+        const errorMsg = value || row.error_message || row.error || row.message || 'Unknown error';
+        return (
+          <div className="text-xs text-red-600 max-w-[120px] sm:max-w-[200px] truncate" title={errorMsg}>
+            {errorMsg}
+          </div>
+        );
+      },
+      className: 'hidden lg:table-cell'
+    }
+  ];
+
   const loadFailedBrands = async (searchTerm = null) => {
     try {
-      // If searching, set searching state
       if (searchTerm) {
         updateQueueState({ isSearching: true });
       }
-      
-      // If searching, always search from page 1 to get all results
+
       const pageToLoad = searchTerm ? 1 : currentPage;
-      const response = await queueAPI.getFailedBrands(pageToLoad, itemsPerPage, searchTerm);
-      
+      const response = await fetchFailedBrands(pageToLoad, itemsPerPage, searchTerm);
+
+
+      let brands = [];
+      let pagination = {};
+
+      if (response.brands && response.pagination) {
+        brands = response.brands;
+        pagination = response.pagination;
+      } else if (response.data) {
+        brands = response.data.brands || response.data || [];
+        pagination = response.data.pagination || {};
+      } else {
+        brands = response || [];
+        pagination = {};
+      }
+
+
       updateQueueState({
-        brands: response.data.data?.brands || [],
-        pagination: response.data.data?.pagination || {},
-        currentPage: searchTerm ? 1 : currentPage, // Reset to page 1 when searching
+        brands,
+        pagination,
+        currentPage: pageToLoad,
         isSearching: false
       });
     } catch (error) {
@@ -57,14 +154,26 @@ const FailedQueue = () => {
     }
   };
 
-  // Initial data fetch only - no automatic refreshing
   useEffect(() => {
-    loadFailedBrands();
+    if (!searchTerm) {
+      loadFailedBrands();
+    }
   }, [currentPage, itemsPerPage]);
 
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchTerm && searchTerm.trim() !== '') {
+        loadFailedBrands(searchTerm);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
   const handleRefresh = async () => {
-    if (isRefreshing) return; // Prevent multiple clicks
-    
+    if (isRefreshing) return;
+
     updateQueueState({ isRefreshing: true });
     try {
       await loadFailedBrands();
@@ -76,51 +185,31 @@ const FailedQueue = () => {
     }
   };
 
-  // Handle search with server-side implementation
   const handleSearch = (searchTerm) => {
     updateQueueState({ searchTerm });
-    
-    // If search is cleared, reset to page 1 and load all brands
+
     if (!searchTerm || searchTerm.trim() === '') {
       updateQueueState({ currentPage: 1 });
       loadFailedBrands();
-      return;
     }
-    
-    // Reset to page 1 when searching
-    if (searchTerm !== queueState.searchTerm) {
-      updateQueueState({ currentPage: 1 });
-    }
-    // Load brands with search term
-    loadFailedBrands(searchTerm);
   };
 
-  // Clear search function
   const clearSearch = () => {
     updateQueueState({ searchTerm: '', currentPage: 1 });
     loadFailedBrands();
   };
 
-  // Use the brands directly since search is now server-side
   const filteredBrands = brands;
-  
-  const totalPages = pagination.total_pages || 1;
 
-  if (error) {
-    return (
-      <ErrorDisplay title="Error Loading Failed Queue" message={error}>
-        <Button onClick={() => window.location.reload()}>Retry</Button>
-      </ErrorDisplay>
-    );
-  }
+  const totalPages = pagination.total_pages || 1;
 
   return (
     <div className="space-y-3 sm:space-y-4 lg:space-y-6 xl:space-y-8">
- 
+
       <div className="mb-4 sm:mb-6 lg:mb-8">
         <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
-           
+
             <div>
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Failed Queue</h1>
               <p className="text-xs sm:text-sm lg:text-base text-gray-600">
@@ -196,7 +285,7 @@ const FailedQueue = () => {
               variant="default"
               showClearButton={true}
               onClear={clearSearch}
-              disabled={loading || isSearching}
+              disabled={isSearching}
             />
           </div>
           <div className="flex items-center space-x-3 sm:space-x-4 text-xs sm:text-sm text-gray-600">
@@ -218,11 +307,8 @@ const FailedQueue = () => {
         </div>
       </Card>
 
-
       <Card>
-        {loading && !failedBrands ? (
-          <LoadingState size="lg" message="Loading failed brands..." />
-        ) : isSearching ? (
+        {isSearching ? (
           <div className="text-center py-12 sm:py-16">
             <div className="flex flex-col items-center space-y-4">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
@@ -238,108 +324,19 @@ const FailedQueue = () => {
           <div className="text-center py-6 sm:py-8 lg:py-12">
             <AlertCircle className="h-8 w-8 sm:h-12 sm:w-12 lg:h-16 lg:w-16 text-gray-300 mx-auto mb-2 sm:mb-3 lg:mb-4" />
             <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No failed brands found</h3>
-            <p className="text-xs sm:text-sm lg:text-base text-gray-500">
+            <p className="text-sm text-gray-500">
               {searchTerm ? 'Try adjusting your search terms' : 'All brands processed successfully'}
             </p>
           </div>
         ) : (
           <Table
             data={filteredBrands}
-            columns={[
-              {
-                key: 'position',
-                label: 'Position',
-                render: (value, row, rowIndex) => {
-                  const page = Number(currentPage) || 1;
-                  const itemsPerPageNum = Number(itemsPerPage) || 10;
-                  const rowIndexNum = Number(rowIndex) || 0;
-                  const position = (page - 1) * itemsPerPageNum + rowIndexNum + 1;
-                  
-                  return (
-                    <div className="flex items-center">
-                      <div className="w-6 h-6 sm:w-8 sm:h-8 bg-red-100 rounded-full flex items-center justify-center">
-                        <span className="text-xs sm:text-sm font-medium text-red-600">
-                          {position}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                },
-                className: 'hidden sm:table-cell'
-              },
-              {
-                key: 'brand_name',
-                label: 'Brand Name',
-                render: (value, row) => {
-                  // Try multiple possible field names
-                  const brandName = value || row.brand_name || row.name || row.brandName || 'Unknown Brand';
-                  return (
-                    <div className="flex items-center">
-                      <Users className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
-                      <div className="text-xs font-medium text-gray-900 max-w-[80px] sm:max-w-none truncate">
-                        {brandName}
-                      </div>
-                    </div>
-                  );
-                }
-              },
-              {
-                key: 'brand_id',
-                label: 'Brand ID',
-                render: (value, row) => {
-                  // Try multiple possible field names
-                  const brandId = value || row.brand_id || row.id || row.queue_id || row.brandId || 'N/A';
-                  return (
-                    <div className="flex items-center">
-                      <Hash className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
-                      <span className="text-xs font-mono text-gray-900 max-w-[60px] sm:max-w-none truncate">
-                        {brandId}
-                      </span>
-                    </div>
-                  );
-                }
-              },
-              {
-                key: 'page_id',
-                label: 'Page ID',
-                render: (value, row) => {
-                  // Try multiple possible field names
-                  const pageId = value || row.page_id || row.pageId || row.page_id || 'N/A';
-                  return (
-                    <div className="flex items-center">
-                      <Tag className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
-                      <span className="text-xs font-mono text-gray-900 max-w-[70px] sm:max-w-none truncate">
-                        {pageId}
-                      </span>
-                    </div>
-                  );
-                }
-              },
-              {
-                key: 'status',
-                label: 'Status',
-                render: () => <Badge variant="error">Failed</Badge>,
-                className: 'hidden sm:table-cell'
-              },
-              {
-                key: 'error_message',
-                label: 'Error Message',
-                render: (value, row) => {
-                  const errorMsg = value || row.error_message || row.error || row.message || 'Unknown error';
-                  return (
-                    <div className="text-xs text-red-600 max-w-[120px] sm:max-w-[200px] truncate" title={errorMsg}>
-                      {errorMsg}
-                    </div>
-                  );
-                },
-                className: 'hidden lg:table-cell'
-              }
-            ]}
+            columns={columns}
             emptyMessage="No failed brands found"
+            className="shadow-md rounded-lg"
           />
         )}
       </Card>
-
 
       {totalPages > 1 && (
         <Pagination

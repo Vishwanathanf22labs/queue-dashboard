@@ -1,72 +1,92 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Button from '../ui/Button';
 import { queueAPI } from '../../services/api';
 
 const ScraperControls = ({ onStatusChange, onStatusDataChange, className = '' }) => {
-  const [scraperStatus, setScraperStatus] = useState('unknown');
-  const [isLoading, setIsLoading] = useState(false);
-  const [lastAction, setLastAction] = useState(null);
-  const [error, setError] = useState(null);
-  const [statusData, setStatusData] = useState(null);
+  const [state, setState] = useState({
+    scraperStatus: 'unknown',
+    isLoading: false,
+    lastAction: null,
+    error: null,
+    statusData: null
+  });
 
+  // Use refs to store the latest callback functions
+  const onStatusChangeRef = useRef(onStatusChange);
+  const onStatusDataChangeRef = useRef(onStatusDataChange);
+
+  // Update refs when props change
+  useEffect(() => {
+    onStatusChangeRef.current = onStatusChange;
+    onStatusDataChangeRef.current = onStatusDataChange;
+  }, [onStatusChange, onStatusDataChange]);
+
+  const updateState = useCallback((updates) => {
+    setState(prev => ({ ...prev, ...updates }));
+  }, []);
 
   const fetchScraperStatus = useCallback(async () => {
     try {
       const response = await queueAPI.getScraperStatus();
-      
-      // Check if response has the expected structure
       if (!response.data) {
-        setError('Invalid response structure from server');
-        setScraperStatus('stopped');
+        updateState({
+          error: 'Invalid response structure from server',
+          scraperStatus: 'stopped'
+        });
         return;
       }
-      
-      // Check if response.data.data exists (backend wraps status in data.data)
+
       if (!response.data.data) {
-        setError('Invalid response structure from server - missing data wrapper');
-        setScraperStatus('stopped');
+        updateState({
+          error: 'Invalid response structure from server - missing data wrapper',
+          scraperStatus: 'stopped'
+        });
         return;
       }
-      
-      // The backend wraps the status in response.data.data
+
       const status = response.data.data.status;
-      
-      // Ensure we have a valid status
+
       if (status && ['running', 'paused', 'stopped'].includes(status)) {
-        setScraperStatus(status);
-        setStatusData(response.data.data); // Store full status data
-        setError(null);
-        
-        // Notify parent component if callback exists
-        if (onStatusChange) {
-          onStatusChange(status);
+        updateState({
+          scraperStatus: status,
+          statusData: response.data.data,
+          error: null
+        });
+
+        // Use refs to avoid dependency issues
+        if (onStatusChangeRef.current) {
+          onStatusChangeRef.current(status);
         }
-        
-        // Notify parent component of status data changes
-        if (onStatusDataChange) {
-          onStatusDataChange(response.data.data);
+
+        if (onStatusDataChangeRef.current) {
+          onStatusDataChangeRef.current(response.data.data);
         }
       } else {
-        setScraperStatus('stopped'); // Default to stopped
-        setError(`Invalid status received: "${status}"`);
+        updateState({
+          scraperStatus: 'stopped',
+          error: `Invalid status received: "${status}"`
+        });
       }
     } catch (err) {
       console.error('Error fetching scraper status:', err);
-      setError('Failed to fetch scraper status');
-      setScraperStatus('stopped'); // Default to stopped on error
+      updateState({
+        error: 'Failed to fetch scraper status',
+        scraperStatus: 'stopped'
+      });
     }
-  }, []); // Remove dependencies to prevent recreation
+  }, [updateState]); // Only updateState as dependency
 
-  // Memoized function to handle scraper actions - won't recreate on every render
   const handleScraperAction = useCallback(async (action) => {
-    if (isLoading) return; // Prevent multiple simultaneous calls
-    
-    setIsLoading(true);
-    setError(null);
-    
+    if (state.isLoading) return;
+
+    updateState({
+      isLoading: true,
+      error: null
+    });
+
     try {
       let response;
-      
+
       switch (action) {
         case 'start':
           response = await queueAPI.startScraper();
@@ -83,33 +103,37 @@ const ScraperControls = ({ onStatusChange, onStatusDataChange, className = '' })
         default:
           throw new Error('Invalid action');
       }
-      
+
       if (response.data.success) {
-        setLastAction({
-          action,
-          timestamp: new Date().toISOString(),
-          message: response.data.message
+        updateState({
+          lastAction: {
+            action,
+            timestamp: new Date().toISOString(),
+            message: response.data.message
+          }
         });
-        
-        // Fetch updated status after successful action
+
+        // Fetch status after successful action
         await fetchScraperStatus();
       } else {
-        setError(response.data.message || `Failed to ${action} scraper`);
+        updateState({
+          error: response.data.message || `Failed to ${action} scraper`
+        });
       }
     } catch (err) {
       console.error(`Error ${action}ing scraper:`, err);
-      setError(err.response?.data?.message || `Failed to ${action} scraper`);
+      updateState({
+        error: err.response?.data?.message || `Failed to ${action} scraper`
+      });
     } finally {
-      setIsLoading(false);
+      updateState({ isLoading: false });
     }
-  }, [isLoading, fetchScraperStatus]);
+  }, [state.isLoading, fetchScraperStatus, updateState]);
 
-  // Fetch initial status on component mount - only once
+  // Fetch status only once on mount
   useEffect(() => {
     fetchScraperStatus();
-  }, []); // Empty dependency array - only run once
-
-  // Auto-refresh removed - users can manually refresh when needed
+  }, []); // Empty dependency array - only run on mount
 
   return (
     <div className={`bg-white rounded-lg border border-gray-200 p-6 shadow-sm ${className}`}>
@@ -117,17 +141,17 @@ const ScraperControls = ({ onStatusChange, onStatusDataChange, className = '' })
         <div className="flex items-center space-x-3">
           <h3 className="text-lg font-semibold text-gray-900">Scraper Controls</h3>
         </div>
-        
-        {lastAction && (
+
+        {state.lastAction && (
           <div className="text-sm text-gray-500">
-            Last action: {lastAction.action} at {new Date(lastAction.timestamp).toLocaleTimeString()}
+            Last action: {state.lastAction.action} at {new Date(state.lastAction.timestamp).toLocaleTimeString()}
           </div>
         )}
       </div>
 
-      {error && (
+      {state.error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-sm text-red-600">{error}</p>
+          <p className="text-sm text-red-600">{state.error}</p>
         </div>
       )}
 
@@ -136,8 +160,8 @@ const ScraperControls = ({ onStatusChange, onStatusDataChange, className = '' })
           variant="success"
           size="md"
           onClick={() => handleScraperAction('start')}
-          disabled={scraperStatus === 'running' || isLoading}
-          loading={isLoading && lastAction?.action === 'start'}
+          disabled={state.scraperStatus === 'running' || state.isLoading}
+          loading={state.isLoading && state.lastAction?.action === 'start'}
           className="w-full"
         >
           Start
@@ -147,8 +171,8 @@ const ScraperControls = ({ onStatusChange, onStatusDataChange, className = '' })
           variant="warning"
           size="md"
           onClick={() => handleScraperAction('pause')}
-          disabled={scraperStatus !== 'running' || isLoading}
-          loading={isLoading && lastAction?.action === 'pause'}
+          disabled={state.scraperStatus !== 'running' || state.isLoading}
+          loading={state.isLoading && state.lastAction?.action === 'pause'}
           className="w-full"
         >
           Pause
@@ -158,8 +182,8 @@ const ScraperControls = ({ onStatusChange, onStatusDataChange, className = '' })
           variant="primary"
           size="md"
           onClick={() => handleScraperAction('resume')}
-          disabled={scraperStatus !== 'paused' || isLoading}
-          loading={isLoading && lastAction?.action === 'resume'}
+          disabled={state.scraperStatus !== 'paused' || state.isLoading}
+          loading={state.isLoading && state.lastAction?.action === 'resume'}
           className="w-full"
         >
           Resume
@@ -169,8 +193,8 @@ const ScraperControls = ({ onStatusChange, onStatusDataChange, className = '' })
           variant="error"
           size="md"
           onClick={() => handleScraperAction('stop')}
-          disabled={scraperStatus === 'stopped' || isLoading}
-          loading={isLoading && lastAction?.action === 'stop'}
+          disabled={state.scraperStatus === 'stopped' || state.isLoading}
+          loading={state.isLoading && state.lastAction?.action === 'stop'}
           className="w-full"
         >
           Stop

@@ -1,7 +1,7 @@
 const express = require("express");
 const queueController = require("../controllers/queueController");
 const queueManagementRoutes = require("./queueManagementRoutes");
-const queuePriorityRoutes = require("./queuePriorityRoutes");
+
 const proxyManagementRoutes = require("./proxyManagementRoutes");
 const scraperControlController = require('../controllers/scraperControlController');
 const adminAuth = require("../middleware/adminAuth");
@@ -44,11 +44,17 @@ router.post(
   queueController.addBulkBrandsFromCSV
 );
 
+// Change brand score (ADMIN ONLY)
+router.put(
+  "/change-score",
+  adminAuth,
+  queueController.changeBrandScore
+);
+
 // Queue Management Routes - Imported from separate file (ALL require admin auth)
 router.use("/queue-management", queueManagementRoutes);
 
-// Priority Queue Management Routes - Admin only
-router.use("/priority", queuePriorityRoutes);
+
 
 // Proxy Management Routes - Admin only
 router.use("/proxy", proxyManagementRoutes);

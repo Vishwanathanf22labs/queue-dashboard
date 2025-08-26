@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect, forwardRef } from 'react';
 import { Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
-
+import Button from './Button';
 
 const Input = forwardRef(({
-  // Core props
   value = '',
   onChange,
   onBlur,
@@ -13,110 +12,86 @@ const Input = forwardRef(({
   type = 'text',
   name,
   id,
-  
-  // Label and description
   label,
   description,
   required = false,
-  
-  // Styling props
-  size = 'md', // 'sm', 'md', 'lg'
-  variant = 'default', // 'default', 'outline', 'filled', 'success', 'error'
+  size = 'md',
+  variant = 'default',
   className = '',
-  
-  // Functionality props
   disabled = false,
   readOnly = false,
   autoComplete,
   autoFocus = false,
   maxLength,
   minLength,
-  
-  // Icon props
   leftIcon = null,
   rightIcon = null,
-  
-  // Status props
   loading = false,
   error = null,
   success = null,
-  
-  // Password specific
   showPasswordToggle = false,
-  
-  // Container props
   containerClassName = '',
   fullWidth = true,
-  
-  // Accessibility
   'aria-label': ariaLabel,
   'aria-describedby': ariaDescribedby,
-  
-  // Validation
   pattern,
   min,
   max,
   step,
-  
-  // Event handlers
   onInput,
   onKeyUp,
   onKeyPress,
 }, ref) => {
-  const [internalValue, setInternalValue] = useState(value);
-  const [isFocused, setIsFocused] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [state, setState] = useState({
+    internalValue: value,
+    isFocused: false,
+    showPassword: false
+  });
+
+  const { internalValue, isFocused, showPassword } = state;
   const inputRef = useRef(null);
 
-  // Use forwarded ref or internal ref
   const finalRef = ref || inputRef;
 
-  // Sync internal value with external value
   useEffect(() => {
-    setInternalValue(value);
+    setState(prev => ({ ...prev, internalValue: value }));
   }, [value]);
 
-  // Handle input change
   const handleChange = (e) => {
     const newValue = e.target.value;
-    setInternalValue(newValue);
+    setState(prev => ({ ...prev, internalValue: newValue }));
     if (onChange) onChange(newValue);
     if (onInput) onInput(e);
   };
 
-  // Handle focus
   const handleFocus = (e) => {
-    setIsFocused(true);
+    setState(prev => ({ ...prev, isFocused: true }));
     if (onFocus) onFocus(e);
   };
 
-  // Handle blur
   const handleBlur = (e) => {
-    setIsFocused(false);
+    setState(prev => ({ ...prev, isFocused: false }));
     if (onBlur) onBlur(e);
   };
 
-  // Toggle password visibility
   const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
+    setState(prev => ({ ...prev, showPassword: !prev.showPassword }));
   };
 
-  // Get size classes
   const getSizeClasses = () => {
     switch (size) {
       case 'sm':
         return 'px-3 py-1.5 text-xs';
       case 'lg':
         return 'px-4 py-3 text-base';
-      default: // md
+      default:
         return 'px-3 py-2 text-sm';
     }
   };
 
-  // Get variant classes
   const getVariantClasses = () => {
     const baseClasses = 'border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-opacity-50';
-    
+
     switch (variant) {
       case 'outline':
         return `${baseClasses} border-gray-300 bg-white hover:border-gray-400 focus:border-blue-500 focus:ring-blue-500`;
@@ -126,36 +101,32 @@ const Input = forwardRef(({
         return `${baseClasses} border-green-300 bg-green-50 focus:border-green-500 focus:ring-green-500`;
       case 'error':
         return `${baseClasses} border-red-300 bg-red-50 focus:border-red-500 focus:ring-red-500`;
-      default: // default
+      default:
         return `${baseClasses} border-gray-300 bg-white hover:border-gray-400 focus:border-blue-500 focus:ring-blue-500`;
     }
   };
 
-  // Get icon size
   const getIconSize = () => {
     switch (size) {
       case 'sm':
         return 'h-3 w-3';
       case 'lg':
         return 'h-5 w-5';
-      default: // md
+      default:
         return 'h-4 w-4';
     }
   };
 
-  // Get left padding based on left icon
   const getLeftPadding = () => {
     if (leftIcon) return 'pl-10';
     return '';
   };
 
-  // Get right padding based on right icon and password toggle
   const getRightPadding = () => {
     if (rightIcon || showPasswordToggle) return 'pr-10';
     return '';
   };
 
-  // Get input type (handle password toggle)
   const getInputType = () => {
     if (type === 'password' && showPasswordToggle) {
       return showPassword ? 'text' : 'password';
@@ -163,39 +134,40 @@ const Input = forwardRef(({
     return type;
   };
 
-  // Get status icon
   const getStatusIcon = () => {
     if (loading) {
       return (
         <div className={`animate-spin rounded-full border-2 border-gray-300 border-t-blue-500 ${getIconSize()}`} />
       );
     }
-    
+
     if (error) {
       return <AlertCircle className={`${getIconSize()} text-red-500`} />;
     }
-    
+
     if (success) {
       return <CheckCircle className={`${getIconSize()} text-green-500`} />;
     }
-    
+
     if (showPasswordToggle && type === 'password') {
       return (
-        <button
+        <Button
           type="button"
           onClick={togglePasswordVisibility}
-          className={`text-gray-400 hover:text-gray-600 transition-colors ${getIconSize()}`}
+          variant="ghost"
+          size="sm"
+          className={`text-gray-400 hover:text-gray-600 transition-colors p-0 h-auto w-auto`}
           aria-label={showPassword ? 'Hide password' : 'Show password'}
         >
-          {showPassword ? <EyeOff /> : <Eye />}
-        </button>
+          {showPassword ? <EyeOff className={getIconSize()} /> : <Eye className={getIconSize()} />}
+        </Button>
       );
     }
-    
+
     if (rightIcon) {
       return <div className="text-gray-400">{rightIcon}</div>;
     }
-    
+
     return null;
   };
 
@@ -203,8 +175,8 @@ const Input = forwardRef(({
     <div className={`${fullWidth ? 'w-full' : ''} ${containerClassName}`}>
 
       {label && (
-        <label 
-          htmlFor={id || name} 
+        <label
+          htmlFor={id || name}
           className="block text-sm font-medium text-gray-700 mb-1"
         >
           {label}
@@ -218,14 +190,13 @@ const Input = forwardRef(({
 
 
       <div className="relative">
-  
+
         {leftIcon && (
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-400">
             {leftIcon}
           </div>
         )}
 
-    
         <input
           ref={finalRef}
           id={id || name}

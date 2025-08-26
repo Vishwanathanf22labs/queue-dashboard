@@ -9,7 +9,7 @@ async function initializeScraperStatus() {
     
     if (!currentStatus) {
       // Check if queues are empty
-      const pendingCount = await redis.llen(QUEUES.PENDING_BRANDS);
+      const pendingCount = await redis.zcard(QUEUES.PENDING_BRANDS);
       const failedCount = await redis.llen(QUEUES.FAILED_BRANDS);
       
       if (pendingCount === 0 && failedCount === 0) {
@@ -37,7 +37,7 @@ async function initializeScraperStatus() {
 // START SCRAPER
 async function startScraper() {
   try {
-    const pendingCount = await redis.llen(QUEUES.PENDING_BRANDS);
+    const pendingCount = await redis.zcard(QUEUES.PENDING_BRANDS);
     const failedCount = await redis.llen(QUEUES.FAILED_BRANDS);
     const currentStatus = await redis.get('scraper:status');
     
@@ -218,7 +218,7 @@ async function getScraperStatus() {
     // Ensure we have a valid status
     const finalStatus = syncedStatus || status || 'stopped';
     
-    const pendingCount = await redis.llen(QUEUES.PENDING_BRANDS);
+    const pendingCount = await redis.zcard(QUEUES.PENDING_BRANDS);
     const failedCount = await redis.llen(QUEUES.FAILED_BRANDS);
     
     // Clean up any existing paused_brands queue (legacy cleanup)

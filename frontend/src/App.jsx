@@ -15,13 +15,14 @@ function App() {
   const location = useLocation();
 
   useEffect(() => {
+    // Define pages that don't require admin access (public pages)
+    const publicPages = ['/', '/pending-queue', '/failed-queue'];
     
-    const readOnlyPages = ['/', '/pending-queue', '/failed-queue'];
-    
-    if (!readOnlyPages.includes(location.pathname)) {
+    // Only check admin status for admin-only pages, not for public pages
+    if (!publicPages.includes(location.pathname)) {
       checkAdminStatus();
     }
-  }, [location.pathname, checkAdminStatus]); // Run when location changes
+  }, [location.pathname, checkAdminStatus]);
 
   return (
     <Layout>

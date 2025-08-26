@@ -4,54 +4,78 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import BrandSearch from '../components/ui/BrandSearch';
 import AdminLoginModal from '../components/ui/AdminLoginModal';
+import AdminAccessRequired from '../components/ui/AdminAccessRequired';
+import CustomDropdown from '../components/ui/CustomDropdown';
+import SortedSetInput from '../components/ui/SortedSetInput';
 import useQueueStore from '../stores/queueStore';
 import useAdminStore from '../stores/adminStore';
 import { validateSingleBrand } from '../utils/validation';
 import { queueAPI } from '../services/api';
-import { Plus, Users, RefreshCw, Check, Shield, LogOut, FileText, Upload, X, CheckCircle, AlertCircle, ChevronDown } from 'lucide-react';
+import { Plus, RefreshCw, Check, Shield, LogOut, FileText, Upload, X, CheckCircle, AlertCircle } from 'lucide-react';
 import { tabs } from '../constants/data';
 
 const AddBrands = () => {
   const { loading } = useQueueStore();
   const { isAdmin, isLoading: adminLoading, logout } = useAdminStore();
 
-  // State declarations
-  const [formState, setFormState] = useState({
-    activeTab: 'single',
-    isSubmitting: false
-  });
-  
-  // Add All Brands filter state
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
-  
-  // Brand counts state
-  const [brandCounts, setBrandCounts] = useState(null);
-  
-  // CSV Upload State
-  const [csvState, setCsvState] = useState({
-    file: null,
-    uploadStatus: null,
-    uploadResult: null
-  });
-  
-  // Ref for file input element
-  const fileInputRef = useRef(null);
+  const getInitialLoginModalState = () => {
+    try {
+      const saved = localStorage.getItem('addBrands_showLoginModal');
+      return saved ? JSON.parse(saved) : false;
+    } catch {
+      return false;
+    }
+  };
 
-  // Destructure for easier access
-  const { activeTab, isSubmitting } = formState;
-  const { file: csvFile, uploadStatus: csvUploadStatus, uploadResult: csvUploadResult } = csvState;
+  const getInitialSingleBrand = () => {
+    try {
+      const saved = localStorage.getItem('addBrands_singleBrand');
+      return saved ? JSON.parse(saved) : { id: '', page_id: '', name: '', score: 0 };
+    } catch {
+      return { id: '', page_id: '', name: '', score: 0 };
+    }
+  };
 
-  // Helper functions to update grouped state
+  const [state, setState] = useState({
+    formState: {
+      activeTab: 'single',
+      isSubmitting: false
+    },
+    statusFilter: 'all',
+    brandCounts: null,
+    csvState: {
+      file: null,
+      uploadStatus: null,
+      uploadResult: null
+    },
+    showLoginModal: getInitialLoginModalState(),
+    singleBrandForm: getInitialSingleBrand()
+  });
+
+  const { activeTab, isSubmitting } = state.formState;
+  const { file: csvFile, uploadStatus: csvUploadStatus, uploadResult: csvUploadResult } = state.csvState;
+
+  const updateState = (updates) => {
+    setState(prev => ({ ...prev, ...updates }));
+  };
+
   const updateFormState = (updates) => {
-    setFormState(prev => ({ ...prev, ...updates }));
+    setState(prev => ({
+      ...prev,
+      formState: { ...prev.formState, ...updates }
+    }));
   };
 
   const updateCsvState = (updates) => {
-    setCsvState(prev => ({ ...prev, ...updates }));
+    setState(prev => ({
+      ...prev,
+      csvState: { ...prev.csvState, ...updates }
+    }));
   };
 
-  // Initialize active tab from localStorage
+  const fileInputRef = useRef(null);
+
+
   useEffect(() => {
     const savedTab = localStorage.getItem('addBrands_activeTab');
     if (savedTab && ['single', 'csv', 'all'].includes(savedTab)) {
@@ -59,39 +83,24 @@ const AddBrands = () => {
     }
   }, []);
 
-  // Save active tab to localStorage whenever it changes
+
   useEffect(() => {
     localStorage.setItem('addBrands_activeTab', activeTab);
   }, [activeTab]);
 
-  // Fetch brand counts when component mounts
+
   useEffect(() => {
     if (isAdmin) {
       fetchBrandCounts();
     }
   }, [isAdmin]);
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showStatusDropdown && !event.target.closest('.status-filter-dropdown')) {
-        setShowStatusDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showStatusDropdown]);
-
-  // Initialize CSV upload result from localStorage
   useEffect(() => {
     try {
       const savedResult = localStorage.getItem('addBrands_csvUploadResult');
       if (savedResult) {
         const parsedResult = JSON.parse(savedResult);
-        // Only restore if it's recent (within last 10 minutes)
+
         if (parsedResult.timestamp && (Date.now() - new Date(parsedResult.timestamp).getTime()) < 10 * 60 * 1000) {
           updateCsvState({ uploadResult: parsedResult });
         } else {
@@ -104,7 +113,6 @@ const AddBrands = () => {
     }
   }, []);
 
-  // Save CSV upload result to localStorage
   const saveCsvUploadResult = (result) => {
     if (result) {
       const resultToSave = {
@@ -118,67 +126,39 @@ const AddBrands = () => {
       updateCsvState({ uploadResult: null });
     }
   };
-  
-  // Fetch brand counts
+
   const fetchBrandCounts = async () => {
     try {
       const response = await queueAPI.getBrandCounts();
       if (response.data.success) {
-        setBrandCounts(response.data.data);
+        updateState({ brandCounts: response.data.data });
       }
     } catch (error) {
       console.error('Failed to fetch brand counts:', error);
     }
   };
-  
-  // Initialize showLoginModal from localStorage to persist across refreshes
-  const getInitialLoginModalState = () => {
-    try {
-      const saved = localStorage.getItem('addBrands_showLoginModal');
-      return saved ? JSON.parse(saved) : false;
-    } catch {
-      return false;
-    }
-  };
-  
-  const [showLoginModal, setShowLoginModal] = useState(getInitialLoginModalState);
-  
-  // Functions to handle modal state with localStorage persistence
+
   const openLoginModal = () => {
-    setShowLoginModal(true);
+    updateState({ showLoginModal: true });
     localStorage.setItem('addBrands_showLoginModal', 'true');
   };
-  
+
   const closeLoginModal = () => {
-    setShowLoginModal(false);
+    updateState({ showLoginModal: false });
     localStorage.removeItem('addBrands_showLoginModal');
   };
-  
-  // Clear login modal state when user successfully logs in as admin
+
   useEffect(() => {
-    if (isAdmin && showLoginModal) {
+    if (isAdmin && state.showLoginModal) {
       closeLoginModal();
     }
-  }, [isAdmin, showLoginModal]);
-  
-  // Initialize state with localStorage data if available
-  const getInitialSingleBrand = () => {
-    try {
-      const saved = localStorage.getItem('addBrands_singleBrand');
-      return saved ? JSON.parse(saved) : { id: '', page_id: '', name: '' };
-    } catch {
-      return { id: '', page_id: '', name: '' };
-    }
-  };
+  }, [isAdmin, state.showLoginModal]);
 
-  const [singleBrandForm, setSingleBrandForm] = useState(getInitialSingleBrand);
-
-  // Save to localStorage whenever forms change
   useEffect(() => {
-    localStorage.setItem('addBrands_singleBrand', JSON.stringify(singleBrandForm));
-  }, [singleBrandForm]);
+    localStorage.setItem('addBrands_singleBrand', JSON.stringify(state.singleBrandForm));
+  }, [state.singleBrandForm]);
 
-  // Handle brand selection from search
+
   const handleSingleBrandSelect = (brand) => {
     if (brand) {
       const newForm = {
@@ -186,47 +166,43 @@ const AddBrands = () => {
         page_id: brand.page_id,
         name: brand.brand_name
       };
-      setSingleBrandForm(newForm);
+      updateState({ singleBrandForm: newForm });
       toast.success(`Selected: ${brand.brand_name}`);
     } else {
-      setSingleBrandForm({ id: '', page_id: '', name: '' });
+      updateState({ singleBrandForm: { id: '', page_id: '', name: '' } });
     }
   };
 
-  // Check if search should be disabled (when brand is already selected)
   const isSearchDisabled = (formData) => {
     return Boolean(formData.id && formData.page_id && formData.name);
   };
 
-  // Handle search attempt when brand is already selected
   const handleSearchAttempt = () => {
-    if (isSearchDisabled(singleBrandForm)) {
+    if (isSearchDisabled(state.singleBrandForm)) {
       toast.error('Only one brand allowed. Please remove the current brand first.');
       return;
     }
   };
 
-  // Clear search input after successful brand addition
   const clearSearchInputs = () => {
-    // Clear single brand form
-    setSingleBrandForm(getInitialSingleBrand);
-    // Clear localStorage
+
+    updateState({ singleBrandForm: getInitialSingleBrand() });
+
     localStorage.removeItem('addBrands_singleBrand');
   };
 
-  // CSV Upload handlers
   const handleCsvFileSelect = (file) => {
     if (file) {
-      updateCsvState({ 
-        file: file, 
-        uploadStatus: null, 
-        uploadResult: null 
+      updateCsvState({
+        file: file,
+        uploadStatus: null,
+        uploadResult: null
       });
     } else {
-      updateCsvState({ 
-        file: null, 
-        uploadStatus: null, 
-        uploadResult: null 
+      updateCsvState({
+        file: null,
+        uploadStatus: null,
+        uploadResult: null
       });
     }
   };
@@ -245,23 +221,22 @@ const AddBrands = () => {
     try {
       updateFormState({ isSubmitting: true });
       updateCsvState({ uploadStatus: { type: 'uploading', message: 'Uploading CSV file...' } });
-      
+
       const result = await queueAPI.addBulkBrandsFromCSV(csvFile);
-      
-      // Handle successful upload
+
       if (result && result.data) {
         const summary = result.data.summary || result.data;
         const results = result.data.results || result.data;
-        
+
         let successMessage = result.message || 'CSV uploaded successfully!';
         let totalAdded = summary.totalAdded || 0;
         let totalErrors = summary.totalErrors || 0;
         let csvErrors = summary.csvErrors || 0;
         let duplicates = summary.duplicates || 0;
-        
-        // Show appropriate toast based on results
+
+
         if (totalAdded > 0) {
-          // Some brands were added successfully
+
           toast.success(successMessage);
         } else if (duplicates > 0) {
           toast.error(successMessage);
@@ -270,7 +245,7 @@ const AddBrands = () => {
         } else {
           toast(successMessage);
         }
-        
+
 
         const uploadResult = {
           type: 'success',
@@ -284,14 +259,14 @@ const AddBrands = () => {
             uploadedAt: new Date().toISOString()
           }
         };
-        
+
         saveCsvUploadResult(uploadResult);
-       
-        updateCsvState({ 
+
+        updateCsvState({
           uploadStatus: { type: 'success', message: successMessage }
         });
-        
-        
+
+
         setTimeout(() => {
           updateCsvState({ uploadStatus: null });
 
@@ -300,28 +275,28 @@ const AddBrands = () => {
           if (fileInputRef.current) {
             fileInputRef.current.value = '';
           }
-        }, 3000); 
-        
-      
+        }, 3000);
+
+
         setTimeout(() => {
           saveCsvUploadResult(null);
-        }, 5000); 
-        
+        }, 5000);
+
       } else {
         throw new Error('Invalid response structure from server');
       }
-      
+
     } catch (error) {
       console.error('CSV Upload Error:', error);
-      
+
       const errorMessage = error.response?.data?.message || error.message || 'Failed to upload CSV file';
       toast.error(errorMessage);
-      
-      updateCsvState({ 
+
+      updateCsvState({
         uploadStatus: { type: 'error', message: errorMessage }
       });
-      
- 
+
+
       saveCsvUploadResult(null);
     } finally {
       updateFormState({ isSubmitting: false });
@@ -330,9 +305,9 @@ const AddBrands = () => {
 
 
   const clearCsvUpload = () => {
-    updateCsvState({ 
-      file: null, 
-      uploadStatus: null 
+    updateCsvState({
+      file: null,
+      uploadStatus: null
     });
     saveCsvUploadResult(null);
 
@@ -343,25 +318,26 @@ const AddBrands = () => {
 
 
   const clearCsvUploadResult = () => {
-    saveCsvUploadResult(null); 
+    saveCsvUploadResult(null);
   };
 
   const handleSingleBrandSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (isSubmitting || loading) {
       toast.error('Please wait, a brand is already being processed.');
       return;
     }
-    
-    if (!singleBrandForm.id || !singleBrandForm.page_id) {
+
+    if (!state.singleBrandForm.id || !state.singleBrandForm.page_id) {
       toast.error('Please search and select a brand first.');
       return;
     }
-    
+
     const validation = validateSingleBrand({
-      id: parseInt(singleBrandForm.id),
-      page_id: singleBrandForm.page_id
+      id: parseInt(state.singleBrandForm.id),
+      page_id: state.singleBrandForm.page_id,
+      score: state.singleBrandForm.score || 0
     });
 
     if (!validation.success) {
@@ -374,6 +350,12 @@ const AddBrands = () => {
       const result = await queueAPI.addSingleBrand(validation.data);
       toast.success(result.message || 'Brand added successfully');
       clearSearchInputs();
+      
+      // Auto-remove the selected brand after 3 seconds
+      setTimeout(() => {
+        updateState({ singleBrandForm: { id: '', page_id: '', name: '', score: 0 } });
+      }, 3000);
+      
     } catch (error) {
       toast.error(error.message || 'Failed to add brand');
     } finally {
@@ -384,14 +366,13 @@ const AddBrands = () => {
   const handleAddAllBrands = async () => {
     try {
       updateFormState({ isSubmitting: true });
-      
-      // Only pass status if it's not 'all'
-      const statusParam = statusFilter === 'all' ? null : statusFilter;
+
+
+      const statusParam = state.statusFilter === 'all' ? null : state.statusFilter;
       const result = await queueAPI.addAllBrands(statusParam);
-      
+
       toast.success(result.message || 'Brands added successfully');
-      
-      // Refresh brand counts after adding brands
+
       await fetchBrandCounts();
     } catch (error) {
       toast.error(error.message || 'Failed to add brands');
@@ -410,7 +391,7 @@ const AddBrands = () => {
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Add Brands</h1>
               <p className="text-xs sm:text-sm lg:text-base text-gray-600">Add brands to the processing queue</p>
             </div>
-  
+
             {adminLoading ? (
               <div className="flex items-center px-2 sm:px-3 py-2 text-xs sm:text-sm text-gray-500">
                 <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-gray-400 mr-2"></div>
@@ -447,31 +428,12 @@ const AddBrands = () => {
         </div>
 
         {!adminLoading && !isAdmin && (
-          <Card>
-            <div className="p-4 sm:p-6 lg:p-8 text-center">
-              <div className="flex flex-col items-center space-y-3 sm:space-y-4">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-pink-100 border border-pink-200 rounded-full flex items-center justify-center">
-                  <Shield className="h-6 w-6 sm:h-8 sm:w-8 text-red-500" />
-                </div>
-                <div>
-                  <h3 className="text-base sm:text-lg font-medium text-gray-900">Admin Access Required</h3>
-                  <p className="text-xs sm:text-sm text-gray-600 mt-1">
-                    This page requires administrator privileges. Please log in with<br className="hidden sm:block" />
-                    your admin credentials to add brands to the queue.
-                  </p>
-                </div>
-                <Button
-                  variant="primary"
-                  size="md"
-                  onClick={openLoginModal}
-                  className="flex items-center space-x-2 mt-3 sm:mt-4"
-                >
-                  <Shield className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
-                  <span>Login as Admin</span>
-                </Button>
-              </div>
-            </div>
-          </Card>
+          <AdminAccessRequired
+            title="Admin Access Required"
+            description="This page requires administrator privileges. Please log in with your admin credentials to add brands to the queue."
+            showLoginButton={true}
+            onLoginClick={openLoginModal}
+          />
         )}
 
 
@@ -482,15 +444,15 @@ const AddBrands = () => {
                 <nav className="-mb-px flex flex-wrap space-x-2 sm:space-x-8">
                   {tabs.map((tab) => {
                     const Icon = tab.icon;
-                    
+
                     return (
-                                              <Button
-                          key={tab.id}
-                          variant={activeTab === tab.id ? 'tab-active' : 'tab'}
-                          size="sm"
-                          onClick={() => updateFormState({ activeTab: tab.id })}
-                          className="py-2 px-2 sm:px-1 text-xs sm:text-sm flex items-center space-x-1 sm:space-y-0 sm:space-x-2 whitespace-nowrap relative"
-                        >
+                      <Button
+                        key={tab.id}
+                        variant={activeTab === tab.id ? 'tab-active' : 'tab'}
+                        size="sm"
+                        onClick={() => updateFormState({ activeTab: tab.id })}
+                        className="py-2 px-2 sm:px-1 text-xs sm:text-sm flex items-center space-x-1 sm:space-y-0 sm:space-x-2 whitespace-nowrap relative"
+                      >
                         <Icon className="h-3 w-3 sm:h-4 sm:w-4" />
                         <span>{tab.label}</span>
                       </Button>
@@ -510,20 +472,20 @@ const AddBrands = () => {
                         <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2 sm:mb-3">
                           Search Brand <span className="text-red-500">*</span>
                         </label>
-                        <BrandSearch 
+                        <BrandSearch
                           onBrandSelect={handleSingleBrandSelect}
                           placeholder="Type brand name to search (e.g., 'nike', 'adidas')..."
-                          selectedBrand={singleBrandForm.id ? singleBrandForm : null}
-                          disabled={Boolean(isSubmitting || loading || isSearchDisabled(singleBrandForm))}
+                          selectedBrand={state.singleBrandForm.id ? state.singleBrandForm : null}
+                          disabled={Boolean(isSubmitting || loading || isSearchDisabled(state.singleBrandForm))}
                           onSearchAttempt={handleSearchAttempt}
                         />
                         <p className="mt-1.5 sm:mt-1 text-xs sm:text-sm text-gray-500 leading-relaxed">
                           Only one brand can be selected at a time
                         </p>
                       </div>
-                      
-        
-                      {singleBrandForm.id && singleBrandForm.page_id && (
+
+
+                      {state.singleBrandForm.id && state.singleBrandForm.page_id && (
                         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-3">
@@ -533,9 +495,16 @@ const AddBrands = () => {
                                 </div>
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-green-800">{singleBrandForm.name}</p>
+                                <p className="text-sm font-medium text-green-800">{state.singleBrandForm.name}</p>
                                 <p className="text-sm text-green-700">
-                                  Brand ID: {singleBrandForm.id} | Page ID: {singleBrandForm.page_id}
+                                  Brand ID: {state.singleBrandForm.id} | Page ID: {state.singleBrandForm.page_id}
+                                </p>
+                                <p className="text-sm text-green-600">
+                                  Queue Score: {state.singleBrandForm.score} 
+                                  {state.singleBrandForm.score === 1 && ' (Priority)'}
+                                  {state.singleBrandForm.score === 0 && ' (Normal)'}
+                                  {state.singleBrandForm.score > 1 && ' (High Priority)'}
+                                  {state.singleBrandForm.score < 0 && ' (Low Priority)'}
                                 </p>
                               </div>
                             </div>
@@ -543,7 +512,7 @@ const AddBrands = () => {
                               variant="remove"
                               size="sm"
                               onClick={() => {
-                                setSingleBrandForm({ id: '', page_id: '', name: '' });
+                                updateState({ singleBrandForm: { id: '', page_id: '', name: '', score: 0 } });
                               }}
                               className="ml-3"
                             >
@@ -552,9 +521,23 @@ const AddBrands = () => {
                           </div>
                         </div>
                       )}
+
+                      <SortedSetInput
+                        score={state.singleBrandForm.score}
+                        onScoreChange={(score) => {
+                          updateState({
+                            singleBrandForm: {
+                              ...state.singleBrandForm,
+                              score: score !== null ? score : 0
+                            }
+                          });
+                        }}
+                        disabled={!state.singleBrandForm.id || isSubmitting || loading}
+                        className="mt-4"
+                      />
                     </div>
                   </div>
-                  <Button type="submit" variant="primary" disabled={loading || isSubmitting || !singleBrandForm.id} className="w-full sm:w-auto">
+                  <Button type="submit" variant="primary" disabled={loading || isSubmitting || !state.singleBrandForm.id} className="w-full sm:w-auto">
                     <Plus className="h-4 w-4 mr-2" />
                     {isSubmitting ? 'Adding Brand...' : 'Add Brand'}
                   </Button>
@@ -567,7 +550,7 @@ const AddBrands = () => {
                     <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2 sm:mb-3 lg:mb-4">Upload CSV File</h3>
 
                     {!csvFile ? (
-                      <div 
+                      <div
                         className="border-2 border-dashed border-gray-300 rounded-lg p-4 sm:p-6 lg:p-8 text-center hover:border-gray-400 transition-colors"
                         onDrop={(e) => {
                           e.preventDefault();
@@ -588,7 +571,7 @@ const AddBrands = () => {
                           <div className="p-2 sm:p-3 bg-gray-100 rounded-full">
                             <Upload className="h-6 w-6 sm:h-8 sm:w-8 text-gray-600" />
                           </div>
-                          
+
                           <div>
                             <p className="text-base sm:text-lg font-medium text-gray-900">Upload CSV File</p>
                             <p className="text-xs sm:text-sm text-gray-500 mt-1">
@@ -604,7 +587,7 @@ const AddBrands = () => {
                               </Button>
                             </p>
                           </div>
-                          
+
                           <div className="text-xs text-gray-400">
                             <p>Supported formats: .csv</p>
                             <p>Max size: 5MB</p>
@@ -626,7 +609,7 @@ const AddBrands = () => {
                               </p>
                             </div>
                           </div>
-                          
+
                           <Button
                             variant="secondary"
                             size="sm"
@@ -640,7 +623,7 @@ const AddBrands = () => {
                       </div>
                     )}
 
-       
+
                     <input
                       id="csv-file-input"
                       type="file"
@@ -650,7 +633,7 @@ const AddBrands = () => {
                         if (file) {
                           handleCsvFileSelect(file);
                         }
-                   
+
                         e.target.value = '';
                       }}
                       className="hidden"
@@ -658,15 +641,14 @@ const AddBrands = () => {
                     />
 
                     {csvUploadStatus && (
-                      <div className={`p-3 rounded-lg ${
-                        csvUploadStatus.type === 'uploading' 
-                          ? 'bg-blue-50 border border-blue-200 text-blue-800'
-                          : csvUploadStatus.type === 'error'
+                      <div className={`p-3 rounded-lg ${csvUploadStatus.type === 'uploading'
+                        ? 'bg-blue-50 border border-blue-200 text-blue-800'
+                        : csvUploadStatus.type === 'error'
                           ? 'bg-red-50 border border-red-200 text-red-800'
                           : csvUploadStatus.type === 'success'
-                          ? 'bg-green-50 border border-green-200 text-green-800'
-                          : 'bg-gray-50 border border-gray-200 text-gray-800'
-                      }`}>
+                            ? 'bg-green-50 border border-green-200 text-green-800'
+                            : 'bg-gray-50 border border-gray-200 text-gray-800'
+                        }`}>
                         <div className="flex items-center space-x-2">
                           {csvUploadStatus.type === 'uploading' && (
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
@@ -693,7 +675,7 @@ const AddBrands = () => {
                           <Upload className="h-4 w-4 mr-2" />
                           {isSubmitting ? 'Uploading...' : 'Upload CSV'}
                         </Button>
-                        
+
                         <Button
                           onClick={clearCsvUpload}
                           variant="outline"
@@ -745,7 +727,7 @@ const AddBrands = () => {
                               )}
                             </div>
                           </div>
-                          
+
                           <Button
                             variant="secondary"
                             size="sm"
@@ -766,88 +748,44 @@ const AddBrands = () => {
                 <div className="space-y-3 sm:space-y-4 lg:space-y-6">
                   <div>
                     <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2 sm:mb-3 lg:mb-4">Add All Brands</h3>
-                    
-                    {/* Brand Counts Display */}
-                    {brandCounts && (
+
+                    {state.brandCounts && (
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                         <div className="bg-gray-50 rounded-lg p-3 text-center">
-                          <div className="text-lg font-semibold text-gray-900">{brandCounts.total}</div>
+                          <div className="text-lg font-semibold text-gray-900">{state.brandCounts.total}</div>
                           <div className="text-xs text-gray-600">Total Brands</div>
                         </div>
                         <div className="bg-green-50 rounded-lg p-3 text-center">
-                          <div className="text-lg font-semibold text-green-600">{brandCounts.active}</div>
+                          <div className="text-lg font-semibold text-green-600">{state.brandCounts.active}</div>
                           <div className="text-xs text-green-600">Active Brands</div>
                         </div>
                         <div className="bg-red-50 rounded-lg p-3 text-center">
-                          <div className="text-lg font-semibold text-red-600">{brandCounts.inactive}</div>
-                          <div className="text-xs text-red-600">Inactive Brands</div>
+                          <div className="text-lg font-semibold text-red-600">{state.brandCounts.inactive}</div>
+                          <div className="text-xs text-gray-600">Inactive Brands</div>
                         </div>
                       </div>
                     )}
-                    
-                    {/* Status Filter Dropdown */}
-                    <div className="relative status-filter-dropdown w-full max-w-xs mb-4">
-                      <button
-                        type="button"
-                        onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                        className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                      >
-                        <span>
-                          {statusFilter === 'all' 
-                            ? 'All Brands' 
-                            : statusFilter === 'Active' 
-                              ? 'Active Brands Only' 
-                              : 'Inactive Brands Only'
-                          }
-                        </span>
-                        <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform duration-200 ${
-                          showStatusDropdown ? 'rotate-180' : ''
-                        }`} />
-                      </button>
-                      
-                      {showStatusDropdown && (
-                        <div className="absolute right-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setStatusFilter('all');
-                              setShowStatusDropdown(false);
-                            }}
-                            className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
-                              statusFilter === 'all' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
-                            }`}
-                          >
-                            All Brands {brandCounts ? `(${brandCounts.total})` : ''}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setStatusFilter('Active');
-                              setShowStatusDropdown(false);
-                            }}
-                            className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
-                              statusFilter === 'Active' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
-                            }`}
-                          >
-                            Active Brands Only {brandCounts ? `(${brandCounts.active})` : ''}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setStatusFilter('Inactive');
-                              setShowStatusDropdown(false);
-                            }}
-                            className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
-                              statusFilter === 'Inactive' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
-                            }`}
-                          >
-                            Inactive Brands Only {brandCounts ? `(${brandCounts.inactive})` : ''}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Action Button */}
+
+                    <CustomDropdown
+                      options={[
+                        {
+                          value: 'all',
+                          label: `All Brands ${state.brandCounts ? `(${state.brandCounts.total})` : ''}`
+                        },
+                        {
+                          value: 'Active',
+                          label: `Active Brands Only ${state.brandCounts ? `(${state.brandCounts.active})` : ''}`
+                        },
+                        {
+                          value: 'Inactive',
+                          label: `Inactive Brands Only ${state.brandCounts ? `(${state.brandCounts.inactive})` : ''}`
+                        }
+                      ]}
+                      value={state.statusFilter}
+                      onChange={(value) => updateState({ statusFilter: value })}
+                      className="w-full max-w-xs mb-4"
+                    />
+
                     <Button
                       onClick={handleAddAllBrands}
                       variant="primary"
@@ -855,11 +793,11 @@ const AddBrands = () => {
                       className="w-full"
                     >
                       <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                      {isSubmitting 
-                        ? 'Adding Brands...' 
-                        : statusFilter === 'all' 
-                          ? 'Add All Brands to Queue' 
-                          : `Add ${statusFilter} Brands to Queue`
+                      {isSubmitting
+                        ? 'Adding Brands...'
+                        : state.statusFilter === 'all'
+                          ? 'Add All Brands to Queue'
+                          : `Add ${state.statusFilter} Brands to Queue`
                       }
                     </Button>
                   </div>
@@ -870,9 +808,9 @@ const AddBrands = () => {
         )}
 
 
-        <AdminLoginModal 
-          isOpen={showLoginModal} 
-          onClose={closeLoginModal} 
+        <AdminLoginModal
+          isOpen={state.showLoginModal}
+          onClose={closeLoginModal}
         />
       </div>
     </div>

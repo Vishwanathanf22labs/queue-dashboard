@@ -3,7 +3,7 @@ const logger = require("../utils/logger");
 
 async function addSingleBrand(req, res) {
   try {
-    const { id, page_id } = req.body;
+    const { id, page_id, score } = req.body;
 
     if (!id || !page_id) {
       return res.status(400).json({
@@ -12,11 +12,22 @@ async function addSingleBrand(req, res) {
         example: {
           id: 5325,
           page_id: "114512100010596",
+          score: 1
         },
       });
     }
 
-    const result = await queueService.addSingleBrandToQueue({ id, page_id });
+    // Validate score (optional, defaults to 0)
+    const validScore = score !== undefined && score !== null ? parseFloat(score) : 0;
+    
+    if (isNaN(validScore)) {
+      return res.status(400).json({
+        success: false,
+        message: "Score must be a valid number"
+      });
+    }
+
+    const result = await queueService.addSingleBrandToQueue({ id, page_id, score: validScore });
 
     res.status(201).json({
       success: true,

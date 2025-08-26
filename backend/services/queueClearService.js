@@ -6,7 +6,7 @@ async function clearAllQueues() {
   try {
     logger.info("Clearing all queues (pending and failed)");
 
-    const pendingCount = await redis.llen(QUEUES.PENDING_BRANDS);
+    const pendingCount = await redis.zcard(QUEUES.PENDING_BRANDS);
     const failedCount = await redis.llen(QUEUES.FAILED_BRANDS);
 
     await redis.del(QUEUES.PENDING_BRANDS);
@@ -34,7 +34,7 @@ async function clearPendingQueue() {
   try {
     logger.info("Clearing entire pending queue");
 
-    const pendingCount = await redis.llen(QUEUES.PENDING_BRANDS);
+    const pendingCount = await redis.zcard(QUEUES.PENDING_BRANDS);
 
     await redis.del(QUEUES.PENDING_BRANDS);
 
