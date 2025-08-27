@@ -6,6 +6,7 @@ const useQueueStore = create((set, get) => ({
   nextBrand: null,
   pendingBrands: null,
   failedBrands: null,
+  watchlistBrands: null,
   brandProcessingQueue: null,
   scrapedStats: null,
   loading: false,
@@ -49,6 +50,19 @@ const useQueueStore = create((set, get) => ({
       return response.data.data;
     } catch (error) {
       console.error("Failed brands API error:", error);
+      set({ error: error.message, loading: false });
+      throw error;
+    }
+  },
+
+  fetchWatchlistBrands: async (page = 1, limit = 100, search = null) => {
+    try {
+      set({ loading: true, error: null });
+      const response = await queueAPI.getWatchlistBrands(page, limit, search);
+      set({ watchlistBrands: response.data.data, loading: false });
+      return response.data.data;
+    } catch (error) {
+      console.error("Watchlist brands API error:", error);
       set({ error: error.message, loading: false });
       throw error;
     }

@@ -11,6 +11,7 @@ const router = express.Router();
 router.get("/overview", queueController.getQueueOverview);
 router.get("/pending", queueController.getPendingBrands);
 router.get("/failed", queueController.getFailedBrands);
+router.get("/watchlist", queueController.getWatchlistBrands);
 router.get("/currently-processing", queueController.getCurrentlyProcessing);
 router.get("/next-brand", queueController.getNextBrand);
 router.get("/stats", queueController.getQueueStats);

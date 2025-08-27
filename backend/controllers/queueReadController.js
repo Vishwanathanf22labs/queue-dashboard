@@ -202,6 +202,30 @@ async function searchBrands(req, res) {
   }
 }
 
+async function getWatchlistBrands(req, res) {
+  try {
+    const { page = 1, limit = 100, search = null } = req.query;
+    const watchlistBrands = await queueService.getWatchlistBrands(
+      parseInt(page),
+      parseInt(limit),
+      search
+    );
+
+    res.status(200).json({
+      success: true,
+      data: watchlistBrands,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error("Error in getWatchlistBrands:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch watchlist brands",
+      error: error.message,
+    });
+  }
+}
+
 async function changeBrandScore(req, res) {
   try {
     const { queueType, brandName, newScore } = req.body;
@@ -258,5 +282,6 @@ module.exports = {
   getBrandProcessingQueue,
   getBrandsScrapedStats,
   searchBrands,
+  getWatchlistBrands,
   changeBrandScore,
 };

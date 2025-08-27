@@ -19,6 +19,14 @@ export const queueAPI = {
     return api.get(`/queue/failed?${params.toString()}`);
   },
 
+  getWatchlistBrands: (page = 1, limit = 100, search = null) => {
+    const params = new URLSearchParams();
+    params.append("page", page);
+    params.append("limit", limit);
+    if (search && search.trim()) params.append("search", search);
+    return api.get(`/queue/watchlist?${params.toString()}`);
+  },
+
   getCurrentlyProcessing: () => api.get("/queue/currently-processing"),
 
   getNextBrand: () => api.get("/queue/next-brand"),
