@@ -1,5 +1,7 @@
 const redis = require("../config/redis");
 const Brand = require("../models/Brand");
+const WatchList = require("../models/WatchList");
+const db = require("../config/database");
 const logger = require("../utils/logger");
 const { QUEUES, PAGINATION } = require("../config/constants");
 
@@ -270,6 +272,174 @@ async function getFailedBrands(
   }
 }
 
+async function getWatchlistBrands(
+  page = PAGINATION.DEFAULT_PAGE,
+  limit = PAGINATION.DEFAULT_LIMIT,
+  search = null,
+  userId = null
+) {
+  try {
+    const validPage = Math.max(1, parseInt(page));
+    const validLimit = Math.max(1, parseInt(limit));
+
+    // Get all watchlist brands from database (without duplicates)
+    // First, get unique brand_ids from WatchList table
+    const uniqueWatchlistBrandIds = await WatchList.findAll({
+      attributes: [
+        [db.fn('DISTINCT', db.col('brand_id')), 'brand_id'],
+        [db.fn('MAX', db.col('created_at')), 'created_at']
+      ],
+      group: ['brand_id'],
+      raw: true
+    });
+
+    logger.info(`Found ${uniqueWatchlistBrandIds.length} unique watchlist brand IDs`);
+
+    if (uniqueWatchlistBrandIds.length === 0) {
+      return {
+        brands: [],
+        pagination: {
+          current_page: validPage,
+          per_page: validLimit,
+          total_items: 0,
+          total_pages: 0,
+        },
+      };
+    }
+
+    // Extract brand IDs and get brand details
+    const brandIds = uniqueWatchlistBrandIds.map(item => item.brand_id);
+    const watchlistBrands = await Brand.findAll({
+      where: { id: brandIds },
+      attributes: ['id', 'page_id', 'actual_name', 'status'],
+      raw: true
+    });
+
+    logger.info(`Found ${watchlistBrands.length} brands with details`);
+
+    // Get all brands from pending queue with scores
+    const allPendingItems = await redis.zrange(QUEUES.PENDING_BRANDS, 0, -1, 'WITHSCORES');
+    const pendingPageIds = new Set();
+    const pendingBrandsMap = new Map(); // page_id -> brand data
+
+    // Process pending brands
+    for (let i = 0; i < allPendingItems.length; i += 2) {
+      const member = allPendingItems[i];
+      const score = allPendingItems[i + 1];
+      
+      try {
+        const brandData = JSON.parse(member);
+        pendingPageIds.add(brandData.page_id);
+        pendingBrandsMap.set(brandData.page_id, {
+          queue_id: brandData.id,
+          score: score,
+          member: member
+        });
+      } catch (error) {
+        logger.error("Error parsing pending brand item:", error);
+      }
+    }
+
+    // Get all failed brands
+    const allFailedItems = await redis.lrange(QUEUES.FAILED_BRANDS, 0, -1);
+    const failedPageIds = new Set();
+    
+    for (const failedItem of allFailedItems) {
+      try {
+        const failedData = JSON.parse(failedItem);
+        failedPageIds.add(failedData.page_id);
+      } catch (error) {
+        logger.error("Error parsing failed brand item:", error);
+      }
+    }
+
+    logger.info(`Pending page_ids: ${Array.from(pendingPageIds).join(', ')}`);
+    logger.info(`Failed page_ids: ${Array.from(failedPageIds).join(', ')}`);
+
+    // Process each watchlist brand and determine status
+    let processedBrands = [];
+    
+    for (const brand of watchlistBrands) {
+      const pageId = brand.page_id;
+      
+      // Determine scraper status based on your logic:
+      // 1. In pending_brands = waiting
+      // 2. Not in pending_brands but in failed_brands = failed  
+      // 3. Not in pending_brands and not in failed_brands = completed
+      
+      let scraperStatus;
+      
+      if (pendingPageIds.has(pageId)) {
+        // Brand is in pending queue = waiting
+        scraperStatus = 'waiting';
+      } else if (failedPageIds.has(pageId)) {
+        // Brand is NOT in pending but IS in failed = failed
+        scraperStatus = 'failed';
+      } else {
+        // Brand is NOT in pending and NOT in failed = completed
+        scraperStatus = 'completed';
+      }
+
+      logger.info(`Brand ${pageId} (${brand.actual_name}) status: ${scraperStatus}`);
+
+      const brandInfo = {
+        queue_id: pendingBrandsMap.get(pageId)?.queue_id || null,
+        page_id: pageId,
+        brand_id: brand.id,
+        brand_name: brand.actual_name || "Unknown",
+        status: brand.status || "Unknown",
+        is_watchlist: true,
+        scraper_status: scraperStatus,
+        added_at: new Date() // Since we don't have watchlist creation time anymore
+      };
+
+      processedBrands.push(brandInfo);
+    }
+
+    // Apply search filter if provided
+    if (search && search.trim()) {
+      const searchTerm = search.toLowerCase().trim();
+      processedBrands = processedBrands.filter(brand => 
+        brand.brand_name?.toLowerCase().includes(searchTerm) ||
+        brand.page_id?.toString().includes(searchTerm) ||
+        brand.brand_id?.toString().includes(searchTerm)
+      );
+    }
+
+    const totalCount = processedBrands.length;
+    
+    if (totalCount === 0) {
+      return {
+        brands: [],
+        pagination: {
+          current_page: validPage,
+          per_page: validLimit,
+          total_items: 0,
+          total_pages: 0,
+        },
+      };
+    }
+
+    // Apply pagination
+    const startIndex = (validPage - 1) * validLimit;
+    const endIndex = startIndex + validLimit;
+    const paginatedBrands = processedBrands.slice(startIndex, endIndex);
+
+    return {
+      brands: paginatedBrands,
+      pagination: {
+        current_page: validPage,
+        per_page: validLimit,
+        total_items: totalCount,
+        total_pages: Math.ceil(totalCount / validLimit),
+      },
+    };
+  } catch (error) {
+    logger.error("Error in getWatchlistBrands:", error);
+    throw error;
+  }
+}
+
 async function getNextBrand() {
   try {
     // Priority Queue Logic: Score 1 = Priority, Score 0 = Regular
@@ -351,5 +521,6 @@ module.exports = {
   enrichBrandsWithDBInfo,
   getPendingBrands,
   getFailedBrands,
+  getWatchlistBrands,
   getNextBrand,
 };

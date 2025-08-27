@@ -1,9 +1,10 @@
-import { AlertTriangle, Clock, Home, Plus, RefreshCw, Settings, FileText, Building2, Play, Globe } from "lucide-react";
+import { AlertTriangle, Clock, Home, Plus, RefreshCw, Settings, FileText, Building2, Play, Globe, Eye } from "lucide-react";
 
 export const navItems = [
   { to: "/", icon: Home, label: "Dashboard" },
   { to: "/pending-queue", icon: Clock, label: "Pending Queue" },
   { to: "/failed-queue", icon: AlertTriangle, label: "Failed Queue" },
+  { to: "/watchlist-brands", icon: Eye, label: "Watchlist Brands" },
   { to: "/add-brands", icon: Building2, label: "Add Brands" },
   { to: "/queue-management", icon: Settings, label: "Q Management" },
   { to: "/scraper-controls", icon: Play, label: "Scraper Controls" },
@@ -49,6 +50,46 @@ export const columns = [
         {new Date(value).toLocaleString()}
       </div>
     )
+  }
+];
+
+export const watchlistBrandsColumns = [
+  {
+    key: 'brand_name',
+    label: 'Brand Name',
+    render: (value) => (
+      <div className="font-medium text-gray-900">
+        {value || 'Unknown'}
+      </div>
+    )
+  },
+  {
+    key: 'page_id',
+    label: 'Page ID',
+    render: (value) => (
+      <div className="text-sm text-gray-600">
+        {value || 'N/A'}
+      </div>
+    )
+  },
+  {
+    key: 'brand_id',
+    label: 'Brand ID',
+    headerAlign: 'center',
+    className: 'text-center',
+    render: (value) => (
+      <div className="text-sm text-gray-600 text-center">
+        {value || 'N/A'}
+      </div>
+    )
+  },
+  {
+    key: 'scraper_status',
+    label: 'Scraper Status',
+    render: (value, brand, index, startIndex) => {
+      // This will be handled in the component with proper status logic
+      return value || 'Unknown';
+    }
   }
 ];
 

@@ -8,6 +8,7 @@ import AddBrands from './pages/AddBrands';
 import QueueManagement from './pages/QueueManagement';
 import ScraperControlsPage from './pages/ScraperControls';
 import Proxies from './pages/Proxies';
+import WatchlistBrands from './pages/WatchlistBrands';
 import useAdminStore from './stores/adminStore';
 
 function App() {
@@ -30,6 +31,7 @@ function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/pending-queue" element={<PendingQueue />} />
         <Route path="/failed-queue" element={<FailedQueue />} />
+        <Route path="/watchlist-brands" element={<WatchlistBrands />} />
         <Route path="/add-brands" element={<AddBrands />} />
         <Route path="/queue-management" element={<QueueManagement />} />
         <Route path="/scraper-controls" element={<ScraperControlsPage />} />
