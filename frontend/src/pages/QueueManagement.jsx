@@ -1,27 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import Table from '../components/ui/Table';
-import Pagination from '../components/ui/Pagination';
-import LoadingState from '../components/ui/LoadingState';
-import ErrorDisplay from '../components/ui/ErrorDisplay';
-import SearchInput from '../components/ui/SearchInput';
 import AdminAccessRequired from '../components/ui/AdminAccessRequired';
+import QueueControls from '../components/queueManagement/QueueControls';
+import QueueStats from '../components/queueManagement/QueueStats';
+import PendingQueue from '../components/queueManagement/PendingQueue';
+import FailedQueue from '../components/queueManagement/FailedQueue';
 import useAdminStore from '../stores/adminStore';
 import useQueueStore from '../stores/queueStore';
 import { queueAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import {
-  ArrowRight,
-  ArrowLeft,
-  Trash2,
-  Users,
-  Tag,
-  Search,
-  RefreshCw,
   Shield,
-  Move,
-  AlertTriangle
+  RefreshCw
 } from 'lucide-react';
 
 const QueueManagement = () => {
@@ -39,7 +30,6 @@ const QueueManagement = () => {
     movePendingToFailed,
     moveFailedToPending
   } = useQueueStore();
-
 
   const [state, setState] = useState({
     pending: {
@@ -62,9 +52,9 @@ const QueueManagement = () => {
       error: null,
       isSearching: false
     },
-            admin: {
-          isProcessingAction: false
-        }
+    admin: {
+      isProcessingAction: false
+    }
   });
 
   const { pending, failed, admin } = state;
@@ -94,191 +84,9 @@ const QueueManagement = () => {
     });
   };
 
-
-
-  const pendingColumns = [
-    {
-      key: 'position',
-      label: 'Position',
-      render: (value, row, rowIndex) => {
-        const page = Number(pending.currentPage) || 1;
-        const itemsPerPageNum = Number(pending.itemsPerPage) || 10;
-        const rowIndexNum = Number(rowIndex) || 0;
-        const position = (page - 1) * itemsPerPageNum + rowIndexNum + 1;
-
-        return (
-          <div className="flex items-center">
-            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center">
-              <span className="text-xs sm:text-sm font-medium text-blue-600">
-                {position}
-              </span>
-            </div>
-          </div>
-        );
-      },
-      className: 'hidden sm:table-cell'
-    },
-
-    {
-      key: 'brand_name',
-      label: 'Brand Name',
-      render: (value, row) => (
-        <div className="flex items-center">
-          <Users className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
-          <div className="text-xs font-medium text-gray-900 max-w-[80px] sm:max-w-none truncate">
-            {value || 'Unknown Brand'}
-          </div>
-        </div>
-      )
-    },
-    {
-      key: 'queue_id',
-      label: 'Brand ID',
-      className: 'hidden md:table-cell',
-      render: (value, row) => (
-        <div className="flex items-center">
-          <Tag className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
-          <span className="text-xs font-mono text-gray-900 max-w-[60px] sm:max-w-none truncate">
-            {value || row.brand_id || 'N/A'}
-          </span>
-        </div>
-      )
-    },
-    {
-      key: 'page_id',
-      label: 'Page ID',
-      render: (value) => (
-        <div className="flex items-center">
-          <Tag className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
-          <span className="text-xs font-mono text-gray-900 max-w-[70px] sm:max-w-none truncate">
-            {value || 'N/A'}
-          </span>
-        </div>
-      )
-    },
-    {
-      key: 'actions',
-      label: 'Actions',
-      render: (value, row) => (
-        <div className="flex items-center space-x-1 sm:space-x-2">
-          <Button
-            size="sm"
-            variant="warning"
-            onClick={() => handleMoveBrand(row, 'failed')}
-            disabled={isProcessingAction}
-            className="text-xs px-1 sm:px-2 py-1"
-            title="Move to Failed Queue"
-          >
-            <Move className="h-3 w-3" />
-          </Button>
-          <Button
-            size="sm"
-            variant="danger"
-            onClick={() => handleRemoveBrand(row, 'pending')}
-            disabled={isProcessingAction}
-            className="text-xs px-1 sm:px-2 py-1"
-            title="Remove Brand"
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
-        </div>
-      ),
-    }
-  ];
-
-  const failedColumns = [
-    {
-      key: 'position',
-      label: 'Position',
-      render: (value, row, rowIndex) => {
-        const page = Number(failed.currentPage) || 1;
-        const itemsPerPageNum = Number(failed.itemsPerPage) || 10;
-        const rowIndexNum = Number(rowIndex) || 0;
-        const position = (page - 1) * itemsPerPageNum + rowIndexNum + 1;
-
-        return (
-          <div className="flex items-center">
-            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-red-100 rounded-full flex items-center justify-center">
-              <span className="text-xs sm:text-sm font-medium text-red-600">
-                {position}
-              </span>
-            </div>
-          </div>
-        );
-      },
-      className: 'hidden sm:table-cell'
-    },
-    {
-      key: 'brand_name',
-      label: 'Brand Name',
-      render: (value, row) => (
-        <div className="flex items-center">
-          <AlertTriangle className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
-          <div className="text-xs font-medium text-gray-900 max-w-[80px] sm:max-w-none truncate">
-            {value || 'Unknown Brand'}
-          </div>
-        </div>
-      )
-    },
-    {
-      key: 'queue_id',
-      label: 'Brand ID',
-      className: 'hidden md:table-cell',
-      render: (value, row) => (
-        <div className="flex items-center">
-          <Tag className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
-          <span className="text-xs font-mono text-gray-900 max-w-[60px] sm:max-w-none truncate">
-            {value || row.brand_id || 'N/A'}
-          </span>
-        </div>
-      )
-    },
-    {
-      key: 'page_id',
-      label: 'Page ID',
-      render: (value) => (
-        <div className="flex items-center">
-          <Tag className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
-          <span className="text-xs font-mono text-gray-900 max-w-[70px] sm:max-w-none truncate">
-            {value || 'N/A'}
-          </span>
-        </div>
-      )
-    },
-    {
-      key: 'actions',
-      label: 'Actions',
-      render: (value, row) => (
-        <div className="flex items-center space-x-1 sm:space-x-2">
-          <Button
-            size="sm"
-            variant="info"
-            onClick={() => handleMoveBrand(row, 'pending')}
-            disabled={isProcessingAction}
-            className="text-xs px-1 sm:px-2 py-1"
-            title="Move to Pending Queue"
-          >
-            <Move className="h-3 w-3" />
-          </Button>
-          <Button
-            size="sm"
-            variant="danger"
-            onClick={() => handleRemoveBrand(row, 'failed')}
-            disabled={isProcessingAction}
-            className="text-xs px-1 sm:px-2 py-1"
-            title="Remove Brand"
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
-        </div>
-      ),
-    }
-  ];
-
   const loadPendingBrands = useCallback(async (searchTerm = null, page = null) => {
     updatePendingState({ loading: true, error: null });
     try {
-
       if (searchTerm) {
         updatePendingState({ isSearching: true });
       }
@@ -288,7 +96,6 @@ const QueueManagement = () => {
 
       const brands = response.data.data?.brands || [];
       const totalCount = response.data.data?.pagination?.total_items || 0;
-
 
       updatePendingState({
         brands,
@@ -317,8 +124,6 @@ const QueueManagement = () => {
       const brands = response.data.data?.brands || [];
       const totalCount = response.data.data?.pagination?.total_items || 0;
 
-
-
       updateFailedState({
         brands,
         totalCount,
@@ -332,7 +137,6 @@ const QueueManagement = () => {
       updateFailedState({ loading: false });
     }
   }, [failed.itemsPerPage]);
-
 
   useEffect(() => {
     // Load both pending and failed brands on component mount
@@ -363,7 +167,6 @@ const QueueManagement = () => {
       return;
     }
 
-
     if (searchTerm !== pending.searchTerm) {
       updatePendingState({ currentPage: 1 });
     }
@@ -374,13 +177,11 @@ const QueueManagement = () => {
   const handleFailedSearch = (searchTerm) => {
     updateFailedState({ searchTerm });
 
-
     if (!searchTerm || searchTerm.trim() === '') {
       updateFailedState({ currentPage: 1 });
       loadFailedBrands();
       return;
     }
-
 
     if (searchTerm !== failed.searchTerm) {
       updateFailedState({ currentPage: 1 });
@@ -388,7 +189,6 @@ const QueueManagement = () => {
 
     loadFailedBrands(searchTerm);
   };
-
 
   const clearPendingSearch = () => {
     updatePendingState({ searchTerm: '', currentPage: 1 });
@@ -400,12 +200,10 @@ const QueueManagement = () => {
     loadFailedBrands();
   };
 
-
   const handleRefresh = async () => {
     await Promise.all([loadPendingBrands(), loadFailedBrands()]);
     toast.success('Queue data refreshed successfully');
   };
-
 
   const handleAdminAction = async (action) => {
     if (isProcessingAction) return;
@@ -436,7 +234,6 @@ const QueueManagement = () => {
 
       toast.success(`${action} completed successfully`);
 
-
       await handleRefresh();
 
     } catch (error) {
@@ -445,7 +242,6 @@ const QueueManagement = () => {
       updateAdminState({ isProcessingAction: false });
     }
   };
-
 
   const handleMoveBrand = async (brand, targetQueue) => {
     if (isProcessingAction) return;
@@ -476,8 +272,6 @@ const QueueManagement = () => {
       updateAdminState({ isProcessingAction: false });
     }
   };
-
-  
 
   const handleRemoveBrand = async (brand, queueType) => {
     if (isProcessingAction) return;
@@ -511,13 +305,6 @@ const QueueManagement = () => {
     }
   };
 
-  const filteredPendingBrands = pending.brands;
-  const filteredFailedBrands = failed.brands;
-
-  const pendingTotalPages = Math.ceil(pending.totalCount / pending.itemsPerPage);
-
-  const failedTotalPages = Math.ceil(failed.totalCount / failed.itemsPerPage);
-
   if (adminLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -532,7 +319,6 @@ const QueueManagement = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6 lg:space-y-8">
-
       <div className="mb-4 sm:mb-6 lg:mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
           <div className="flex items-center space-x-4">
@@ -541,7 +327,6 @@ const QueueManagement = () => {
               <p className="text-xs sm:text-sm lg:text-base text-gray-600">Queue management controls for pending and failed brand queues</p>
             </div>
           </div>
-
 
           <div className="flex items-center space-x-3">
             {isAdmin ? (
@@ -577,285 +362,36 @@ const QueueManagement = () => {
       </div>
 
       <Card>
-        <div className="p-3 sm:p-4 lg:p-6">
-          <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">Queue Management Controls</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
-            <Button
-              variant="danger"
-              onClick={() => handleAdminAction('Clear All Queues')}
-              disabled={isProcessingAction}
-              className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5"
-            >
-              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">Clear All Queues</span>
-              <span className="sm:hidden">Clear All</span>
-            </Button>
-
-            <Button
-              variant="warning"
-              onClick={() => handleAdminAction('Clear Pending Queue')}
-              disabled={isProcessingAction}
-              className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5"
-            >
-              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">Clear Pending Queue</span>
-              <span className="sm:hidden">Clear Pending</span>
-            </Button>
-
-            <Button
-              variant="warning"
-              onClick={() => handleAdminAction('Clear Failed Queue')}
-              disabled={isProcessingAction}
-              size="sm"
-              className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5"
-            >
-              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span>
-                <span className="hidden sm:inline">Clear Failed Queue</span>
-                <span className="sm:hidden">Clear Failed</span>
-              </span>
-            </Button>
-
-            <Button
-              variant="info"
-              onClick={() => handleAdminAction('Move All Pending to Failed')}
-              disabled={isProcessingAction}
-              className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5"
-            >
-              <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden lg:inline">All Pending → Failed</span>
-              <span className="hidden sm:inline lg:hidden">Pending → Failed</span>
-              <span className="sm:hidden">P→F</span>
-            </Button>
-
-            <Button
-              variant="success"
-              onClick={() => handleAdminAction('Move All Failed to Pending')}
-              disabled={isProcessingAction}
-              className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5"
-            >
-              <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden lg:inline">All Failed → Pending</span>
-              <span className="hidden sm:inline lg:hidden">Failed → Pending</span>
-              <span className="sm:hidden">F→P</span>
-            </Button>
-          </div>
-        </div>
+        <QueueControls 
+          isProcessingAction={isProcessingAction}
+          onAdminAction={handleAdminAction}
+        />
       </Card>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-3 sm:mb-4 lg:mb-6">
-        <Card>
-          <div className="flex items-center">
-            <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
-              <Users className="h-5 w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8 text-blue-600" />
-            </div>
-            <div className="ml-2 sm:ml-3 lg:ml-4">
-              <p className="text-xs sm:text-sm font-medium text-gray-600">Total Pending</p>
-              <p className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-blue-600">
-                {pending.totalCount}
-              </p>
-            </div>
-          </div>
-        </Card>
+      <QueueStats 
+        pendingCount={pending.totalCount}
+        failedCount={failed.totalCount}
+      />
 
-        <Card>
-          <div className="flex items-center">
-            <div className="p-2 sm:p-3 bg-red-100 rounded-lg">
-              <AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8 text-red-600" />
-            </div>
-            <div className="ml-2 sm:ml-3 lg:ml-4">
-              <p className="text-xs sm:text-sm font-medium text-gray-600">Total Failed</p>
-              <p className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-red-600">
-                {failed.totalCount}
-              </p>
-            </div>
-          </div>
-        </Card>
+      <PendingQueue
+        pending={pending}
+        onSearch={handlePendingSearch}
+        onClearSearch={clearPendingSearch}
+        onPageChange={(page) => updatePendingState({ currentPage: page })}
+        onMoveBrand={handleMoveBrand}
+        onRemoveBrand={handleRemoveBrand}
+        isProcessingAction={isProcessingAction}
+      />
 
-        <Card className="sm:col-span-2 lg:col-span-1">
-          <div className="flex items-center">
-            <div className="p-2 sm:p-3 bg-gray-100 rounded-lg">
-              <RefreshCw className="h-5 w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8 text-gray-600" />
-            </div>
-            <div className="ml-2 sm:ml-3 lg:ml-4">
-              <p className="text-xs sm:text-sm font-medium text-gray-600">Total Brands</p>
-              <p className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-600">
-                {pending.totalCount + failed.totalCount}
-              </p>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      <div className="space-y-4 sm:space-y-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Pending Queue</h2>
-
-        <Card className="mb-4 sm:mb-6">
-          <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 sm:gap-4">
-            <div className="flex-1 max-w-md">
-              <SearchInput
-                value={pending.searchTerm}
-                onChange={(value) => handlePendingSearch(value)}
-                placeholder="Search pending brands by name, ID, or page ID..."
-                leftIcon={<Search className="h-4 w-4 text-gray-400" />}
-                size="md"
-                variant="default"
-                showClearButton={true}
-                onClear={clearPendingSearch}
-                disabled={pending.loading || pending.isSearching}
-              />
-            </div>
-            <div className="flex items-center space-x-3 sm:space-x-4 text-xs sm:text-sm text-gray-600">
-              <span>Total: {pending.totalCount}</span>
-              <span>Showing: {filteredPendingBrands.length}</span>
-              {pending.searchTerm && (
-                <span className="text-blue-600">
-                  {pending.isSearching ? (
-                    <span className="flex items-center">
-                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-1"></div>
-                      Searching: "{pending.searchTerm}"
-                    </span>
-                  ) : (
-                    `Searching: "${pending.searchTerm}"`
-                  )}
-                </span>
-              )}
-            </div>
-          </div>
-        </Card>
-
-        <Card>
-          {pending.error ? (
-            <ErrorDisplay title="Error Loading Pending Queue" message={pending.error}>
-              <Button onClick={loadPendingBrands}>Retry</Button>
-            </ErrorDisplay>
-          ) : pending.loading ? (
-            <LoadingState size="lg" message="Loading pending brands..." />
-          ) : pending.isSearching ? (
-            <div className="text-center py-12 sm:py-16">
-              <div className="flex flex-col items-center space-y-4">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                <div className="text-center">
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Searching...</h3>
-                  <p className="text-sm text-gray-500">
-                    Searching for "{pending.searchTerm}" across all pages
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : filteredPendingBrands.length === 0 ? (
-            <div className="text-center py-8 sm:py-12">
-              <Users className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-3 sm:mb-4" />
-              <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No pending brands found</h3>
-              <p className="text-sm sm:text-base text-gray-500">
-                {pending.searchTerm ? 'Try adjusting your search terms' : 'All brands have been processed'}
-              </p>
-            </div>
-          ) : (
-            <Table
-              data={filteredPendingBrands}
-              columns={pendingColumns}
-              emptyMessage="No pending brands found"
-              className="shadow-md rounded-lg"
-            />
-          )}
-        </Card>
-
-        <Pagination
-          currentPage={pending.currentPage}
-          totalPages={pendingTotalPages}
-          onPageChange={(page) => updatePendingState({ currentPage: page })}
-          totalItems={pending.totalCount}
-          itemsPerPage={pending.itemsPerPage}
-          showPageInfo={true}
-        />
-      </div>
-
-      <div className="space-y-4 sm:space-y-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Failed Queue</h2>
-
-        <Card className="mb-4 sm:mb-6">
-          <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 sm:gap-4">
-            <div className="flex-1 max-w-md">
-              <SearchInput
-                value={failed.searchTerm}
-                onChange={(value) => handleFailedSearch(value)}
-                placeholder="Search failed brands by name, ID, or page ID..."
-                leftIcon={<Search className="h-4 w-4 text-gray-400" />}
-                size="md"
-                variant="default"
-                showClearButton={true}
-                onClear={clearFailedSearch}
-                disabled={failed.loading || failed.isSearching}
-              />
-            </div>
-            <div className="flex items-center space-x-3 sm:space-x-4 text-xs sm:text-sm text-gray-600">
-              <span>Total: {failed.totalCount}</span>
-              <span>Showing: {filteredFailedBrands.length}</span>
-              {failed.searchTerm && (
-                <span className="text-red-600">
-                  {failed.isSearching ? (
-                    <span className="flex items-center">
-                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-600 mr-1"></div>
-                      Searching: "{failed.searchTerm}"
-                    </span>
-                  ) : (
-                    `Searching: "${failed.searchTerm}"`
-                  )}
-                </span>
-              )}
-            </div>
-          </div>
-        </Card>
-
-        <Card>
-          {failed.error ? (
-            <ErrorDisplay title="Error Loading Failed Queue" message={failed.error}>
-              <Button onClick={loadFailedBrands}>Retry</Button>
-            </ErrorDisplay>
-          ) : failed.loading ? (
-            <LoadingState size="lg" message="Loading failed brands..." />
-          ) : failed.isSearching ? (
-            <div className="text-center py-12 sm:py-16">
-              <div className="flex flex-col items-center space-y-4">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
-                <div className="text-center">
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Searching...</h3>
-                  <p className="text-sm text-gray-500">
-                    Searching for "{failed.searchTerm}" across all pages
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : filteredFailedBrands.length === 0 ? (
-            <div className="text-center py-8 sm:py-12">
-              <AlertTriangle className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-3 sm:mb-4" />
-              <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No failed brands found</h3>
-              <p className="text-sm sm:text-base text-gray-500">
-                {failed.searchTerm ? 'Try adjusting your search terms' : 'All brands have been processed'}
-              </p>
-            </div>
-          ) : (
-            <Table
-              data={filteredFailedBrands}
-              columns={failedColumns}
-              emptyMessage="No failed brands found"
-              className="shadow-md rounded-lg"
-            />
-          )}
-        </Card>
-
-        <Pagination
-          currentPage={failed.currentPage}
-          totalPages={failedTotalPages}
-          onPageChange={(page) => updateFailedState({ currentPage: page })}
-          totalItems={failed.totalCount}
-          itemsPerPage={failed.itemsPerPage}
-          showPageInfo={true}
-        />
-      </div>
-
-      
+      <FailedQueue
+        failed={failed}
+        onSearch={handleFailedSearch}
+        onClearSearch={clearFailedSearch}
+        onPageChange={(page) => updateFailedState({ currentPage: page })}
+        onMoveBrand={handleMoveBrand}
+        onRemoveBrand={handleRemoveBrand}
+        isProcessingAction={isProcessingAction}
+      />
     </div>
   );
 };
