@@ -90,6 +90,16 @@ export const watchlistBrandsColumns = [
       // This will be handled in the component with proper status logic
       return value || 'Unknown';
     }
+  },
+  {
+    key: 'actions',
+    label: 'Actions',
+    headerAlign: 'center',
+    className: 'text-center',
+    render: (value, brand) => {
+      // This will be handled in the component with proper action buttons
+      return null;
+    }
   }
 ];
 
