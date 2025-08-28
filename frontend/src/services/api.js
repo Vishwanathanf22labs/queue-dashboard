@@ -83,6 +83,8 @@ export const queueAPI = {
     api.put("/queue/queue-management/pending/move-all-to-failed"),
   moveAllFailedToPending: () =>
     api.put("/queue/queue-management/failed/move-all-to-pending"),
+  moveWatchlistFailedToPending: () =>
+    api.put("/queue/queue-management/watchlist/move-failed-to-pending"),
 
   getQueueManagementStats: () => api.get("/queue/queue-management/stats"),
 

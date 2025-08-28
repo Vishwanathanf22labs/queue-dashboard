@@ -41,28 +41,22 @@ const server = app.listen(PORT, () => {
 redis.on("ready", async () => {
   console.log("Redis is ready for operations");
 
-  if (process.env.NODE_ENV === "production") {
-    try {
-      console.log(
-        "Production environment detected - checking scraper status..."
-      );
+  try {
+    console.log("Initializing scraper status...");
 
-      const currentStatus = await redis.get("scraper:status");
-      if (!currentStatus) {
-        console.log("No scraper status found - initializing...");
-        const {
-          initializeScraperStatus,
-        } = require("./services/scraperControlService");
-        const status = await initializeScraperStatus();
-        console.log(`Scraper initialized with status: ${status}`);
-      } else {
-        console.log(`Scraper status found: ${currentStatus}`);
-      }
-    } catch (error) {
-      console.error("Failed to auto-start scraper on production:", error);
+    const currentStatus = await redis.get("scraper:status");
+    if (!currentStatus) {
+      console.log("No scraper status found - initializing...");
+      const {
+        initializeScraperStatus,
+      } = require("./services/scraperControlService");
+      const status = await initializeScraperStatus();
+      console.log(`Scraper initialized with status: ${status}`);
+    } else {
+      console.log(`Scraper status found: ${currentStatus}`);
     }
-  } else {
-    console.log("Development environment - scraper auto-start disabled");
+  } catch (error) {
+    console.error("Failed to initialize scraper:", error);
   }
 });
 

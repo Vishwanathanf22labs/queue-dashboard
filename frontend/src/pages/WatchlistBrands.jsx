@@ -10,10 +10,13 @@ import LoadingState from '../components/ui/LoadingState';
 import ErrorDisplay from '../components/ui/ErrorDisplay';
 import { Eye, Clock, CheckCircle, XCircle, Search } from 'lucide-react';
 import useQueueStore from '../stores/queueStore';
+import useAdminStore from '../stores/adminStore';
 import { watchlistBrandsColumns } from '../constants/data';
+import toast from 'react-hot-toast';
 
 const WatchlistBrands = () => {
-  const { watchlistBrands, loading, error, fetchWatchlistBrands } = useQueueStore();
+  const { watchlistBrands, loading, error, fetchWatchlistBrands, moveWatchlistFailedToPending, moveFailedToPending } = useQueueStore();
+  const { isAdmin } = useAdminStore();
   
   const [filteredBrands, setFilteredBrands] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -116,27 +119,98 @@ const WatchlistBrands = () => {
     setCurrentPage(page);
   };
 
-  // Table columns definition with custom render functions
-  const tableColumns = watchlistBrandsColumns.map(column => {
-    if (column.key === 'scraper_status') {
-      return {
-        ...column,
-        render: (value, brand) => {
-          const scraperStatus = determineScraperStatus(brand);
-          const statusInfo = getScraperStatusInfo(scraperStatus);
-          const StatusIcon = statusInfo.icon;
+  // Handle individual brand movement from failed to pending
+  const handleMoveIndividualBrand = async (brand) => {
+    try {
+      // Get the brand identifier (brand_id, page_id, or queue_id)
+      const brandIdentifier = brand.brand_id || brand.page_id;
+      
+      if (!brandIdentifier) {
+        toast.error('Brand identifier not found');
+        return;
+      }
 
-          return (
-            <Badge variant={statusInfo.variant} className="flex items-center space-x-1">
-              <StatusIcon className="h-3 w-3" />
-              <span>{statusInfo.label}</span>
-            </Badge>
-          );
-        }
-      };
+      // Move the individual brand from failed to pending
+      await moveFailedToPending(brandIdentifier);
+      toast.success(`Brand "${brand.brand_name || 'Unknown'}" moved to pending queue successfully`);
+      
+      // Refresh the data to show updated statuses
+      await fetchWatchlistBrands(1, 10000);
+    } catch (error) {
+      toast.error(error.message || 'Failed to move brand to pending queue');
     }
-    return column;
-  });
+  };
+
+  // Table columns definition with custom render functions
+  const tableColumns = watchlistBrandsColumns
+    .map(column => {
+      if (column.key === 'scraper_status') {
+        return {
+          ...column,
+          render: (value, brand) => {
+            const scraperStatus = determineScraperStatus(brand);
+            const statusInfo = getScraperStatusInfo(scraperStatus);
+            const StatusIcon = statusInfo.icon;
+
+            return (
+              <Badge variant={statusInfo.variant} className="flex items-center space-x-1">
+                <StatusIcon className="h-3 w-3" />
+                <span>{statusInfo.label}</span>
+              </Badge>
+            );
+          }
+        };
+      } else if (column.key === 'actions') {
+        return {
+          ...column,
+          render: (value, brand) => {
+            const scraperStatus = determineScraperStatus(brand);
+            
+            if (scraperStatus === 'failed') {
+              // Show action button for failed brands
+              return (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={!isAdmin}
+                  onClick={() => {
+                    if (!isAdmin) {
+                      toast.error('Admin access required to move brands');
+                      return;
+                    }
+                    handleMoveIndividualBrand(brand);
+                  }}
+                  className={`text-xs px-2 py-1 ${!isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {isAdmin ? 'Move to Pending' : 'Admin Only'}
+                </Button>
+              );
+            } else if (scraperStatus === 'completed') {
+              // Show dash for completed brands (no action needed)
+              return (
+                <div className="text-xs text-gray-400 font-medium text-center">
+                  —
+                </div>
+              );
+            } else if (scraperStatus === 'waiting') {
+              // Show dash for waiting brands (no action needed)
+              return (
+                <div className="text-xs text-gray-400 font-medium text-center">
+                  —
+                </div>
+              );
+            }
+            
+            return (
+              <div className="text-xs text-gray-400 font-medium text-center">
+                —
+              </div>
+            );
+          }
+        };
+      }
+      return column;
+    });
 
   if (loading) {
     return <LoadingState size="lg" message="Loading watchlist brands..." />;
@@ -205,33 +279,76 @@ const WatchlistBrands = () => {
          </Button>
        </div>
 
-            {/* Summary Stats Cards - Above Search */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">
-              {filteredBrands ? filteredBrands.filter(b => determineScraperStatus(b) === 'completed').length : 0}
+                         {/* Summary Stats Cards - Above Search */}
+       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+         <Card>
+           <div className="text-center">
+             <div className="text-2xl font-bold text-green-600">
+               {filteredBrands ? filteredBrands.filter(b => determineScraperStatus(b) === 'completed').length : 0}
+             </div>
+             <div className="text-sm text-gray-600">Completed</div>
+           </div>
+         </Card>
+         <Card>
+           <div className="text-center">
+             <div className="text-2xl font-bold text-yellow-600">
+               {filteredBrands ? filteredBrands.filter(b => determineScraperStatus(b) === 'waiting').length : 0}
+             </div>
+             <div className="text-sm text-gray-600">Waiting</div>
+           </div>
+         </Card>
+         <Card>
+           <div className="text-center">
+             <div className="text-2xl font-bold text-red-600">
+               {filteredBrands ? filteredBrands.filter(b => determineScraperStatus(b) === 'failed').length : 0}
+             </div>
+             <div className="text-sm text-gray-600">Failed</div>
+           </div>
+         </Card>
+       </div>
+
+               {/* Move Watchlist Failed to Pending Button */}
+        {filteredBrands && filteredBrands.filter(b => determineScraperStatus(b) === 'failed').length > 0 && (
+          <Card>
+            <div className="p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900">Failed Watchlist Brands</h4>
+                  <p className="text-sm text-gray-600">
+                    {filteredBrands.filter(b => determineScraperStatus(b) === 'failed').length} brands are currently failed
+                  </p>
+                </div>
+                <Button
+                  variant="primary"
+                  size="md"
+                  disabled={!isAdmin}
+                  onClick={async () => {
+                    if (!isAdmin) {
+                      toast.error('Admin access required to move brands');
+                      return;
+                    }
+                    try {
+                      const result = await moveWatchlistFailedToPending();
+                      toast.success(result.message || 'Successfully moved failed watchlist brands to pending queue');
+                      // Refresh the data to show updated statuses
+                      await fetchWatchlistBrands(1, 10000);
+                    } catch (error) {
+                      toast.error(error.message || 'Failed to move watchlist failed brands to pending queue');
+                    }
+                  }}
+                  className={`w-full sm:w-auto ${!isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <span className="hidden sm:inline">
+                    {isAdmin ? 'Move All Watchlist Failed to Pending' : 'Admin Access Required'}
+                  </span>
+                  <span className="sm:hidden">
+                    {isAdmin ? 'Move All Failed to Pending' : 'Admin Required'}
+                  </span>
+                </Button>
+              </div>
             </div>
-            <div className="text-sm text-gray-600">Completed</div>
-          </div>
-        </Card>
-        <Card>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-yellow-600">
-              {filteredBrands ? filteredBrands.filter(b => determineScraperStatus(b) === 'waiting').length : 0}
-            </div>
-            <div className="text-sm text-gray-600">Waiting</div>
-          </div>
-        </Card>
-        <Card>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-red-600">
-              {filteredBrands ? filteredBrands.filter(b => determineScraperStatus(b) === 'failed').length : 0}
-            </div>
-            <div className="text-sm text-gray-600">Failed</div>
-          </div>
-        </Card>
-      </div>
+          </Card>
+        )}
 
              {/* Search Bar */}
        <Card>
@@ -298,6 +415,27 @@ const WatchlistBrands = () => {
                      <span className="ml-2 font-medium text-gray-900">{brand.brand_id || 'N/A'}</span>
                    </div>
                  </div>
+                 
+                                   {/* Action Button - Only for Failed Brands */}
+                  {determineScraperStatus(brand) === 'failed' && (
+                    <div className="pt-2">
+                      <Button
+                        variant="primary"
+                        size="md"
+                        disabled={!isAdmin}
+                        onClick={() => {
+                          if (!isAdmin) {
+                            toast.error('Admin access required to move brands');
+                            return;
+                          }
+                          handleMoveIndividualBrand(brand);
+                        }}
+                        className={`w-full ${!isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {isAdmin ? 'Move to Pending' : 'Admin Access Required'}
+                      </Button>
+                    </div>
+                  )}
                </div>
              </Card>
            ))

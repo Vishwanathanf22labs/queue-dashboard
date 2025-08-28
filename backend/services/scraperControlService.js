@@ -8,29 +8,17 @@ async function initializeScraperStatus() {
     const currentStatus = await redis.get('scraper:status');
     
     if (!currentStatus) {
-      // Check if queues are empty
-      const pendingCount = await redis.zcard(QUEUES.PENDING_BRANDS);
-      const failedCount = await redis.llen(QUEUES.FAILED_BRANDS);
-      
-      if (pendingCount === 0 && failedCount === 0) {
-        // If queues are empty, set to running state
-        await redis.set('scraper:status', 'running', 'EX', 86400);
-        await redis.set('scraper:started_at', new Date().toISOString(), 'EX', 86400);
-        logger.info('Queues are empty - setting scraper to running state');
-        return 'running';
-      } else {
-        // If queues have brands, set to stopped state
-        await redis.set('scraper:status', 'stopped', 'EX', 86400);
-        await redis.set('scraper:stopped_at', new Date().toISOString(), 'EX', 86400);
-        logger.info('Queues have brands - setting scraper to stopped state');
-        return 'stopped';
-      }
+      // Always set scraper to running state regardless of queue state
+      await redis.set('scraper:status', 'running', 'EX', 86400);
+      await redis.set('scraper:started_at', new Date().toISOString(), 'EX', 86400);
+      logger.info('Scraper initialized - always set to running state');
+      return 'running';
     }
     
     return currentStatus;
   } catch (error) {
     logger.error('Error initializing scraper status:', error);
-    return 'stopped'; // Default fallback
+    return 'running'; // Default fallback - always running
   }
 }
 
@@ -50,7 +38,7 @@ async function startScraper() {
       };
     }
     
-    // Set status to running without moving any brands
+    // Set status to running regardless of queue state
     await redis.set('scraper:status', 'running', 'EX', 86400);
     await redis.set('scraper:started_at', new Date().toISOString(), 'EX', 86400);
     

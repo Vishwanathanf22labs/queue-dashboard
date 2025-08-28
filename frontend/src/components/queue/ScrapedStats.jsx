@@ -27,7 +27,7 @@ const ScrapedStats = () => {
     }
   };
 
-  const dailyStats = scrapedStats?.stats || [];
+  const dailyStats = (scrapedStats?.stats || []).slice().reverse();
 
   const columns = [
     {

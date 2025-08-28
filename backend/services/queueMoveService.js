@@ -106,9 +106,9 @@ async function moveFailedToPending(brandId) {
       page_id: brandToMove.page_id
     };
 
-    // Add to pending sorted set with current timestamp (newest first)
-    const timestamp = Date.now();
-    await redis.zadd(QUEUES.PENDING_BRANDS, timestamp, JSON.stringify(pendingBrandData));
+    // Add to pending sorted set with default score 3
+    const defaultScore = 3;
+    await redis.zadd(QUEUES.PENDING_BRANDS, defaultScore, JSON.stringify(pendingBrandData));
 
     logger.info(
       `Successfully moved brand ${
@@ -209,9 +209,9 @@ async function moveAllFailedToPending() {
           page_id: brandData.page_id
         };
 
-        // Add to pending sorted set with current timestamp (newest first)
-        const timestamp = Date.now();
-        pipeline.zadd(QUEUES.PENDING_BRANDS, timestamp, JSON.stringify(pendingBrandData));
+        // Add to pending sorted set with default score 3
+        const defaultScore = 3;
+        pipeline.zadd(QUEUES.PENDING_BRANDS, defaultScore, JSON.stringify(pendingBrandData));
         movedBrands.push(pendingBrandData);
       } catch (parseError) {
         logger.error(`Error parsing failed brand data:`, parseError);
@@ -237,9 +237,121 @@ async function moveAllFailedToPending() {
   }
 }
 
+// NEW FUNCTION: Move only watchlist failed brands to pending queue
+async function moveWatchlistFailedToPending() {
+  try {
+    logger.info("Moving watchlist failed brands to pending queue");
+
+    // Get all failed brands from Redis
+    const failedBrands = await redis.lrange(QUEUES.FAILED_BRANDS, 0, -1);
+
+    if (failedBrands.length === 0) {
+      return {
+        moved_count: 0,
+        message: "No failed brands to move",
+      };
+    }
+
+    // Get watchlist brands to identify which failed brands are in watchlist
+    const WatchList = require('../models/WatchList');
+    const Brand = require('../models/Brand');
+    
+    // First get all watchlist brand_ids
+    const watchlistItems = await WatchList.findAll({
+      attributes: ['brand_id'],
+      raw: true
+    });
+    
+    if (watchlistItems.length === 0) {
+      return {
+        moved_count: 0,
+        message: "No watchlist brands found in database",
+      };
+    }
+    
+    // Get the brand details for watchlist brands
+    const watchlistBrandIds = watchlistItems.map(item => item.brand_id);
+    const watchlistBrands = await Brand.findAll({
+      where: {
+        id: watchlistBrandIds
+      },
+      attributes: ['id', 'page_id', 'actual_name'],
+      raw: true
+    });
+
+    // Create a set of watchlist page_ids for fast lookup
+    const watchlistPageIds = new Set(watchlistBrands.map(brand => brand.page_id));
+
+    // Filter failed brands to only include watchlist brands
+    const watchlistFailedBrands = [];
+    const pipeline = redis.pipeline();
+    let movedCount = 0;
+
+    for (const failedBrand of failedBrands) {
+      try {
+        const brandData = JSON.parse(failedBrand);
+        const pageId = brandData.page_id;
+
+        // Only move if this failed brand is in the watchlist
+        if (watchlistPageIds.has(pageId)) {
+          const pendingBrandData = {
+            id: brandData.id || brandData.brand_id || brandData.queue_id,
+            page_id: pageId
+          };
+
+          // Add to pending sorted set with default score 3
+          const defaultScore = 3;
+          pipeline.zadd(QUEUES.PENDING_BRANDS, defaultScore, JSON.stringify(pendingBrandData));
+          watchlistFailedBrands.push(pendingBrandData);
+          movedCount++;
+        }
+      } catch (parseError) {
+        logger.error(`Error parsing failed brand data:`, parseError);
+      }
+    }
+
+    if (movedCount === 0) {
+      return {
+        moved_count: 0,
+        message: "No watchlist brands found in failed queue",
+      };
+    }
+
+    // Remove the moved brands from failed queue
+    for (const failedBrand of failedBrands) {
+      try {
+        const brandData = JSON.parse(failedBrand);
+        const pageId = brandData.page_id;
+        
+        if (watchlistPageIds.has(pageId)) {
+          pipeline.lrem(QUEUES.FAILED_BRANDS, 0, failedBrand);
+        }
+      } catch (parseError) {
+        logger.error(`Error parsing failed brand data for removal:`, parseError);
+      }
+    }
+
+    await pipeline.exec();
+
+    logger.info(
+      `Successfully moved ${movedCount} watchlist failed brands to pending queue`
+    );
+
+    return {
+      moved_count: movedCount,
+      moved_brands: watchlistFailedBrands,
+      message: `Moved ${movedCount} watchlist failed brands to pending queue successfully`,
+    };
+  } catch (error) {
+    logger.error("Error moving watchlist failed brands to pending queue:", error);
+    throw error;
+  }
+}
+
 module.exports = {
   movePendingToFailed,
   moveFailedToPending,
   moveAllPendingToFailed,
   moveAllFailedToPending,
+  moveWatchlistFailedToPending,
 };

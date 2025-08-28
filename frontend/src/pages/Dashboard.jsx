@@ -28,7 +28,7 @@ const Dashboard = () => {
   const pendingCount = overview?.queue_counts?.pending || 0;
   const failedCount = overview?.queue_counts?.failed || 0;
   const activeCount = overview?.queue_counts?.active || 0;
-  const processedAdsToday = overview?.today_stats?.ads_processed || 0;
+  const brandsScrapedToday = overview?.today_stats?.brands_scraped || 0;
 
   const [state, setState] = useState({
     scraperStatus: 'unknown',
@@ -223,7 +223,7 @@ const Dashboard = () => {
         pendingCount={pendingCount}
         failedCount={failedCount}
         activeCount={activeCount}
-        processedAdsToday={processedAdsToday}
+        brandsScrapedToday={brandsScrapedToday}
       />
 
       <ProcessingStatus
@@ -232,6 +232,7 @@ const Dashboard = () => {
         scraperStatus={scraperStatus}
         scraperStatusLoading={scraperStatusLoading}
         formattedStartTime={formattedStartTime}
+        pendingCount={pendingCount}
       />
 
       <QuickActions
