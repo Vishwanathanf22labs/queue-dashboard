@@ -14,7 +14,19 @@ import { watchlistBrandsColumns } from '../constants/data';
 import toast from 'react-hot-toast';
 
 const WatchlistBrands = () => {
-  const { watchlistBrands, loading, error, fetchWatchlistBrands, moveWatchlistFailedToPending, moveFailedToPending, pendingBrands, failedBrands, fetchPendingBrands, fetchFailedBrands } = useQueueStore();
+  const { 
+    watchlistBrands, 
+    pendingBrands,
+    failedBrands,
+    loading, 
+    error, 
+    fetchWatchlistBrands, 
+    fetchPendingBrands,
+    fetchFailedBrands,
+    moveWatchlistFailedToPending, 
+    moveFailedToPending,
+    moveWatchlistToPending
+  } = useQueueStore();
   const { isAdmin } = useAdminStore();
 
   const [state, setState] = useState({
@@ -44,7 +56,7 @@ const WatchlistBrands = () => {
     };
 
     loadData();
-  }, []); 
+  }, [fetchWatchlistBrands, fetchPendingBrands, fetchFailedBrands]);
 
   useEffect(() => {
     if (watchlistBrands && watchlistBrands.brands) {
@@ -296,33 +308,78 @@ const WatchlistBrands = () => {
         </Button>
       </div>
 
-      {/* Summary Stats Cards - Above Search */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">
-              {filteredBrands ? filteredBrands.filter(b => determineScraperStatus(b) === 'completed').length : 0}
-            </div>
-            <div className="text-sm text-gray-600">Completed</div>
-          </div>
-        </Card>
-        <Card>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-yellow-600">
-              {filteredBrands ? filteredBrands.filter(b => determineScraperStatus(b) === 'waiting').length : 0}
-            </div>
-            <div className="text-sm text-gray-600">Waiting</div>
-          </div>
-        </Card>
-        <Card>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-red-600">
-              {filteredBrands ? filteredBrands.filter(b => determineScraperStatus(b) === 'failed').length : 0}
-            </div>
-            <div className="text-sm text-gray-600">Failed</div>
-          </div>
-        </Card>
-      </div>
+                         {/* Summary Stats Cards - Above Search */}
+       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+         <Card>
+           <div className="text-center">
+             <div className="text-2xl font-bold text-green-600">
+               {filteredBrands ? filteredBrands.filter(b => determineScraperStatus(b) === 'completed').length : 0}
+             </div>
+             <div className="text-sm text-gray-600">Completed</div>
+           </div>
+         </Card>
+         <Card>
+           <div className="text-center">
+             <div className="text-2xl font-bold text-yellow-600">
+               {filteredBrands ? filteredBrands.filter(b => determineScraperStatus(b) === 'waiting').length : 0}
+             </div>
+             <div className="text-sm text-gray-600">Waiting</div>
+           </div>
+         </Card>
+         <Card>
+           <div className="text-center">
+             <div className="text-2xl font-bold text-red-600">
+               {filteredBrands ? filteredBrands.filter(b => determineScraperStatus(b) === 'failed').length : 0}
+             </div>
+             <div className="text-sm text-gray-600">Failed</div>
+           </div>
+         </Card>
+       </div>
+
+       {/* Load Watchlist to Pending Button */}
+       <Card>
+         <div className="p-4 sm:p-6">
+           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+             <div>
+               <h4 className="text-lg font-semibold text-gray-900">Load Watchlist to Pending Queue</h4>
+               <p className="text-sm text-gray-600">
+                 Add all watchlist brands to the pending queue with priority score 1
+               </p>
+             </div>
+             <Button
+               variant="primary"
+               size="md"
+               disabled={!isAdmin}
+               onClick={async () => {
+                 if (!isAdmin) {
+                   toast.error('Admin access required to load brands');
+                   return;
+                 }
+                 try {
+                   const result = await moveWatchlistToPending();
+                   toast.success(result.message || 'Successfully loaded watchlist brands to pending queue');
+                   // Refresh the data to show updated statuses
+                   await fetchWatchlistBrands(1, 10000);
+                   await Promise.all([
+                     fetchPendingBrands(1, 10000),
+                     fetchFailedBrands(1, 10000)
+                   ]);
+                 } catch (error) {
+                   toast.error(error.message || 'Failed to load watchlist brands to pending queue');
+                 }
+               }}
+               className={`w-full sm:w-auto ${!isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}
+             >
+               <span className="hidden sm:inline">
+                 {isAdmin ? 'Load Watchlist to Pending' : 'Admin Access Required'}
+               </span>
+               <span className="sm:hidden">
+                 {isAdmin ? 'Load to Pending' : 'Admin Required'}
+               </span>
+             </Button>
+           </div>
+         </div>
+       </Card>
 
       {/* Move Watchlist Failed to Pending Button */}
       {filteredBrands && filteredBrands.filter(b => determineScraperStatus(b) === 'failed').length > 0 && (

@@ -348,10 +348,104 @@ async function moveWatchlistFailedToPending() {
   }
 }
 
+// NEW FUNCTION: Move all watchlist brands from database to pending queue with score 1
+async function moveWatchlistToPending() {
+  try {
+    logger.info("Moving all watchlist brands from database to pending queue with score 1");
+
+    // Get all watchlist brands from database
+    const WatchList = require('../models/WatchList');
+    const Brand = require('../models/Brand');
+    
+    const watchlistItems = await WatchList.findAll({
+      attributes: ['brand_id'],
+      raw: true
+    });
+    
+    if (watchlistItems.length === 0) {
+      return {
+        moved_count: 0,
+        message: "No watchlist brands found in database",
+      };
+    }
+    
+    // Get the brand details for watchlist brands
+    const watchlistBrandIds = watchlistItems.map(item => item.brand_id);
+    const watchlistBrands = await Brand.findAll({
+      where: {
+        id: watchlistBrandIds
+      },
+      attributes: ['id', 'page_id', 'actual_name'],
+      raw: true
+    });
+
+    if (watchlistBrands.length === 0) {
+      return {
+        moved_count: 0,
+        message: "No watchlist brands found with valid details",
+      };
+    }
+
+    // Get existing pending brands to avoid duplicates
+    const existingPendingItems = await redis.zrange(QUEUES.PENDING_BRANDS, 0, -1);
+    const existingPageIds = new Set();
+    
+    for (const pendingItem of existingPendingItems) {
+      try {
+        const pendingData = JSON.parse(pendingItem);
+        existingPageIds.add(pendingData.page_id);
+      } catch (parseError) {
+        logger.error(`Error parsing existing pending brand data:`, parseError);
+      }
+    }
+
+    // Filter out brands that are already in pending queue
+    const brandsToAdd = watchlistBrands.filter(brand => !existingPageIds.has(brand.page_id));
+    
+    if (brandsToAdd.length === 0) {
+      return {
+        moved_count: 0,
+        message: "All watchlist brands are already in pending queue",
+      };
+    }
+
+    // Add brands to pending queue with score 1 (priority)
+    const pipeline = redis.pipeline();
+    const addedBrands = [];
+    
+    for (const brand of brandsToAdd) {
+      const pendingBrandData = {
+        id: brand.id,
+        page_id: brand.page_id
+      };
+      
+      // Add to pending sorted set with score 1 (priority)
+      pipeline.zadd(QUEUES.PENDING_BRANDS, 1, JSON.stringify(pendingBrandData));
+      addedBrands.push(pendingBrandData);
+    }
+
+    await pipeline.exec();
+
+    logger.info(
+      `Successfully added ${addedBrands.length} watchlist brands to pending queue with score 1`
+    );
+
+    return {
+      moved_count: addedBrands.length,
+      moved_brands: addedBrands,
+      message: `Successfully added ${addedBrands.length} watchlist brands to pending queue with priority score 1`,
+    };
+  } catch (error) {
+    logger.error("Error moving watchlist brands to pending queue:", error);
+    throw error;
+  }
+}
+
 module.exports = {
   movePendingToFailed,
   moveFailedToPending,
   moveAllPendingToFailed,
   moveAllFailedToPending,
   moveWatchlistFailedToPending,
+  moveWatchlistToPending,
 };

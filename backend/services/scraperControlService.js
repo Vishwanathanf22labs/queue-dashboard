@@ -2,34 +2,14 @@ const redis = require("../config/redis");
 const logger = require("../utils/logger");
 const { QUEUES } = require("../config/constants");
 
-// Initialize default scraper status if none exists
-async function initializeScraperStatus() {
-  try {
-    const currentStatus = await redis.get('scraper:status');
-    
-    if (!currentStatus) {
-      // Always set scraper to running state regardless of queue state
-      await redis.set('scraper:status', 'running', 'EX', 86400);
-      await redis.set('scraper:started_at', new Date().toISOString(), 'EX', 86400);
-      logger.info('Scraper initialized - always set to running state');
-      return 'running';
-    }
-    
-    return currentStatus;
-  } catch (error) {
-    logger.error('Error initializing scraper status:', error);
-    return 'running'; // Default fallback - always running
-  }
-}
 
-// START SCRAPER
 async function startScraper() {
   try {
     const pendingCount = await redis.zcard(QUEUES.PENDING_BRANDS);
     const failedCount = await redis.llen(QUEUES.FAILED_BRANDS);
     const currentStatus = await redis.get('scraper:status');
     
-    // If scraper is already running
+ 
     if (currentStatus === 'running') {
       return {
         success: false,
@@ -38,11 +18,11 @@ async function startScraper() {
       };
     }
     
-    // Set status to running regardless of queue state
+
     await redis.set('scraper:status', 'running', 'EX', 86400);
     await redis.set('scraper:started_at', new Date().toISOString(), 'EX', 86400);
     
-    // Remove any paused status if it exists
+ 
     await redis.del('scraper:paused_at');
     
     logger.info('Scraper started successfully');
@@ -64,10 +44,9 @@ async function startScraper() {
   }
 }
 
-// STOP SCRAPER
+
 async function stopScraper() {
   try {
-    // Get the currently processing brand before stopping
     let currentBrandInfo = null;
     try {
       const { getCurrentlyProcessing } = require('./queueOverviewService');
@@ -78,7 +57,7 @@ async function stopScraper() {
           name: currentlyProcessing.brand_name || 'Unknown Brand',
           page_id: currentlyProcessing.page_id || 'unknown'
         };
-        // Store the brand info when stopping
+  
         await redis.set('scraper:stopped_brand', JSON.stringify(currentBrandInfo), 'EX', 86400);
       }
     } catch (brandError) {
@@ -88,7 +67,7 @@ async function stopScraper() {
     await redis.set('scraper:status', 'stopped', 'EX', 86400);
     await redis.set('scraper:stopped_at', new Date().toISOString(), 'EX', 86400);
     
-    // Remove any paused status if it exists
+
     await redis.del('scraper:paused_at');
     await redis.del('scraper:paused_brand');
     
@@ -107,7 +86,7 @@ async function stopScraper() {
   }
 }
 
-// PAUSE SCRAPER
+
 async function pauseScraper() {
   try {
     const currentStatus = await redis.get('scraper:status');
@@ -125,8 +104,7 @@ async function pauseScraper() {
         message: 'Cannot pause stopped scraper. Start the scraper first.' 
       };
     }
-    
-    // Get the currently processing brand before pausing
+
     let currentBrandInfo = null;
     try {
       const { getCurrentlyProcessing } = require('./queueOverviewService');
@@ -137,14 +115,14 @@ async function pauseScraper() {
           name: currentlyProcessing.brand_name || 'Unknown Brand',
           page_id: currentlyProcessing.page_id || 'unknown'
         };
-        // Store the brand info when pausing
+  
         await redis.set('scraper:paused_brand', JSON.stringify(currentBrandInfo), 'EX', 86400);
       }
     } catch (brandError) {
       logger.error('Error getting current brand info for pause:', brandError);
     }
     
-    // Just change status to paused without moving any brands
+
     await redis.set('scraper:status', 'paused', 'EX', 86400);
     await redis.set('scraper:paused_at', new Date().toISOString(), 'EX', 86400);
     
@@ -163,7 +141,7 @@ async function pauseScraper() {
   }
 }
 
-// RESUME SCRAPER
+
 async function resumeScraper() {
   try {
     const currentStatus = await redis.get('scraper:status');
@@ -175,7 +153,7 @@ async function resumeScraper() {
       };
     }
     
-    // Just change status back to running without moving any brands
+
     await redis.set('scraper:status', 'running', 'EX', 86400);
     await redis.set('scraper:started_at', new Date().toISOString(), 'EX', 86400);
     await redis.del('scraper:paused_at');
@@ -194,47 +172,33 @@ async function resumeScraper() {
   }
 }
 
-// GET SCRAPER STATUS
+
 async function getScraperStatus() {
   try {
-    // Initialize status if none exists
-    const status = await initializeScraperStatus();
-    
-    // Sync status to check if external process is actually running
-    const syncedStatus = await syncScraperStatus();
-    
-    // Ensure we have a valid status
-    const finalStatus = syncedStatus || status || 'stopped';
+    const currentStatus = await redis.get('scraper:status');
     
     const pendingCount = await redis.zcard(QUEUES.PENDING_BRANDS);
     const failedCount = await redis.llen(QUEUES.FAILED_BRANDS);
     
-    // Clean up any existing paused_brands queue (legacy cleanup)
-    const pausedExists = await redis.exists('paused_brands');
-    if (pausedExists) {
-      await redis.del('paused_brands');
-      logger.info('Cleaned up legacy paused_brands queue');
-    }
-    
-    let statusDetails = {
-      status: finalStatus,
+    const statusDetails = {
+      status: currentStatus || 'stopped',
       pending_count: pendingCount,
       failed_count: failedCount,
       total_queued: pendingCount + failedCount,
       timestamp: new Date().toISOString()
     };
     
-    // Add specific timestamps and brand details
-    if (finalStatus === 'paused') {
+   
+    if (currentStatus === 'paused') {
       const pausedAt = await redis.get('scraper:paused_at');
       statusDetails.paused_at = pausedAt;
       
-      // Get the brand that was paused from stored info
+     
       try {
         const pausedBrandData = await redis.get('scraper:paused_brand');
         if (pausedBrandData) {
           const brandInfo = JSON.parse(pausedBrandData);
-          statusDetails.paused_brand = {
+          statusDetails.last_processed_brand = {
             id: brandInfo.id,
             name: brandInfo.name,
             page_id: brandInfo.page_id
@@ -243,11 +207,10 @@ async function getScraperStatus() {
       } catch (brandError) {
         logger.error('Error getting paused brand details:', brandError);
       }
-    } else if (finalStatus === 'stopped') {
+    } else if (currentStatus === 'stopped') {
       const stoppedAt = await redis.get('scraper:stopped_at');
       statusDetails.stopped_at = stoppedAt;
-      
-      // Get the brand that was stopped from stored info
+
       try {
         const stoppedBrandData = await redis.get('scraper:stopped_brand');
         if (stoppedBrandData) {
@@ -261,11 +224,10 @@ async function getScraperStatus() {
       } catch (brandError) {
         logger.error('Error getting stopped brand details:', brandError);
       }
-    } else if (finalStatus === 'running') {
+    } else if (currentStatus === 'running') {
       const startedAt = await redis.get('scraper:started_at');
       statusDetails.started_at = startedAt;
-      
-      // Get currently processing brand
+
       try {
         const { getCurrentlyProcessing } = require('./queueOverviewService');
         const currentlyProcessing = await getCurrentlyProcessing();
@@ -284,7 +246,7 @@ async function getScraperStatus() {
     return statusDetails;
   } catch (error) {
     logger.error('Error getting scraper status:', error);
-    // Return a default status on error
+   
     return {
       status: 'stopped',
       pending_count: 0,
@@ -295,33 +257,10 @@ async function getScraperStatus() {
   }
 }
 
-// Check if external scraper process is running and sync status
-async function syncScraperStatus() {
-  try {
-    // Get the current status from Redis
-    const currentStatus = await redis.get('scraper:status');
-    
-    // If no status exists, return 'stopped' (this shouldn't happen due to initialization)
-    if (!currentStatus) {
-      logger.warn('No scraper status found, returning stopped');
-      return 'stopped';
-    }
-    
-    // Removed automatic scraper stopping logic - scraper will stay running until manually stopped
-    
-    return currentStatus;
-  } catch (error) {
-    logger.error('Error syncing scraper status:', error);
-    return 'stopped';
-  }
-}
-
 module.exports = {
   startScraper,
   stopScraper,
   pauseScraper,
   resumeScraper,
-  getScraperStatus,
-  syncScraperStatus,
-  initializeScraperStatus
+  getScraperStatus
 };
