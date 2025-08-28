@@ -307,24 +307,7 @@ async function syncScraperStatus() {
       return 'stopped';
     }
     
-    // If status is 'running' but no recent activity, check if it's actually running
-    if (currentStatus === 'running') {
-      const startedAt = await redis.get('scraper:started_at');
-      if (startedAt) {
-        const startTime = new Date(startedAt);
-        const now = new Date();
-        const timeDiff = now - startTime;
-        
-        // If scraper has been "running" for more than 10 minutes without activity, 
-        // it might have crashed - set to stopped
-        if (timeDiff > 10 * 60 * 1000) { // 10 minutes
-          logger.warn('Scraper appears to have crashed, setting status to stopped');
-          await redis.set('scraper:status', 'stopped', 'EX', 86400);
-          await redis.set('scraper:stopped_at', new Date().toISOString(), 'EX', 86400);
-          return 'stopped';
-        }
-      }
-    }
+    // Removed automatic scraper stopping logic - scraper will stay running until manually stopped
     
     return currentStatus;
   } catch (error) {
