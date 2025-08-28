@@ -45,6 +45,11 @@ router.put(
   queueManagementController.moveWatchlistFailedToPending
 );
 
+router.put(
+  "/watchlist/move-to-pending",
+  queueManagementController.moveWatchlistToPending
+);
+
 // Get queue management statistics
 router.get("/stats", queueManagementController.getQueueManagementStats);
 

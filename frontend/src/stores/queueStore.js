@@ -298,6 +298,19 @@ const useQueueStore = create((set, get) => ({
     }
   },
 
+  moveWatchlistToPending: async () => {
+    try {
+      set({ loading: true, error: null });
+      const response = await queueAPI.moveWatchlistToPending();
+      set({ loading: false });
+      return response.data;
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || "Failed to move watchlist brands to pending queue";
+      set({ error: errorMessage, loading: false });
+      throw error;
+    }
+  },
+
   fetchScraperStatus: async () => {
     try {
       set({ loading: true, error: null });

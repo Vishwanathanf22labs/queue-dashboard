@@ -124,4 +124,5 @@ module.exports = {
   getQueueStats,
   changeBrandScore,
   moveWatchlistFailedToPending: queueMoveService.moveWatchlistFailedToPending,
+  moveWatchlistToPending: queueMoveService.moveWatchlistToPending,
 };

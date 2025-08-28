@@ -231,6 +231,28 @@ async function moveWatchlistFailedToPending(req, res) {
   }
 }
 
+async function moveWatchlistToPending(req, res) {
+  try {
+    logger.info("Move watchlist to pending request received");
+
+    const result = await queueManagementService.moveWatchlistToPending();
+
+    res.status(200).json({
+      success: true,
+      message: "Watchlist brands moved to pending queue successfully",
+      data: result,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error("Error in moveWatchlistToPending controller:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to move watchlist brands to pending queue",
+      error: error.message,
+    });
+  }
+}
+
 async function getQueueManagementStats(req, res) {
   try {
     logger.info("Get queue management stats request received");
@@ -264,5 +286,6 @@ module.exports = {
   moveAllPendingToFailed,
   moveAllFailedToPending,
   moveWatchlistFailedToPending,
+  moveWatchlistToPending,
   getQueueManagementStats,
 };
