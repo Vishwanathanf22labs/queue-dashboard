@@ -12,15 +12,13 @@ const CACHE_TTL = 30000; // 30 seconds
 try {
   madanglesRedis = new Redis({
     host:
-      process.env.MADANGLES_REDIS_HOST || process.env.REDIS_HOST || "localhost",
-    port: process.env.MADANGLES_REDIS_PORT || process.env.REDIS_PORT || 6379,
+      process.env.MADANGLES_REDIS_HOST,
+    port: process.env.MADANGLES_REDIS_PORT,
     password:
-      process.env.MADANGLES_REDIS_PASSWORD || process.env.REDIS_PASSWORD || "",
-    db: process.env.MADANGLES_REDIS_DB || 0,
+      process.env.MADANGLES_REDIS_PASSWORD,
     maxRetriesPerRequest: 3,
     retryDelayOnFailover: 100,
     enableReadyCheck: false,
-    maxRetriesPerRequest: null,
   });
 
   madanglesRedis.on("error", (err) => {

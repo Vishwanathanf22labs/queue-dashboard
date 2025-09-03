@@ -86,9 +86,7 @@ const Dashboard = () => {
     try {
       updateState({ scraperStatusLoading: true });
       const response = await queueAPI.getScraperStatus();
-      console.log('Scraper status response:', response.data);
       const status = response.data?.status || 'unknown';
-      console.log('Setting scraper status to:', status);
       updateState({ scraperStatus: status });
     } catch (error) {
       console.error('Failed to fetch scraper status:', error);
@@ -103,7 +101,6 @@ const Dashboard = () => {
     if (currentlyProcessing && !scraperStatusLoading) {
       // If there's a brand processing, force status to 'running'
       if (scraperStatus !== 'running') {
-        console.log('Overriding scraper status to running because brand is processing');
         updateState({ scraperStatus: 'running' });
       }
     }

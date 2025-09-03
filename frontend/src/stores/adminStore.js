@@ -14,7 +14,6 @@ const useAdminStore = create((set, get) => ({
   checkAdminStatus: async (skipPages = []) => {
     const currentPath = window.location.pathname;
     if (skipPages.includes(currentPath)) {
-      console.log(`Skipping admin status check on ${currentPath}`);
       return false;
     }
 
