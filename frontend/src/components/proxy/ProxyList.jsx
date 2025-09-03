@@ -1,0 +1,282 @@
+import { useState, useCallback } from 'react';
+import Button from '../ui/Button';
+import Card from '../ui/Card';
+import Badge from '../ui/Badge';
+import Table from '../ui/Table';
+import { proxyAPI } from '../../services/api';
+import toast from 'react-hot-toast';
+import { CheckCircle, XCircle, Trash2, RotateCcw } from 'lucide-react';
+
+const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated }) => {
+  const [updatingStatus, setUpdatingStatus] = useState(null);
+
+  const handleStatusUpdate = useCallback(async (proxyId, isWorking) => {
+    setUpdatingStatus(proxyId);
+    try {
+      const response = await proxyAPI.updateProxyStatus(proxyId, isWorking);
+
+      if (response.data.success) {
+        toast.success(`Proxy marked as ${isWorking ? 'working' : 'not working'}`);
+        onProxyUpdated?.(proxyId, { is_working: isWorking });
+      } else {
+        toast.error(response.data.message || 'Failed to update proxy status');
+      }
+    } catch (error) {
+      toast.error('Error updating proxy status');
+    } finally {
+      setUpdatingStatus(null);
+    }
+  }, [onProxyUpdated]);
+
+  const handleRemoveProxy = useCallback(async (proxyId) => {
+    try {
+      const response = await proxyAPI.removeProxy(proxyId);
+
+      if (response.data.success) {
+        toast.success('Proxy removed successfully');
+        onProxyRemoved?.(proxyId);
+      } else {
+        toast.error(response.data.message || 'Failed to remove proxy');
+      }
+    } catch (error) {
+      toast.error('Error removing proxy');
+    }
+  }, [onProxyRemoved]);
+
+  if (!proxies || proxies.length === 0) {
+    return (
+      <Card title="Proxy List" subtitle="Manage your proxy configurations">
+        <div className="text-center py-8">
+          <p className="text-gray-500 text-lg">No proxies found</p>
+          <p className="text-gray-400 text-sm mt-2">Add your first proxy to get started</p>
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <Card title="Proxy List" subtitle="Manage your proxy configurations">
+      {/* Mobile view */}
+      <div className="block xl:hidden space-y-4">
+        {proxies.map((proxy) => (
+          <div key={proxy.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-900 break-all">
+                    {proxy.ip}:{proxy.port}
+                  </div>
+                  {proxy.username && (
+                    <div className="text-xs text-gray-500 mt-1 break-all">
+                      {proxy.username}
+                    </div>
+                  )}
+                </div>
+                <div className="ml-3 flex-shrink-0">
+                  <Badge variant={proxy.is_working ? 'success' : 'error'} size="sm">
+                    {proxy.is_working ? 'Working' : 'Failed'}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <span className="text-gray-500">Country:</span>
+                  <div className="font-medium text-gray-900 break-all">
+                    {proxy.country || 'Unknown'}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-gray-500">Type:</span>
+                  <div className="mt-1">
+                    <Badge variant="info" size="sm">
+                      {proxy.type?.toUpperCase() || 'HTTP'}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <span className="text-gray-500">Success:</span>
+                  <div className="font-medium text-green-600">
+                    {proxy.successCount || proxy.success_count || 0}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-gray-500">Failed:</span>
+                  <div className="font-medium text-red-600">
+                    {proxy.failCount || proxy.fail_count || 0}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-gray-500">Total Usage:</span>
+                  <div className="font-medium text-gray-900">
+                    {proxy.usage_count || 0}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-gray-500">Added:</span>
+                  <div className="font-medium text-gray-900 text-xs break-all">
+                    {proxy.added_date}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-center space-x-2 pt-2 border-t border-gray-200">
+                <Button
+                  onClick={() => handleStatusUpdate(proxy.id, !proxy.is_working)}
+                  disabled={updatingStatus === proxy.id}
+                  variant={proxy.is_working ? 'error' : 'success'}
+                  size="sm"
+                  className="p-2 min-w-0"
+                  title={proxy.is_working ? 'Mark as Failed' : 'Mark as Working'}
+                  loading={updatingStatus === proxy.id}
+                >
+                  {proxy.is_working ? (
+                    <XCircle className="h-4 w-4" />
+                  ) : (
+                    <CheckCircle className="h-4 w-4" />
+                  )}
+                </Button>
+
+                <Button
+                  onClick={() => handleRemoveProxy(proxy.id)}
+                  variant="error"
+                  size="sm"
+                  className="p-2 min-w-0"
+                  title="Remove Proxy"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop view - Custom Table Implementation */}
+      <div className="hidden xl:block overflow-hidden">
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+          {/* Table Header */}
+          <div className="bg-gray-50 border-b border-gray-200">
+            <div className="grid grid-cols-12 gap-1 px-4 py-3 text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <div className="col-span-3 text-center">Proxy</div>
+              <div className="col-span-1 text-center">Country</div>
+              <div className="col-span-1 text-center">Type</div>
+              <div className="col-span-1 text-center">Status</div>
+              <div className="col-span-1 text-center">Success</div>
+              <div className="col-span-1 text-center">Failed</div>
+              <div className="col-span-1 text-center">Usage</div>
+              <div className="col-span-2 text-center">Added</div>
+              <div className="col-span-1 text-center">Actions</div>
+            </div>
+          </div>
+
+          {/* Table Body */}
+          <div className="divide-y divide-gray-200">
+            {proxies.map((proxy, index) => (
+              <div key={proxy.id} className={`grid grid-cols-12 gap-1 px-4 py-3 text-xs hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                {/* Proxy */}
+                <div className="col-span-3 flex flex-col items-center justify-center min-w-0">
+                  <div className="font-medium text-gray-900 truncate w-full text-center">
+                    {proxy.ip}:{proxy.port}
+                  </div>
+                  {proxy.username && (
+                    <div className="text-gray-500 truncate w-full text-center">
+                      {proxy.username}
+                    </div>
+                  )}
+                </div>
+
+                {/* Country */}
+                <div className="col-span-1 flex items-center justify-center">
+                  <span className="text-gray-900 truncate">
+                    {proxy.country || 'Unknown'}
+                  </span>
+                </div>
+
+                {/* Type */}
+                <div className="col-span-1 flex items-center justify-center">
+                  <Badge variant="info" size="sm" className="text-xs px-1 py-0.5">
+                    {proxy.type?.toUpperCase() || 'HTTP'}
+                  </Badge>
+                </div>
+
+                {/* Status */}
+                <div className="col-span-1 flex items-center justify-center">
+                  <Badge
+                    variant={proxy.is_working ? 'success' : 'error'}
+                    size="sm"
+                    className="text-xs px-1 py-0.5"
+                  >
+                    {proxy.is_working ? 'Good' : 'FAIL'}
+                  </Badge>
+                </div>
+
+                {/* Success */}
+                <div className="col-span-1 flex items-center justify-center">
+                  <span className="font-medium text-green-600">
+                    {proxy.successCount || proxy.success_count || 0}
+                  </span>
+                </div>
+
+                {/* Failed */}
+                <div className="col-span-1 flex items-center justify-center">
+                  <span className="font-medium text-red-600">
+                    {proxy.failCount || proxy.fail_count || 0}
+                  </span>
+                </div>
+
+                {/* Total */}
+                <div className="col-span-1 flex items-center justify-center">
+                  <span className="font-medium text-gray-900">
+                    {proxy.usage_count || 0}
+                  </span>
+                </div>
+
+                {/* Added */}
+                <div className="col-span-2 flex flex-col items-center justify-center min-w-0">
+                  <div className="text-gray-900 truncate w-full text-center">
+                    {proxy.added_date}
+                  </div>
+                  <div className="text-gray-500 truncate w-full text-center">
+                    {proxy.added_time}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="col-span-1 flex items-center justify-center space-x-1">
+                  <Button
+                    onClick={() => handleStatusUpdate(proxy.id, !proxy.is_working)}
+                    disabled={updatingStatus === proxy.id}
+                    variant={proxy.is_working ? 'error' : 'success'}
+                    size="sm"
+                    className="p-1 min-w-0"
+                    title={proxy.is_working ? 'Mark as Failed' : 'Mark as Working'}
+                    loading={updatingStatus === proxy.id}
+                  >
+                    {proxy.is_working ? (
+                      <XCircle className="h-3 w-3" />
+                    ) : (
+                      <CheckCircle className="h-3 w-3" />
+                    )}
+                  </Button>
+
+                  <Button
+                    onClick={() => handleRemoveProxy(proxy.id)}
+                    variant="error"
+                    size="sm"
+                    className="p-1 min-w-0"
+                    title="Remove Proxy"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+};
+
+export default ProxyList;

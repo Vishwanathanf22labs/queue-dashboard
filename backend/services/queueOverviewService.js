@@ -1,0 +1,278 @@
+const redis = require("../config/redis");
+const Brand = require("../models/Brand");
+const logger = require("../utils/logger");
+const { QUEUES } = require("../config/constants");
+const watchlistRedisService = require("./watchlistRedisService");
+const WatchList = require("../models/WatchList"); // Added import for WatchList
+
+// Cleanup function to remove completed/failed brands from currently processing queue
+async function cleanupCompletedBrands() {
+  try {
+    const currentlyProcessingBrands = await redis.lrange(QUEUES.CURRENTLY_PROCESSING, 0, -1);
+    
+    if (!currentlyProcessingBrands || currentlyProcessingBrands.length === 0) {
+      return;
+    }
+
+    let removedCount = 0;
+    const brandsToKeep = [];
+
+    for (let i = 0; i < currentlyProcessingBrands.length; i++) {
+      try {
+        const processingData = JSON.parse(currentlyProcessingBrands[i]);
+        const status = processingData.status?.toLowerCase();
+        
+        // Keep only brands that are actively processing (not completed or failed)
+        if (status && (status === 'complete' || status === 'failed' || status === 'error')) {
+          logger.info(`Cleanup: Removing ${status} brand ${processingData.brandId} from ${QUEUES.CURRENTLY_PROCESSING} Redis key`);
+          removedCount++;
+        } else {
+          // Keep this brand in the list (processing, active, etc.)
+          brandsToKeep.push(currentlyProcessingBrands[i]);
+        }
+      } catch (parseError) {
+        logger.warn(`Cleanup: Error parsing brand data: ${parseError.message}`);
+        // If we can't parse, keep it to be safe
+        brandsToKeep.push(currentlyProcessingBrands[i]);
+      }
+    }
+
+    // If we removed any brands, update the Redis key
+    if (removedCount > 0) {
+      // Clear the current list
+      await redis.del(QUEUES.CURRENTLY_PROCESSING);
+      
+      // Add back only the brands to keep
+      if (brandsToKeep.length > 0) {
+        await redis.rpush(QUEUES.CURRENTLY_PROCESSING, ...brandsToKeep);
+      }
+      
+      logger.info(`Cleanup completed: removed ${removedCount} completed/failed brands, kept ${brandsToKeep.length} active brands`);
+    }
+  } catch (error) {
+    logger.error('Error during cleanup of completed brands:', error);
+  }
+}
+
+// Start automatic cleanup interval when module loads
+let cleanupInterval = null;
+
+// Function to start the cleanup interval
+function startCleanupInterval() {
+  // Clear any existing interval first
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    logger.info('Cleared existing cleanup interval');
+  }
+  
+  // Start new interval
+  cleanupInterval = setInterval(async () => {
+    logger.info('Running scheduled cleanup of completed brands...');
+    await cleanupCompletedBrands();
+    
+    // Log next cleanup time
+    const nextCleanup = new Date(Date.now() + 4 * 60 * 1000);
+    logger.info(`Next cleanup scheduled for: ${nextCleanup.toLocaleString()}`);
+  }, 4 * 60 * 1000); // Every 4 minutes
+  
+  logger.info('Started automatic cleanup interval for completed brands (every 4 minutes)');
+  
+  // Log the first cleanup time
+  const firstCleanup = new Date(Date.now() + 4 * 60 * 1000);
+  logger.info(`First cleanup scheduled for: ${firstCleanup.toLocaleString()}`);
+}
+
+// Start the interval
+startCleanupInterval();
+
+async function getQueueOverview() {
+  try {
+    const pendingCount = await redis.zcard(QUEUES.PENDING_BRANDS);
+
+    // Use same Redis approach as pending count for consistency
+    const failedCount = await redis.llen(QUEUES.FAILED_BRANDS);
+
+    let activeBrandsCount = 0;
+    try {
+      const activeBrands = await Brand.count({
+        where: { status: "Active" },
+      });
+      activeBrandsCount = activeBrands;
+    } catch (dbError) {
+      logger.error("Error counting active brands from database:", dbError);
+      activeBrandsCount = 0;
+    }
+
+
+
+    const currentlyProcessing = await getCurrentlyProcessing();
+
+    // Get watchlist stats
+    let watchlistStats = null;
+    try {
+      watchlistStats = await watchlistRedisService.getWatchlistStats();
+    } catch (watchlistError) {
+      logger.error("Error getting watchlist stats:", watchlistError);
+      watchlistStats = {
+        pending_count: 0,
+        failed_count: 0
+      };
+    }
+
+    return {
+      queue_counts: {
+        pending: pendingCount,
+        failed: failedCount,
+        active: activeBrandsCount,
+      },
+      currently_processing: currentlyProcessing,
+      watchlist_stats: watchlistStats,
+    };
+  } catch (error) {
+    logger.error("Error in getQueueOverview:", error);
+    throw error;
+  }
+}
+
+async function getCurrentlyProcessing() {
+  try {
+    // Get ALL currently processing brands from Redis key (cleanup runs automatically every 5 minutes)
+    const currentlyProcessingBrands = await redis.lrange(QUEUES.CURRENTLY_PROCESSING, 0, -1);
+    
+    if (!currentlyProcessingBrands || currentlyProcessingBrands.length === 0) {
+      return null;
+    }
+
+    const results = [];
+    
+    for (let i = 0; i < currentlyProcessingBrands.length; i++) {
+      try {
+        const processingData = JSON.parse(currentlyProcessingBrands[i]);
+        
+        // Check if brand is in watchlist table
+        let isInWatchlist = false;
+        try {
+          const watchlistBrand = await WatchList.findOne({
+            where: { brand_id: parseInt(processingData.brandId) },
+            attributes: ['brand_id'],
+            raw: true
+          });
+          isInWatchlist = !!watchlistBrand;
+        } catch (watchlistError) {
+          logger.warn(`Error checking watchlist for brand ${processingData.brandId}:`, watchlistError);
+          isInWatchlist = false;
+        }
+        
+        // Get brand details from database
+        const brand = await Brand.findOne({
+          where: { id: parseInt(processingData.brandId) },
+          attributes: ["actual_name", "page_id", "status"],
+          raw: true,
+        });
+
+        if (!brand) {
+          logger.warn(`Brand with ID ${processingData.brandId} not found in database`);
+          // Return the Redis data even if brand not found in database
+          results.push({
+            brand_id: parseInt(processingData.brandId),
+            brand_name: "Unknown Brand",
+            page_id: processingData.pageId || "Unknown",
+            status: processingData.status || "Unknown",
+            started_at: processingData.startAt || new Date().toISOString(),
+            processing_duration: processingData.duration || 0,
+            total_ads: processingData.totalAds || 0,
+            proxy: processingData.proxy ? (() => {
+              try {
+                const proxyData = JSON.parse(processingData.proxy);
+                return {
+                  host: proxyData.proxy?.host,
+                  port: proxyData.proxy?.port
+                };
+              } catch (e) {
+                return null;
+              }
+            })() : null,
+            is_watchlist: isInWatchlist
+          });
+        } else {
+          // Parse proxy information if available
+          let proxyInfo = null;
+          if (processingData.proxy) {
+            try {
+              proxyInfo = JSON.parse(processingData.proxy);
+            } catch (proxyParseError) {
+              logger.warn(`Failed to parse proxy data: ${proxyParseError.message}`);
+            }
+          }
+
+          results.push({
+            brand_id: parseInt(processingData.brandId),
+            brand_name: brand.actual_name || "Unknown",
+            page_id: processingData.pageId || brand.page_id || "Unknown",
+            status: processingData.status || brand.status || "Unknown",
+            started_at: processingData.startAt || new Date().toISOString(),
+            processing_duration: processingData.duration || 0,
+            total_ads: processingData.totalAds || 0,
+            proxy: proxyInfo ? {
+              host: proxyInfo.proxy?.host,
+              port: proxyInfo.proxy?.port
+            } : null,
+            is_watchlist: isInWatchlist
+          });
+        }
+      } catch (parseError) {
+        logger.error(`Error parsing currently processing brand data at index ${i}:`, parseError);
+        // Continue with next brand instead of failing completely
+      }
+    }
+
+    return results.length > 0 ? results : null;
+  } catch (error) {
+    logger.error("Error in getCurrentlyProcessing:", error);
+    return null;
+  }
+}
+
+async function getQueueStatistics() {
+  try {
+    const pendingCount = await redis.zcard(QUEUES.PENDING_BRANDS);
+
+    const failedCount = await redis.llen(QUEUES.FAILED_BRANDS);
+
+    const activeBrandsCount = await Brand.count({
+      where: { status: "Active" },
+    });
+
+    const totalBrandsCount = await Brand.count();
+
+    return {
+      queue_stats: {
+        pending_count: pendingCount,
+        failed_count: failedCount,
+        total_queued: pendingCount + failedCount,
+      },
+      brand_stats: {
+        total_brands: totalBrandsCount,
+        active_brands: activeBrandsCount,
+      },
+    };
+  } catch (error) {
+    logger.error("Error in getQueueStatistics:", error);
+    throw error;
+  }
+}
+
+module.exports = {
+  getQueueOverview,
+  getCurrentlyProcessing,
+  getQueueStatistics,
+  cleanupCompletedBrands,
+  startCleanupInterval,
+  stopCleanupInterval: () => {
+    if (cleanupInterval) {
+      clearInterval(cleanupInterval);
+      cleanupInterval = null;
+      logger.info('Stopped automatic cleanup interval');
+    }
+  }
+};
