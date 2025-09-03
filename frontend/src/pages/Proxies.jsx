@@ -36,7 +36,6 @@ const Proxies = () => {
 
   const loadProxies = useCallback(async (page = 1, filterType = 'all', search = '') => {
     try {
-      console.log('Loading proxies with:', { page, filterType, search });
       const response = await proxyAPI.getProxies(page, 10, filterType, search);
 
       if (response.data.success) {
@@ -44,13 +43,6 @@ const Proxies = () => {
         const totalPages = response.data.data.pagination?.pages || 1;
         const currentPage = response.data.data.pagination?.page || 1;
 
-        console.log('Proxies loaded successfully:', { 
-          count: proxies.length, 
-          totalPages, 
-          currentPage,
-          filter: response.data.data.filter,
-          search: response.data.data.search
-        });
 
         updateDataState({
           proxies,
@@ -62,7 +54,6 @@ const Proxies = () => {
           toast.info(`No proxies found matching "${search}"`);
         }
       } else {
-        console.error('Failed to load proxies:', response.data);
         toast.error(response.data.message || 'Failed to load proxies');
       }
     } catch (error) {
@@ -77,9 +68,7 @@ const Proxies = () => {
       const response = await proxyAPI.getProxyStats();
       if (response.data.success) {
         updateDataState({ stats: response.data.data });
-        console.log('Stats loaded successfully:', response.data.data);
       } else {
-        console.error('Failed to load stats:', response.data);
         toast.error('Failed to load proxy statistics');
       }
     } catch (error) {
@@ -93,9 +82,7 @@ const Proxies = () => {
       const response = await proxyAPI.getProxyManagementStats();
       if (response.data.success) {
         updateDataState({ managementStats: response.data.data });
-        console.log('Management stats loaded successfully:', response.data.data);
       } else {
-        console.error('Failed to load management stats:', response.data);
         toast.error('Failed to load proxy management statistics');
       }
     } catch (error) {
@@ -170,7 +157,6 @@ const Proxies = () => {
   }, [loadStats, loadManagementStats, dataState.currentPage, dataState.filter, searchTerm, loadProxies, updateDataState]);
 
   const handleSearch = useCallback(async (value) => {
-    console.log('Search changed to:', value);
     setSearchTerm(value);
 
     if (!value.trim()) {
@@ -192,7 +178,6 @@ const Proxies = () => {
   }, [dataState.filter, loadProxies]);
 
   const handleFilterChange = useCallback((newFilter) => {
-    console.log('Filter changed to:', newFilter);
     updateDataState({
       filter: newFilter,
       currentPage: 1
