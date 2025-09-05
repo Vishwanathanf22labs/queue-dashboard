@@ -5,7 +5,7 @@ import LoadingState from '../ui/LoadingState';
 import ErrorDisplay from '../ui/ErrorDisplay';
 import SearchInput from '../ui/SearchInput';
 import Button from '../ui/Button';
-import { Users, Tag, Move, Trash2, Search } from 'lucide-react';
+import { Users, Tag, Move, Trash2, Search, ExternalLink } from 'lucide-react';
 
 const PendingQueue = ({ 
   pending, 
@@ -41,14 +41,31 @@ const PendingQueue = ({
     {
       key: 'brand_name',
       label: 'Brand Name',
-      render: (value, row) => (
-        <div className="flex items-center">
-          <Users className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
-          <div className="text-xs font-medium text-gray-900 max-w-[80px] sm:max-w-none truncate">
-            {value || 'Unknown Brand'}
+      render: (value, row) => {
+        const pageId = row.page_id || 'N/A';
+        return (
+          <div className="flex items-center">
+            <Users className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
+            <div className="flex items-center space-x-2 flex-1">
+              <div className="text-xs font-medium text-gray-900 max-w-[80px] sm:max-w-none truncate">
+                {value || 'Unknown Brand'}
+              </div>
+              {pageId && pageId !== 'N/A' && (
+                <button
+                  onClick={() => {
+                    const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=${pageId}`;
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="flex-shrink-0 p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                  title="View in Facebook Ad Library"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-      )
+        );
+      }
     },
     {
       key: 'queue_id',
@@ -146,7 +163,8 @@ const PendingQueue = ({
         </div>
       </Card>
 
-      <Card>
+      {/* Desktop Table View */}
+      <Card className="hidden md:block">
         {pending.error ? (
           <ErrorDisplay title="Error Loading Pending Queue" message={pending.error}>
             <Button onClick={() => onSearch('')}>Retry</Button>
@@ -182,6 +200,125 @@ const PendingQueue = ({
           />
         )}
       </Card>
+
+      {/* Mobile Cards View */}
+      <div className="md:hidden space-y-3">
+        {pending.error ? (
+          <Card>
+            <ErrorDisplay title="Error Loading Pending Queue" message={pending.error}>
+              <Button onClick={() => onSearch('')}>Retry</Button>
+            </ErrorDisplay>
+          </Card>
+        ) : pending.loading ? (
+          <Card>
+            <LoadingState size="lg" message="Loading pending brands..." />
+          </Card>
+        ) : pending.isSearching ? (
+          <Card>
+            <div className="text-center py-8">
+              <div className="flex flex-col items-center space-y-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="text-center">
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Searching...</h3>
+                  <p className="text-sm text-gray-500">
+                    Searching for "{pending.searchTerm}" across all pages
+                  </p>
+                </div>
+              </div>
+            </div>
+          </Card>
+        ) : filteredPendingBrands.length === 0 ? (
+          <Card>
+            <div className="text-center py-8">
+              <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No pending brands found</h3>
+              <p className="text-sm text-gray-500">
+                {pending.searchTerm ? 'Try adjusting your search terms' : 'All brands have been processed'}
+              </p>
+            </div>
+          </Card>
+        ) : (
+          filteredPendingBrands.map((brand, index) => {
+            const position = (pending.currentPage - 1) * pending.itemsPerPage + index + 1;
+            const brandName = brand.brand_name || 'Unknown Brand';
+            const brandId = brand.queue_id || brand.brand_id || 'N/A';
+            const pageId = brand.page_id || 'N/A';
+
+            return (
+              <Card key={`${brandId}-${index}`} className="p-4 relative pb-16">
+                <div className="space-y-3">
+                  {/* Header with Position and Brand Name */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      {/* Position Circle */}
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-medium text-blue-600">
+                          {position}
+                        </span>
+                      </div>
+                      <h3 className="font-semibold text-gray-900 text-lg">{brandName}</h3>
+                    </div>
+                  </div>
+
+                  {/* Details Grid */}
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500">Brand ID:</span>
+                      <span className="ml-2 font-medium text-gray-900 font-mono">{brandId}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Page ID:</span>
+                      <span className="ml-2 font-medium text-gray-900 font-mono">{pageId}</span>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-col space-y-2 pt-2">
+                    <div className="flex space-x-2">
+                      <Button
+                        size="sm"
+                        variant="warning"
+                        onClick={() => onMoveBrand(brand, 'failed')}
+                        disabled={isProcessingAction}
+                        className="flex-1 text-xs"
+                        title="Move to Failed Queue"
+                      >
+                        <Move className="h-3 w-3 mr-1" />
+                        Move to Failed
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => onRemoveBrand(brand, 'pending')}
+                        disabled={isProcessingAction}
+                        className="flex-1 text-xs"
+                        title="Remove Brand"
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" />
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* External Link Icon - Bottom Right */}
+                  {pageId && pageId !== 'N/A' && (
+                    <button
+                      onClick={() => {
+                        const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=${pageId}`;
+                        window.open(url, '_blank', 'noopener,noreferrer');
+                      }}
+                      className="absolute bottom-3 right-3 p-1.5 text-gray-400 hover:text-blue-600 transition-colors bg-white rounded-full shadow-sm border border-gray-200"
+                      title="View in Facebook Ad Library"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              </Card>
+            );
+          })
+        )}
+      </div>
 
       <Pagination
         currentPage={pending.currentPage}

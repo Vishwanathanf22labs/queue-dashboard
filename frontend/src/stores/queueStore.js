@@ -13,6 +13,7 @@ const useQueueStore = create((set, get) => ({
   brandProcessingQueue: null,
   watchlistBrandsQueue: null,
   scrapedStats: null,
+  scrapedStatsLoading: false,
   loading: false,
   error: null,
 
@@ -126,13 +127,13 @@ const useQueueStore = create((set, get) => ({
 
   fetchScrapedStats: async (date = null, days = null) => {
     try {
-      set({ loading: true, error: null });
+      set({ scrapedStatsLoading: true, error: null });
       const response = await queueAPI.getScrapedStats(date, days);
-      set({ scrapedStats: response.data, loading: false });
+      set({ scrapedStats: response.data, scrapedStatsLoading: false });
       return response.data;
     } catch (error) {
       console.error("Scraped Stats API error:", error);
-      set({ error: error.message, loading: false });
+      set({ error: error.message, scrapedStatsLoading: false });
       throw error;
     }
   },

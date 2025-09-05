@@ -7,7 +7,7 @@ import Table from '../components/ui/Table';
 import Pagination from '../components/ui/Pagination';
 import LoadingState from '../components/ui/LoadingState';
 import ErrorDisplay from '../components/ui/ErrorDisplay';
-import { Eye, Clock, CheckCircle, XCircle, Search } from 'lucide-react';
+import { Eye, Clock, CheckCircle, XCircle, Search, ExternalLink } from 'lucide-react';
 import useQueueStore from '../stores/queueStore';
 import useAdminStore from '../stores/adminStore';
 import { watchlistBrandsColumns } from '../constants/data';
@@ -483,7 +483,7 @@ const WatchlistBrands = () => {
            </Card>
          ) : (
            currentBrands.map((brand, index) => (
-            <Card key={`${brand.brand_id}-${index}`} className="p-4">
+            <Card key={`${brand.brand_id}-${index}`} className="p-4 relative">
               <div className="space-y-3">
                 {/* Brand Name */}
                 <div className="flex items-center justify-between">
@@ -534,6 +534,20 @@ const WatchlistBrands = () => {
                       {isAdmin ? 'Move to Watchlist Pending' : 'Admin Access Required'}
                     </Button>
                   </div>
+                )}
+
+                {/* External Link Icon - Bottom Right */}
+                {brand?.page_id && (
+                  <button
+                    onClick={() => {
+                      const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=${brand.page_id}`;
+                      window.open(url, '_blank', 'noopener,noreferrer');
+                    }}
+                    className="absolute bottom-4 right-4 p-2 text-gray-400 hover:text-blue-600 transition-colors bg-white rounded-full shadow-sm border border-gray-200"
+                    title="View in Facebook Ad Library"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </button>
                 )}
               </div>
             </Card>

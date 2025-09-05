@@ -2,12 +2,13 @@ import { useState } from 'react';
 import useQueueStore from '../../stores/queueStore';
 import Card from '../ui/Card';
 import Table from '../ui/Table';
+import LoadingState from '../ui/LoadingState';
 import toast from 'react-hot-toast';
 import { Filter } from 'lucide-react';
 import CustomDropdown from '../ui/CustomDropdown';
 
 const ScrapedStats = () => {
-  const { scrapedStats, fetchScrapedStats } = useQueueStore();
+  const { scrapedStats, scrapedStatsLoading, fetchScrapedStats } = useQueueStore();
 
   const [selectedPeriod, setSelectedPeriod] = useState(7);
 
@@ -98,7 +99,9 @@ const ScrapedStats = () => {
       <Card>
         <div className="p-4 sm:p-6">
           <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4 sm:mb-6">Daily Breakdown</h3>
-          {dailyStats && dailyStats.length > 0 ? (
+          {scrapedStatsLoading ? (
+            <LoadingState size="lg" message="Loading daily breakdown..." />
+          ) : !scrapedStatsLoading && dailyStats && dailyStats.length > 0 ? (
             <>
               <div className="hidden lg:block">
                 <Table
@@ -144,11 +147,11 @@ const ScrapedStats = () => {
                 ))}
               </div>
             </>
-          ) : (
+          ) : !scrapedStatsLoading ? (
             <div className="text-center py-8 text-gray-500">
               <p>No daily breakdown data available for the selected period.</p>
             </div>
-          )}
+          ) : null}
         </div>
       </Card>
     </div>

@@ -4,7 +4,8 @@ import LoadingState from '../ui/LoadingState';
 import ErrorDisplay from '../ui/ErrorDisplay';
 import Table from '../ui/Table';
 import Pagination from '../ui/Pagination';
-import { Eye, Users } from 'lucide-react';
+import { Eye, Users, ExternalLink } from 'lucide-react';
+import { openFacebookAdLibrary } from '../../utils/facebookAdLibrary';
 
 const WatchlistAdsCountTable = ({ watchlistBrandsQueue, loading, error, onPageChange }) => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -35,8 +36,12 @@ const WatchlistAdsCountTable = ({ watchlistBrandsQueue, loading, error, onPageCh
     );
   }
 
-  // Use watchlist brands directly from the API
-  const watchlistBrands = watchlistBrandsQueue.brands || [];
+  // Use watchlist brands directly from the API and sort by date descending
+  const watchlistBrands = (watchlistBrandsQueue.brands || []).sort((a, b) => {
+    const dateA = new Date(a.created_at || 0);
+    const dateB = new Date(b.created_at || 0);
+    return dateB - dateA; // Descending order (newest first)
+  });
   const totalPages = watchlistBrandsQueue.pagination?.total_pages || 1;
   const totalItems = watchlistBrandsQueue.pagination?.total_items || 0;
   const itemsPerPage = watchlistBrandsQueue.pagination?.per_page || 10;
@@ -56,8 +61,19 @@ const WatchlistAdsCountTable = ({ watchlistBrandsQueue, loading, error, onPageCh
       label: 'Watchlist Brand',
       render: (value, brand) => (
         <div>
-          <div className="text-sm font-medium text-gray-900 max-w-[115px] sm:max-w-none truncate">
-            {brand.brand_name || brand.page_name || 'Unknown'}
+          <div className="flex items-center space-x-2">
+            <div className="text-sm font-medium text-gray-900 max-w-[115px] sm:max-w-none truncate">
+              {brand.brand_name || brand.page_name || 'Unknown'}
+            </div>
+            {brand.page_id && (
+              <button
+                onClick={() => openFacebookAdLibrary(brand.page_id)}
+                className="flex-shrink-0 p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                title="View in Facebook Ad Library"
+              >
+                <ExternalLink className="h-3 w-3" />
+              </button>
+            )}
           </div>
           <div className="text-sm text-gray-500 max-w-[115px] sm:max-w-none truncate">
             ID: {brand.brand_id} | Page: {brand.page_id}
@@ -147,19 +163,84 @@ const WatchlistAdsCountTable = ({ watchlistBrandsQueue, loading, error, onPageCh
 
         {loading ? (
           <LoadingState size="lg" message="Loading watchlist brands..." />
-        ) : watchlistBrands && watchlistBrands.length > 0 ? (
-          <Table
-            data={watchlistBrands}
-            columns={columns}
-            emptyMessage="No watchlist brands in queue"
-            className="shadow-md rounded-lg"
-          />
-        ) : (
+        ) : !loading && watchlistBrands && watchlistBrands.length > 0 ? (
+          <>
+            {/* Desktop Table View */}
+            <div className="hidden md:block">
+              <Table
+                data={watchlistBrands}
+                columns={columns}
+                emptyMessage="No watchlist brands in queue"
+                className="shadow-md rounded-lg"
+              />
+            </div>
+
+            {/* Mobile Cards View */}
+            <div className="md:hidden space-y-3">
+              {watchlistBrands.map((brand, index) => (
+                <Card key={`${brand.brand_id}-${index}`} className="p-4 relative pb-12">
+                  <div className="space-y-3">
+                    {/* Header with Brand Name */}
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 pr-3">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <h3 className="font-semibold text-gray-900 text-lg leading-tight">
+                            {brand.brand_name || brand.page_name || 'Unknown'}
+                          </h3>
+                          {brand.page_id && (
+                            <button
+                              onClick={() => openFacebookAdLibrary(brand.page_id)}
+                              className="flex-shrink-0 p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                              title="View in Facebook Ad Library"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-lg font-bold text-blue-600">{brand.total_ads || 0}</div>
+                        <div className="text-xs text-gray-500">Ads</div>
+                      </div>
+                    </div>
+
+                    {/* Details Grid */}
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-500">Brand ID:</span>
+                        <span className="ml-2 font-medium text-gray-900">{brand.brand_id}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Page ID:</span>
+                        <span className="ml-2 font-medium text-gray-900">{brand.page_id}</span>
+                      </div>
+                    </div>
+
+                    {/* Created Date */}
+                    <div className="text-sm">
+                      <span className="text-gray-500">Created:</span>
+                      <span className="ml-2 text-gray-900">
+                        {brand.created_at ? new Date(brand.created_at).toLocaleDateString() : 'N/A'}
+                      </span>
+                    </div>
+
+                    {/* Category */}
+                    {brand.page_category && (
+                      <div className="text-xs text-blue-600">
+                        ⭐ Watchlist • {brand.page_category}
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </>
+        ) : !loading ? (
           <div className="text-center py-6 sm:py-8">
             <Users className="h-8 w-8 sm:h-12 sm:w-12 text-blue-300 mx-auto mb-2 sm:mb-3" />
             <p className="text-sm sm:text-base text-gray-500">No watchlist brands in queue</p>
           </div>
-        )}
+        ) : null}
 
         {totalPages > 1 && (
           <div className="mt-6">

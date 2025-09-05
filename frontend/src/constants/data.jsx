@@ -1,4 +1,4 @@
-import { AlertTriangle, Clock, Home, Plus, RefreshCw, Settings, FileText, Building2, Play, Globe, Eye, List, XCircle, Activity } from "lucide-react";
+import { AlertTriangle, Clock, Home, Plus, RefreshCw, Settings, FileText, Building2, Play, Globe, Eye, List, XCircle, Activity, Upload, ExternalLink } from "lucide-react";
 
 export const navItems = [
   { to: "/", icon: Home, label: "Dashboard" },
@@ -59,9 +59,23 @@ export const watchlistBrandsColumns = [
   {
     key: 'brand_name',
     label: 'Brand Name',
-    render: (value) => (
-      <div className="font-medium text-gray-900">
-        {value || 'Unknown'}
+    render: (value, brand) => (
+      <div className="flex items-center space-x-2">
+        <div className="font-medium text-gray-900">
+          {value || 'Unknown'}
+        </div>
+        {brand?.page_id && (
+          <button
+            onClick={() => {
+              const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=${brand.page_id}`;
+              window.open(url, '_blank', 'noopener,noreferrer');
+            }}
+            className="flex-shrink-0 p-1 text-gray-400 hover:text-blue-600 transition-colors"
+            title="View in Facebook Ad Library"
+          >
+            <ExternalLink className="h-3 w-3" />
+          </button>
+        )}
       </div>
     )
   },
@@ -114,5 +128,6 @@ export const sizeClasses = {
 export const tabs = [
   { id: 'single', label: 'Single Brand', icon: Plus },
   { id: 'csv', label: 'CSV Upload', icon: FileText },
-  { id: 'all', label: 'Add All Brands', icon: RefreshCw }
+  { id: 'all', label: 'Add All Brands', icon: RefreshCw },
+  { id: 'madangles', label: 'Initial Scraping', icon: Upload }
 ];

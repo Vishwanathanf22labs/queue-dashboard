@@ -8,7 +8,7 @@ import Table from '../components/ui/Table';
 import Pagination from '../components/ui/Pagination';
 import toast from 'react-hot-toast';
 import useQueueStore from '../stores/queueStore';
-import { AlertCircle, Search, Users, Hash, Tag, XCircle, RefreshCw } from 'lucide-react';
+import { AlertCircle, Search, Users, Hash, Tag, XCircle, RefreshCw, ExternalLink } from 'lucide-react';
 import SearchInput from '../components/ui/SearchInput';
 
 const FailedQueue = () => {
@@ -56,11 +56,26 @@ const FailedQueue = () => {
       label: 'Brand Name',
       render: (value, row) => {
         const brandName = value || row.brand_name || row.name || row.brandName || 'Unknown Brand';
+        const pageId = row.page_id || row.pageId || 'N/A';
         return (
           <div className="flex items-center">
             <Users className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
-            <div className="text-xs font-medium text-gray-900 max-w-[80px] sm:max-w-none truncate">
-              {brandName}
+            <div className="flex items-center space-x-2 flex-1">
+              <div className="text-xs font-medium text-gray-900 max-w-[80px] sm:max-w-none truncate">
+                {brandName}
+              </div>
+              {pageId && pageId !== 'N/A' && (
+                <button
+                  onClick={() => {
+                    const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=${pageId}`;
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="flex-shrink-0 p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                  title="View in Facebook Ad Library"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                </button>
+              )}
             </div>
           </div>
         );
@@ -307,7 +322,8 @@ const FailedQueue = () => {
         </div>
       </Card>
 
-      <Card>
+      {/* Desktop Table View */}
+      <Card className="hidden md:block">
         {isSearching ? (
           <div className="text-center py-12 sm:py-16">
             <div className="flex flex-col items-center space-y-4">
@@ -337,6 +353,97 @@ const FailedQueue = () => {
           />
         )}
       </Card>
+
+      {/* Mobile Cards View */}
+      <div className="md:hidden space-y-3">
+        {isSearching ? (
+          <Card>
+            <div className="text-center py-8">
+              <div className="flex flex-col items-center space-y-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+                <div className="text-center">
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Searching...</h3>
+                  <p className="text-sm text-gray-500">
+                    Searching for "{searchTerm}" across all pages
+                  </p>
+                </div>
+              </div>
+            </div>
+          </Card>
+        ) : filteredBrands.length === 0 ? (
+          <Card>
+            <div className="text-center py-8">
+              <AlertCircle className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No failed brands found</h3>
+              <p className="text-sm text-gray-500">
+                {searchTerm ? 'Try adjusting your search terms' : 'All brands processed successfully'}
+              </p>
+            </div>
+          </Card>
+        ) : (
+          filteredBrands.map((brand, index) => {
+            const position = (currentPage - 1) * itemsPerPage + index + 1;
+            const brandName = brand.brand_name || brand.name || brand.brandName || 'Unknown Brand';
+            const brandId = brand.brand_id || brand.id || brand.queue_id || brand.brandId || 'N/A';
+            const pageId = brand.page_id || brand.pageId || 'N/A';
+            const errorMessage = brand.error_message || brand.error || brand.message || 'Unknown error';
+
+            return (
+              <Card key={`${brandId}-${index}`} className="p-4 relative pb-12">
+                <div className="space-y-3">
+                  {/* Header with Position and Brand Name */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      {/* Position Circle */}
+                      <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-medium text-red-600">
+                          {position}
+                        </span>
+                      </div>
+                      <h3 className="font-semibold text-gray-900 text-lg">{brandName}</h3>
+                    </div>
+                    <Badge variant="error">Failed</Badge>
+                  </div>
+
+                  {/* Details Grid */}
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500">Brand ID:</span>
+                      <span className="ml-2 font-medium text-gray-900 font-mono">{brandId}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Page ID:</span>
+                      <span className="ml-2 font-medium text-gray-900 font-mono">{pageId}</span>
+                    </div>
+                  </div>
+
+                  {/* Error Message */}
+                  <div className="pt-2">
+                    <span className="text-gray-500 text-sm">Error:</span>
+                    <p className="text-sm text-red-600 mt-1 break-words" title={errorMessage}>
+                      {errorMessage}
+                    </p>
+                  </div>
+
+                  {/* External Link Icon - Bottom Right */}
+                  {pageId && pageId !== 'N/A' && (
+                    <button
+                      onClick={() => {
+                        const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=${pageId}`;
+                        window.open(url, '_blank', 'noopener,noreferrer');
+                      }}
+                      className="absolute bottom-3 right-3 p-1.5 text-gray-400 hover:text-blue-600 transition-colors bg-white rounded-full shadow-sm border border-gray-200"
+                      title="View in Facebook Ad Library"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              </Card>
+            );
+          })
+        )}
+      </div>
 
       {totalPages > 1 && (
         <Pagination

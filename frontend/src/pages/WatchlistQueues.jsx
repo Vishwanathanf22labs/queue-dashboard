@@ -8,7 +8,7 @@ import Table from '../components/ui/Table';
 import Pagination from '../components/ui/Pagination';
 import toast from 'react-hot-toast';
 import useQueueStore from '../stores/queueStore';
-import { Clock, Search, Users, Hash, Tag, RefreshCw, List, XCircle, AlertCircle } from 'lucide-react';
+import { Clock, Search, Users, Hash, Tag, RefreshCw, XCircle, AlertCircle, ExternalLink } from 'lucide-react';
 import SearchInput from '../components/ui/SearchInput';
 import CustomDropdown from '../components/ui/CustomDropdown';
 
@@ -58,11 +58,26 @@ const WatchlistQueues = () => {
        label: 'Brand Name',
        render: (value, row) => {
          const brandName = value || row.brand_name || row.name || row.brandName || 'Unknown Brand';
+         const pageId = row.page_id || 'N/A';
          return (
            <div className="flex items-center">
              <Users className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
-             <div className="text-xs font-medium text-gray-900 max-w-[80px] sm:max-w-none truncate">
-               {brandName}
+             <div className="flex items-center space-x-2 flex-1">
+               <div className="text-xs font-medium text-gray-900 max-w-[80px] sm:max-w-none truncate">
+                 {brandName}
+               </div>
+               {pageId && pageId !== 'N/A' && (
+                 <button
+                   onClick={() => {
+                     const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=${pageId}`;
+                     window.open(url, '_blank', 'noopener,noreferrer');
+                   }}
+                   className="flex-shrink-0 p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                   title="View in Facebook Ad Library"
+                 >
+                   <ExternalLink className="h-3 w-3" />
+                 </button>
+               )}
              </div>
            </div>
          );
@@ -127,11 +142,26 @@ const WatchlistQueues = () => {
       label: 'Brand Name',
       render: (value, row) => {
         const brandName = value || row.brand_name || row.name || row.brandName || 'Unknown Brand';
+        const pageId = row.page_id || row.pageId || 'N/A';
         return (
           <div className="flex items-center">
             <Users className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
-            <div className="text-xs font-medium text-gray-900 max-w-[80px] sm:max-w-none truncate">
-              {brandName}
+            <div className="flex items-center space-x-2 flex-1">
+              <div className="text-xs font-medium text-gray-900 max-w-[80px] sm:max-w-none truncate">
+                {brandName}
+              </div>
+              {pageId && pageId !== 'N/A' && (
+                <button
+                  onClick={() => {
+                    const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=${pageId}`;
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="flex-shrink-0 p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                  title="View in Facebook Ad Library"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                </button>
+              )}
             </div>
           </div>
         );
@@ -278,7 +308,7 @@ const WatchlistQueues = () => {
   }
 
   const currentColumns = activeTab === 'pending' ? pendingColumns : failedColumns;
-  const tabIcon = activeTab === 'pending' ? List : XCircle;
+  const tabIcon = activeTab === 'pending' ? Clock : XCircle;
   const tabColor = activeTab === 'pending' ? 'purple' : 'orange';
   const tabTitle = activeTab === 'pending' ? 'Watchlist Pending Queue' : 'Watchlist Failed Queue';
   const tabDescription = activeTab === 'pending' 
@@ -289,17 +319,10 @@ const WatchlistQueues = () => {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-gray-100 rounded-lg">
-            <List className="h-6 w-6 text-gray-600" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">Watchlist Queues</h1>
-            <p className="text-sm text-gray-600">Manage watchlist pending and failed brands</p>
-          </div>
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">Watchlist Queues</h1>
+          <p className="text-sm text-gray-600">Manage watchlist pending and failed brands</p>
         </div>
-        
-        
       </div>
 
       {/* Tabs */}
@@ -307,13 +330,12 @@ const WatchlistQueues = () => {
         <div className="flex space-x-1">
           <button
             onClick={() => handleTabChange('pending')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               activeTab === 'pending'
                 ? 'bg-purple-100 text-purple-700 border border-purple-200'
                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
-            <List className="h-4 w-4" />
             Pending Queue
           </button>
           <button
@@ -343,7 +365,8 @@ const WatchlistQueues = () => {
 
              {/* Stats Card */}
        <Card>
-         <div className="flex items-center justify-between">
+         {/* Desktop Layout */}
+         <div className="hidden md:flex items-center justify-between">
            <div className="flex items-center gap-4">
              <div className="flex items-center gap-2">
                {activeTab === 'pending' ? (
@@ -390,8 +413,65 @@ const WatchlistQueues = () => {
                />
              </div>
            </div>
-           
-           
+         </div>
+
+         {/* Mobile Layout */}
+         <div className="md:hidden space-y-4">
+           {/* Main Stats Row */}
+           <div className="flex items-center justify-between">
+             <div className="flex items-center gap-2">
+               {activeTab === 'pending' ? (
+                 <Clock className="h-5 w-5 text-purple-600" />
+               ) : (
+                 <AlertCircle className="h-5 w-5 text-orange-600" />
+               )}
+               <span className="text-sm font-medium text-gray-600">
+                 Total {activeTab === 'pending' ? 'Pending' : 'Failed'} Brands:
+               </span>
+             </div>
+             <span className={`text-lg font-bold text-${tabColor}-600`}>
+               {pagination?.total_items || brands?.length || 0}
+             </span>
+           </div>
+
+           {/* Page Info Row */}
+           <div className="flex items-center justify-between">
+             <span className="text-sm font-medium text-gray-600">Current Page:</span>
+             <span className="text-lg font-bold text-gray-900">{currentPage}</span>
+           </div>
+
+           {/* Total Pages Row */}
+           <div className="flex items-center justify-between">
+             <span className="text-sm font-medium text-gray-600">Total Pages:</span>
+             <span className="text-lg font-bold text-gray-900">
+               {pagination?.total_pages || Math.ceil((pagination?.total_items || brands.length) / itemsPerPage)}
+             </span>
+           </div>
+
+           {/* Showing Row */}
+           <div className="flex items-center justify-between">
+             <span className="text-sm font-medium text-gray-600">Showing:</span>
+             <span className="text-sm font-medium text-gray-900">
+               {brands?.length || 0} of {pagination?.total_items || 0}
+             </span>
+           </div>
+
+           {/* Items per page Row */}
+           <div className="flex items-center justify-between">
+             <span className="text-sm font-medium text-gray-600">Items per page:</span>
+             <CustomDropdown
+               options={[
+                 { value: 10, label: '10' },
+                 { value: 25, label: '25' },
+                 { value: 50, label: '50' },
+                 { value: 100, label: '100' }
+               ]}
+               value={itemsPerPage}
+               onChange={handleItemsPerPageChange}
+               placeholder="Select items per page"
+               className="w-20"
+             />
+           </div>
          </div>
        </Card>
 
@@ -431,8 +511,8 @@ const WatchlistQueues = () => {
         </div>
       </Card>
 
-             {/* Table */}
-       <Card>
+             {/* Table - Desktop Only */}
+       <Card className="hidden md:block">
          {isSearching ? (
            <div className="text-center py-12 sm:py-16">
              <div className="flex flex-col items-center space-y-4">
@@ -467,6 +547,99 @@ const WatchlistQueues = () => {
            </div>
          )}
        </Card>
+
+       {/* Mobile Cards View */}
+       <div className="md:hidden space-y-3">
+         {isSearching ? (
+           <Card>
+             <div className="text-center py-8">
+               <div className="flex flex-col items-center space-y-4">
+                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                 <div className="text-center">
+                   <h3 className="text-lg font-medium text-gray-900 mb-2">Searching...</h3>
+                   <p className="text-sm text-gray-500">
+                     Searching for "{searchTerm}" across all pages
+                   </p>
+                 </div>
+               </div>
+             </div>
+           </Card>
+         ) : brands && brands.length > 0 ? (
+           brands.map((brand, index) => {
+             const position = (currentPage - 1) * itemsPerPage + index + 1;
+             const brandName = brand.brand_name || brand.name || brand.brandName || 'Unknown Brand';
+             const brandId = brand.brand_id || brand.id || brand.queue_id || brand.brandId || 'N/A';
+             const pageId = brand.page_id || brand.pageId || 'N/A';
+             const isPending = activeTab === 'pending';
+
+             return (
+               <Card key={`${brandId}-${index}`} className="p-4 relative pb-12">
+                 <div className="space-y-3">
+                   {/* Header with Position and Brand Name */}
+                   <div className="flex items-center justify-between">
+                     <div className="flex items-center space-x-3">
+                       {/* Position Circle */}
+                       <div className={`w-8 h-8 ${isPending ? 'bg-purple-100' : 'bg-orange-100'} rounded-full flex items-center justify-center`}>
+                         <span className={`text-sm font-medium ${isPending ? 'text-purple-600' : 'text-orange-600'}`}>
+                           {position}
+                         </span>
+                       </div>
+                       <h3 className="font-semibold text-gray-900 text-lg">{brandName}</h3>
+                     </div>
+                     <div className="flex items-center space-x-2">
+                       <Badge variant={isPending ? "info" : "error"}>
+                         {isPending ? 'Watchlist Pending' : 'Watchlist Failed'}
+                       </Badge>
+                     </div>
+                   </div>
+
+                   {/* Details Grid */}
+                   <div className="grid grid-cols-2 gap-4 text-sm">
+                     <div>
+                       <span className="text-gray-500">Brand ID:</span>
+                       <span className="ml-2 font-medium text-gray-900 font-mono">{brandId}</span>
+                     </div>
+                     <div>
+                       <span className="text-gray-500">Page ID:</span>
+                       <span className="ml-2 font-medium text-gray-900 font-mono">{pageId}</span>
+                     </div>
+                   </div>
+
+                   {/* External Link Icon - Bottom Right */}
+                   {pageId && pageId !== 'N/A' && (
+                     <button
+                       onClick={() => {
+                         const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=${pageId}`;
+                         window.open(url, '_blank', 'noopener,noreferrer');
+                       }}
+                       className="absolute bottom-3 right-3 p-1.5 text-gray-400 hover:text-blue-600 transition-colors bg-white rounded-full shadow-sm border border-gray-200"
+                       title="View in Facebook Ad Library"
+                     >
+                       <ExternalLink className="h-3 w-3" />
+                     </button>
+                   )}
+                 </div>
+               </Card>
+             );
+           })
+         ) : (
+           <Card>
+             <div className="text-center py-8">
+               {activeTab === 'pending' ? (
+                 <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+               ) : (
+                 <XCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+               )}
+               <h3 className="text-lg font-medium text-gray-900 mb-2">
+                 No Watchlist {activeTab === 'pending' ? 'Pending' : 'Failed'} Brands
+               </h3>
+               <p className="text-gray-600">
+                 {searchTerm ? 'Try adjusting your search terms' : `The watchlist ${activeTab === 'pending' ? 'pending' : 'failed'} queue is currently empty.`}
+               </p>
+             </div>
+           </Card>
+         )}
+       </div>
 
                {/* Pagination - Always visible when there are brands */}
         {brands && brands.length > 0 && (
