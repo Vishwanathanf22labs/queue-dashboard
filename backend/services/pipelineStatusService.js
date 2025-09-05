@@ -1,6 +1,7 @@
 const { Brand, BrandsDailyStatus, Ad, AdMediaItem } = require("../models");
 const { Op, Sequelize } = require("sequelize");
 const Redis = require("ioredis");
+const redis = require("../config/redis");
 
 // Connect to Madangles Scraper Redis (for Bull queues)
 let madanglesRedis = null;
@@ -37,6 +38,82 @@ try {
 // Cache helper functions
 function getCacheKey(prefix, ...args) {
   return `${prefix}:${args.join(":")}`;
+}
+
+// Redis Bull queue data functions
+async function getTypesenseBullQueueData() {
+  try {
+    if (!madanglesRedis) return new Map();
+    
+    // Get Typesense Bull queue data
+    const queueKeys = await madanglesRedis.keys('bull:typesense:*');
+    const jobData = new Map();
+    
+    for (const key of queueKeys) {
+      const jobData = await madanglesRedis.hgetall(key);
+      if (jobData && jobData.data) {
+        const adId = JSON.parse(jobData.data).adId;
+        if (adId) {
+          jobData.set(adId, true);
+        }
+      }
+    }
+    
+    return jobData;
+  } catch (error) {
+    console.warn('Error getting Typesense Bull queue data:', error.message);
+    return new Map();
+  }
+}
+
+async function getTypesenseFailedQueueData() {
+  try {
+    if (!madanglesRedis) return new Map();
+    
+    // Get Typesense failed queue data
+    const failedKeys = await madanglesRedis.keys('bull:typesense:failed:*');
+    const failedData = new Map();
+    
+    for (const key of failedKeys) {
+      const jobData = await madanglesRedis.hgetall(key);
+      if (jobData && jobData.data) {
+        const adId = JSON.parse(jobData.data).adId;
+        if (adId) {
+          failedData.set(adId, true);
+        }
+      }
+    }
+    
+    return failedData;
+  } catch (error) {
+    console.warn('Error getting Typesense failed queue data:', error.message);
+    return new Map();
+  }
+}
+
+async function getFileUploadBullQueueData() {
+  try {
+    if (!redis) return new Map();
+    
+    // Get file upload Bull queue data
+    const queueKeys = await redis.keys('bull:file-upload:*');
+    const jobData = new Map();
+    
+    for (const key of queueKeys) {
+      const jobData = await redis.hgetall(key);
+      if (jobData && jobData.data) {
+        const brandId = JSON.parse(jobData.data).brandId;
+        if (brandId) {
+          jobData.set(brandId, true);
+        }
+      }
+    }
+    
+    return jobData;
+  } catch (error) {
+    console.warn('Error getting file upload Bull queue data:', error.message);
+    return new Map();
+  }
 }
 
 function getCachedData(key) {
@@ -432,14 +509,15 @@ async function getBrandScrapingStatus(brandId, date = null) {
           })
         : [];
 
-    // Get statuses without Redis calls for single brand (too expensive)
-    const typesenseStatus = await getTypesenseStatus(brandId, targetDate, ads);
+    // Get statuses with Redis queue checking for accurate status
+    const typesenseStatus = await getTypesenseStatus(brandId, targetDate, ads, bullJobData, failedJobData);
     const fileUploadStatus = await getFileUploadStatus(
       brandId,
       targetDate,
       ads,
       mediaItems,
-      brand
+      brand,
+      brandProcessingJobData
     );
 
     const result = {
@@ -604,10 +682,10 @@ async function getAllBrandsScrapingStatus(page = 1, limit = 10, date = null) {
       }),
     ]);
 
-    // Skip Redis operations for better performance - they were disabled anyway
-    // const bullJobData = new Map();
-    // const failedJobData = new Map();
-    // const brandProcessingJobData = new Map();
+    // Get Redis Bull queue data for accurate status checking
+    const bullJobData = await getTypesenseBullQueueData();
+    const failedJobData = await getTypesenseFailedQueueData();
+    const brandProcessingJobData = await getFileUploadBullQueueData();
 
     // Process results efficiently
     const brandMap = new Map(brands.map((brand) => [brand.id, brand]));

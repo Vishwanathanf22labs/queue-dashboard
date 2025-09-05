@@ -6,6 +6,7 @@ import AdminAccessRequired from '../components/ui/AdminAccessRequired';
 import SingleBrandForm from '../components/addBrands/SingleBrandForm';
 import CsvUploadForm from '../components/addBrands/CsvUploadForm';
 import AddAllBrandsForm from '../components/addBrands/AddAllBrandsForm';
+import MadanglesCsvUploadForm from '../components/addBrands/MadanglesCsvUploadForm';
 import useQueueStore from '../stores/queueStore';
 import useAdminStore from '../stores/adminStore';
 import { Shield, LogOut } from 'lucide-react';
@@ -43,7 +44,7 @@ const AddBrands = () => {
 
   useEffect(() => {
     const savedTab = localStorage.getItem('addBrands_activeTab');
-    if (savedTab && ['single', 'csv', 'all'].includes(savedTab)) {
+    if (savedTab && ['single', 'csv', 'all', 'madangles'].includes(savedTab)) {
       updateFormState({ activeTab: savedTab });
     }
   }, []);
@@ -171,6 +172,10 @@ const AddBrands = () => {
                   isSubmitting={isSubmitting}
                   onSubmittingChange={(value) => updateFormState({ isSubmitting: value })}
                 />
+              )}
+
+              {activeTab === 'madangles' && (
+                <MadanglesCsvUploadForm />
               )}
             </Card>
           </>

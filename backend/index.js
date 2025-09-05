@@ -4,6 +4,7 @@ const cookieParser = require("cookie-parser");
 const queueRoutes = require("./routes/queueRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const pipelineStatusRoutes = require("./routes/pipelineStatus");
+const madanglesRoutes = require("./routes/madanglesRoutes");
 
 const sequelize = require("./config/database");
 const redis = require("./config/redis");
@@ -35,6 +36,8 @@ sequelize
 app.use("/api/queue", queueRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/pipeline-status", pipelineStatusRoutes);
+app.use("/api/madangles", madanglesRoutes);
+
 
 const server = app.listen(PORT, () => {
   console.log(`Queue Dashboard API running on port ${PORT}`);

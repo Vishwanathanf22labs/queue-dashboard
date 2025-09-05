@@ -1,6 +1,7 @@
 import Card from '../ui/Card';
 import Badge from '../ui/Badge';
-import { Play, Clock, Pause, Square, Hourglass } from 'lucide-react';
+import { Play, Clock, Pause, Square, Hourglass, ExternalLink } from 'lucide-react';
+import { openFacebookAdLibrary } from '../../utils/facebookAdLibrary';
 
 const ProcessingStatus = ({ 
   currentlyProcessing, 
@@ -79,9 +80,20 @@ const ProcessingStatus = ({
                       <Play className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-gray-900 text-sm truncate">
-                        {brand.brand_name || 'Unknown Brand'}
-                      </p>
+                      <div className="flex items-center space-x-2">
+                        <p className="font-medium text-gray-900 text-sm truncate">
+                          {brand.brand_name || 'Unknown Brand'}
+                        </p>
+                        {brand.page_id && (
+                          <button
+                            onClick={() => openFacebookAdLibrary(brand.page_id)}
+                            className="flex-shrink-0 p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                            title="View in Facebook Ad Library"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                   
@@ -182,9 +194,20 @@ const ProcessingStatus = ({
                       <Clock className="h-3 w-3 text-blue-600" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-gray-900 text-sm truncate">
-                        {brand.brand_name || 'Unknown Brand'}
-                      </p>
+                      <div className="flex items-center space-x-2">
+                        <p className="font-medium text-gray-900 text-sm truncate">
+                          {brand.brand_name || 'Unknown Brand'}
+                        </p>
+                        {brand.page_id && (
+                          <button
+                            onClick={() => openFacebookAdLibrary(brand.page_id)}
+                            className="flex-shrink-0 p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                            title="View in Facebook Ad Library"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                   
@@ -215,9 +238,20 @@ const ProcessingStatus = ({
                     <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-gray-900 text-sm sm:text-base truncate">
-                      {nextBrand.brand_name || 'Unknown Brand'}
-                    </p>
+                    <div className="flex items-center space-x-2">
+                      <p className="font-medium text-gray-900 text-sm sm:text-base truncate">
+                        {nextBrand.brand_name || 'Unknown Brand'}
+                      </p>
+                      {nextBrand.page_id && (
+                        <button
+                          onClick={() => openFacebookAdLibrary(nextBrand.page_id)}
+                          className="flex-shrink-0 p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                          title="View in Facebook Ad Library"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
                     <p className="text-xs sm:text-sm text-gray-500">
                       ID: {nextBrand.queue_id || 'N/A'} | Page: {nextBrand.page_id || 'N/A'}
                     </p>
