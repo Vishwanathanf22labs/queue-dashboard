@@ -35,7 +35,8 @@ async function addProxy(ip, port = null, country = null, username = null, passwo
       successCount: "0",
       active: "true",
       disabledAt: "",
-      country: country || "Unknown"
+      country: country || "Unknown",
+      type: type || "http"
     };
 
     // Add to Redis hash

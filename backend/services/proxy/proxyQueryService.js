@@ -111,7 +111,7 @@ async function getProxies(page = 1, limit = 10, filter = "all", search = "") {
         active: proxy.active === "true",
         // Use country from Redis if available, otherwise default
         country: proxy.country || "Unknown",
-        type: "http",
+        type: proxy.type || "http",
         added_at: new Date().toISOString(),
         added_date: new Date().toLocaleDateString('en-US', { 
           year: 'numeric', 
@@ -199,7 +199,7 @@ async function getAvailableProxies() {
             ip: proxy.ip,
             port: proxy.port,
             country: "Unknown",
-            type: "http",
+            type: proxy.type || "http",
             usage_count: failCount + successCount,
             last_used: null,
             failCount: failCount,
@@ -262,7 +262,7 @@ async function getLastMonthProxies() {
             ip: proxy.ip,
             port: proxy.port,
             country: "Unknown",
-            type: "http",
+            type: proxy.type || "http",
             added_at: new Date().toISOString(),
             added_date: new Date().toLocaleDateString('en-US', { 
               year: 'numeric', 
@@ -370,7 +370,7 @@ async function getNextProxy() {
         active: true,
         // Add default values for UI compatibility
         country: "Unknown",
-        type: "http",
+        type: proxy.type || "http",
         added_at: new Date().toISOString(),
         added_date: new Date().toLocaleDateString('en-US', { 
           year: 'numeric', 
