@@ -45,14 +45,14 @@ async function getTypesenseBullQueueData() {
   try {
     if (!madanglesRedis) return new Map();
     
-    // Get Typesense Bull queue data
-    const queueKeys = await madanglesRedis.keys('bull:typesense:*');
+    // Get Ad Update Bull queue data (for Typesense indexing)
+    const queueKeys = await madanglesRedis.keys('bull:ad-update:*');
     const jobData = new Map();
     
     for (const key of queueKeys) {
       const jobData = await madanglesRedis.hgetall(key);
       if (jobData && jobData.data) {
-        const adId = JSON.parse(jobData.data).adId;
+        const adId = JSON.parse(jobData.data).adid;
         if (adId) {
           jobData.set(adId, true);
         }
@@ -61,7 +61,7 @@ async function getTypesenseBullQueueData() {
     
     return jobData;
   } catch (error) {
-    console.warn('Error getting Typesense Bull queue data:', error.message);
+    console.warn('Error getting Ad Update Bull queue data:', error.message);
     return new Map();
   }
 }
@@ -70,14 +70,14 @@ async function getTypesenseFailedQueueData() {
   try {
     if (!madanglesRedis) return new Map();
     
-    // Get Typesense failed queue data
-    const failedKeys = await madanglesRedis.keys('bull:typesense:failed:*');
+    // Get Ad Update failed queue data
+    const failedKeys = await madanglesRedis.keys('bull:ad-update:failed:*');
     const failedData = new Map();
     
     for (const key of failedKeys) {
       const jobData = await madanglesRedis.hgetall(key);
       if (jobData && jobData.data) {
-        const adId = JSON.parse(jobData.data).adId;
+        const adId = JSON.parse(jobData.data).adid;
         if (adId) {
           failedData.set(adId, true);
         }
@@ -86,21 +86,21 @@ async function getTypesenseFailedQueueData() {
     
     return failedData;
   } catch (error) {
-    console.warn('Error getting Typesense failed queue data:', error.message);
+    console.warn('Error getting Ad Update failed queue data:', error.message);
     return new Map();
   }
 }
 
 async function getFileUploadBullQueueData() {
   try {
-    if (!redis) return new Map();
+    if (!madanglesRedis) return new Map();
     
-    // Get file upload Bull queue data
-    const queueKeys = await redis.keys('bull:file-upload:*');
+    // Get brand processing Bull queue data (for file upload)
+    const queueKeys = await madanglesRedis.keys('bull:brand-processing:*');
     const jobData = new Map();
     
     for (const key of queueKeys) {
-      const jobData = await redis.hgetall(key);
+      const jobData = await madanglesRedis.hgetall(key);
       if (jobData && jobData.data) {
         const brandId = JSON.parse(jobData.data).brandId;
         if (brandId) {
@@ -111,7 +111,7 @@ async function getFileUploadBullQueueData() {
     
     return jobData;
   } catch (error) {
-    console.warn('Error getting file upload Bull queue data:', error.message);
+    console.warn('Error getting brand processing Bull queue data:', error.message);
     return new Map();
   }
 }
