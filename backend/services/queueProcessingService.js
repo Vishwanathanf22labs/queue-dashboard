@@ -90,11 +90,11 @@ async function getBrandProcessingQueue(
 
     // 🚀 OPTIMIZATION 1: Fetch only what we need with pagination
     const [waiting, active, delayed, completed, failed] = await Promise.all([
-      brandProcessingQueue.getJobs(["waiting"], 0, validLimit * 2), // Only fetch what we need
-      brandProcessingQueue.getJobs(["active"], 0, validLimit * 2),
-      brandProcessingQueue.getJobs(["delayed"], 0, validLimit * 2),
-      brandProcessingQueue.getJobs(["completed"], 0, validLimit * 2),
-      brandProcessingQueue.getJobs(["failed"], 0, validLimit * 2),
+      brandProcessingQueue.getJobs(["waiting"], 0, validLimit * 10), // Only fetch what we need
+      brandProcessingQueue.getJobs(["active"], 0, validLimit * 10),
+      brandProcessingQueue.getJobs(["delayed"], 0, validLimit * 10),
+      brandProcessingQueue.getJobs(["completed"], 0, validLimit * 10),
+      brandProcessingQueue.getJobs(["failed"], 0, validLimit * 10),
     ]);
 
     const allJobs = [
@@ -225,11 +225,11 @@ async function getWatchlistBrandsQueue(
 
     // 🚀 OPTIMIZATION 1: Fetch only what we need with pagination
     const [waiting, active, delayed, completed, failed] = await Promise.all([
-      brandProcessingQueue.getJobs(["waiting"], 0, validLimit * 2), // Only fetch what we need
-      brandProcessingQueue.getJobs(["active"], 0, validLimit * 2),
-      brandProcessingQueue.getJobs(["delayed"], 0, validLimit * 2),
-      brandProcessingQueue.getJobs(["completed"], 0, validLimit * 2),
-      brandProcessingQueue.getJobs(["failed"], 0, validLimit * 2),
+      brandProcessingQueue.getJobs(["waiting"], 0, validLimit * 10), // Only fetch what we need
+      brandProcessingQueue.getJobs(["active"], 0, validLimit * 10),
+      brandProcessingQueue.getJobs(["delayed"], 0, validLimit * 10),
+      brandProcessingQueue.getJobs(["completed"], 0, validLimit * 10),
+      brandProcessingQueue.getJobs(["failed"], 0, validLimit * 10),
     ]);
 
     const allJobs = [
