@@ -88,13 +88,18 @@ async function getBrandProcessingQueue(
       PAGINATION.MAX_LIMIT
     );
 
-    // 🚀 OPTIMIZATION 1: Fetch only what we need with pagination
+    const totalJobsCreated = parseInt(
+      (await redis.get("bull:brand-processing:id")) || 0
+    );
+
+    logger.info("Total Jobs Created:", totalJobsCreated);
+
     const [waiting, active, delayed, completed, failed] = await Promise.all([
-      brandProcessingQueue.getJobs(["waiting"], 0, validLimit * 10), // Only fetch what we need
-      brandProcessingQueue.getJobs(["active"], 0, validLimit * 10),
-      brandProcessingQueue.getJobs(["delayed"], 0, validLimit * 10),
-      brandProcessingQueue.getJobs(["completed"], 0, validLimit * 10),
-      brandProcessingQueue.getJobs(["failed"], 0, validLimit * 10),
+      brandProcessingQueue.getJobs(["waiting"], 0, JOB_FETCH_LIMIT),
+      brandProcessingQueue.getJobs(["active"], 0, JOB_FETCH_LIMIT),
+      brandProcessingQueue.getJobs(["delayed"], 0, JOB_FETCH_LIMIT),
+      brandProcessingQueue.getJobs(["completed"], 0, JOB_FETCH_LIMIT),
+      brandProcessingQueue.getJobs(["failed"], 0, JOB_FETCH_LIMIT),
     ]);
 
     const allJobs = [
@@ -104,93 +109,56 @@ async function getBrandProcessingQueue(
       ...completed,
       ...failed,
     ];
-
-    if (allJobs.length === 0) {
-      return {
-        brands: [],
-        pagination: {
-          current_page: validPage,
-          per_page: validLimit,
-          total_items: 0,
-          total_pages: 0,
-        },
-      };
-    }
-
-    // 🚀 OPTIMIZATION 2: Batch collect unique brand IDs
-    const uniqueBrandIds = [
-      ...new Set(allJobs.map((job) => job.data.brandId).filter(Boolean)),
-    ];
-
-    if (uniqueBrandIds.length === 0) {
-      return {
-        brands: [],
-        pagination: {
-          current_page: validPage,
-          per_page: validLimit,
-          total_items: 0,
-          total_pages: 0,
-        },
-      };
-    }
-
-    // 🚀 OPTIMIZATION 3: Single batch query for all brands
-    const brands = await Brand.findAll({
-      where: { id: uniqueBrandIds },
-      attributes: ["id", "actual_name", "page_id"],
-      raw: true,
-    });
-
-    // 🚀 OPTIMIZATION 4: Single batch query for watchlist status
-    const watchlistBrands = await WatchList.findAll({
-      where: { brand_id: uniqueBrandIds },
-      attributes: ["brand_id"],
-      raw: true,
-    });
-
-    // Create lookup maps for O(1) access
-    const brandMap = new Map(brands.map((b) => [b.id, b]));
-    const watchlistSet = new Set(watchlistBrands.map((w) => w.brand_id));
-
-    // 🚀 OPTIMIZATION 5: Process jobs with O(1) lookups
     const brandProcessingData = [];
-    const processedBrandIds = new Set();
 
     for (const job of allJobs) {
       try {
-        const brandId = parseInt(job.data.brandId);
+        const brandId = job.data.brandId;
         const pageCategory = job.data.brandDetails?.page_category;
         const totalAds = job.data.totalAds?.length || 0;
 
-        if (brandId && !processedBrandIds.has(brandId)) {
-          processedBrandIds.add(brandId);
+        const brand = await Brand.findOne({
+          where: { id: brandId },
+          attributes: ["actual_name", "page_id"],
+          raw: true,
+        });
 
-          const brand = brandMap.get(brandId);
-          const isInWatchlist = watchlistSet.has(brandId);
+        // Check if brand is in watchlist table
+        let isInWatchlist = false;
+        try {
+          const watchlistBrand = await WatchList.findOne({
+            where: { brand_id: brandId },
+            attributes: ['brand_id'],
+            raw: true
+          });
+          isInWatchlist = !!watchlistBrand;
+        } catch (watchlistError) {
+          logger.warn(`Error checking watchlist for brand ${brandId}:`, watchlistError);
+          isInWatchlist = false;
+        }
 
-          // Only include regular brands (not watchlist brands)
-          if (!isInWatchlist && brand) {
-            brandProcessingData.push({
-              brand_id: brandId,
-              page_id: brand.page_id || "Unknown",
-              page_name: brand.actual_name || "Unknown",
-              total_ads: totalAds,
-              page_category: pageCategory || "Unknown",
-              created_at: new Date(job.timestamp).toISOString(),
-              is_watchlist: false,
-            });
-          }
+        // Only include regular brands (not watchlist brands)
+        if (!isInWatchlist) {
+          brandProcessingData.push({
+            brand_id: brandId,
+            page_id: brand?.page_id || "Unknown",
+            page_name: brand?.actual_name || "Unknown",
+            total_ads: totalAds,
+            page_category: pageCategory || "Unknown",
+            created_at: new Date(job.timestamp).toISOString(),
+            is_watchlist: false
+          });
         }
       } catch (jobError) {
         logger.error(`Error processing job ${job.id}:`, jobError);
       }
     }
 
-    brandProcessingData.sort(
-      (a, b) => parseInt(b.brand_id) - parseInt(a.brand_id)
-    );
+    brandProcessingData.sort((a, b) => parseInt(b.brand_id) - parseInt(a.brand_id));
 
-    // Apply pagination
+    // Count only regular brands (not watchlist)
+    const regularBrandsCount = brandProcessingData.length;
+
     const startIndex = (validPage - 1) * validLimit;
     const endIndex = startIndex + validLimit;
     const paginatedBrands = brandProcessingData.slice(startIndex, endIndex);
@@ -200,9 +168,10 @@ async function getBrandProcessingQueue(
       pagination: {
         current_page: validPage,
         per_page: validLimit,
-        total_items: brandProcessingData.length,
-        total_pages: Math.ceil(brandProcessingData.length / validLimit),
+        total_items: regularBrandsCount,
+        total_pages: Math.ceil(regularBrandsCount / validLimit),
       },
+
     };
   } catch (error) {
     logger.error("Error in getBrandProcessingQueue:", error);
@@ -223,13 +192,18 @@ async function getWatchlistBrandsQueue(
       PAGINATION.MAX_LIMIT
     );
 
-    // 🚀 OPTIMIZATION 1: Fetch only what we need with pagination
+    const totalJobsCreated = parseInt(
+      (await redis.get("bull:brand-processing:id")) || 0
+    );
+
+    logger.info("Total Jobs Created:", totalJobsCreated);
+
     const [waiting, active, delayed, completed, failed] = await Promise.all([
-      brandProcessingQueue.getJobs(["waiting"], 0, validLimit * 10), // Only fetch what we need
-      brandProcessingQueue.getJobs(["active"], 0, validLimit * 10),
-      brandProcessingQueue.getJobs(["delayed"], 0, validLimit * 10),
-      brandProcessingQueue.getJobs(["completed"], 0, validLimit * 10),
-      brandProcessingQueue.getJobs(["failed"], 0, validLimit * 10),
+      brandProcessingQueue.getJobs(["waiting"], 0, JOB_FETCH_LIMIT),
+      brandProcessingQueue.getJobs(["active"], 0, JOB_FETCH_LIMIT),
+      brandProcessingQueue.getJobs(["delayed"], 0, JOB_FETCH_LIMIT),
+      brandProcessingQueue.getJobs(["completed"], 0, JOB_FETCH_LIMIT),
+      brandProcessingQueue.getJobs(["failed"], 0, JOB_FETCH_LIMIT),
     ]);
 
     const allJobs = [
@@ -240,80 +214,46 @@ async function getWatchlistBrandsQueue(
       ...failed,
     ];
 
-    if (allJobs.length === 0) {
-      return {
-        brands: [],
-        pagination: {
-          current_page: validPage,
-          per_page: validLimit,
-          total_items: 0,
-          total_pages: 0,
-        },
-      };
-    }
-
-    // 🚀 OPTIMIZATION 2: Batch collect unique brand IDs
-    const uniqueBrandIds = [
-      ...new Set(allJobs.map((job) => job.data.brandId).filter(Boolean)),
-    ];
-
-    if (uniqueBrandIds.length === 0) {
-      return {
-        brands: [],
-        pagination: {
-          current_page: validPage,
-          per_page: validLimit,
-          total_items: 0,
-          total_pages: 0,
-        },
-      };
-    }
-
-    // 🚀 OPTIMIZATION 3: Single batch query for all brands
-    const brands = await Brand.findAll({
-      where: { id: uniqueBrandIds },
-      attributes: ["id", "actual_name", "page_id"],
-      raw: true,
-    });
-
-    // 🚀 OPTIMIZATION 4: Single batch query for watchlist status
-    const watchlistBrands = await WatchList.findAll({
-      where: { brand_id: uniqueBrandIds },
-      attributes: ["brand_id"],
-      raw: true,
-    });
-
-    // Create lookup maps for O(1) access
-    const brandMap = new Map(brands.map((b) => [b.id, b]));
-    const watchlistSet = new Set(watchlistBrands.map((w) => w.brand_id));
-
-    // 🚀 OPTIMIZATION 5: Process jobs with O(1) lookups
+    // Filter only watchlist brands
     const watchlistJobs = [];
-    const processedBrandIds = new Set();
+    const brandIds = new Set();
 
     for (const job of allJobs) {
-      const brandId = parseInt(job.data.brandId);
+      const brandId = job.data.brandId;
       const pageCategory = job.data.brandDetails?.page_category;
       const totalAds = job.data.totalAds?.length || 0;
 
-      if (
-        brandId &&
-        !processedBrandIds.has(brandId) &&
-        watchlistSet.has(brandId)
-      ) {
-        processedBrandIds.add(brandId);
+      if (brandId && !brandIds.has(brandId)) {
+        brandIds.add(brandId);
 
-        const brand = brandMap.get(brandId);
+        // Get brand details from database
+        const brand = await Brand.findOne({
+          where: { id: parseInt(brandId) },
+          attributes: ["actual_name", "page_id"],
+          raw: true,
+        });
+
         if (brand) {
-          watchlistJobs.push({
-            brand_id: brandId,
-            page_id: job.data.pageId || brand.page_id || "Unknown",
-            page_name: brand.actual_name || "Unknown",
-            total_ads: totalAds,
-            page_category: pageCategory || "Unknown",
-            created_at: job.timestamp || new Date().toISOString(),
-            is_watchlist: true,
+          // Check if this brand is in watchlist
+          const WatchList = require("../models/WatchList");
+          const isInWatchlist = await WatchList.findOne({
+            where: { brand_id: parseInt(brandId) },
+            attributes: ['brand_id'],
+            raw: true
           });
+
+          // Only include if it's a watchlist brand
+          if (isInWatchlist) {
+            watchlistJobs.push({
+              brand_id: parseInt(brandId),
+              page_id: job.data.pageId || brand.page_id || "Unknown",
+              page_name: brand.actual_name || "Unknown",
+              total_ads: totalAds,
+              page_category: pageCategory || "Unknown",
+              created_at: job.timestamp || new Date().toISOString(),
+              is_watchlist: true,
+            });
+          }
         }
       }
     }
@@ -334,6 +274,7 @@ async function getWatchlistBrandsQueue(
         total_items: watchlistJobs.length,
         total_pages: Math.ceil(watchlistJobs.length / validLimit),
       },
+
     };
   } catch (error) {
     logger.error("Error in getWatchlistBrandsQueue:", error);
