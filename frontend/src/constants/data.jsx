@@ -10,6 +10,7 @@ export const navItems = [
   { to: "/queue-management", icon: Settings, label: "Q Management" },
   { to: "/scraper-controls", icon: Play, label: "Scraper Controls" },
   { to: "/proxies", icon: Globe, label: "Proxy Controls" },
+  { to: "/scraped-brands", icon: FileText, label: "Scraped Brands" },
   { to: "/pipeline-status", icon: Activity, label: "Pipeline Status" }
 ];
 

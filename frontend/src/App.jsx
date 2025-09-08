@@ -13,6 +13,7 @@ const QueueManagement = lazy(() => import('./pages/QueueManagement'));
 const ScraperControlsPage = lazy(() => import('./pages/ScraperControls'));
 const PipelineStatusPage = lazy(() => import('./pages/PipelineStatusPage'));
 const Proxies = lazy(() => import('./pages/Proxies'));
+const ScrapedBrands = lazy(() => import('./pages/ScrapedBrands'));
 const WatchlistBrands = lazy(() => import('./pages/WatchlistBrands'));
 const WatchlistQueues = lazy(() => import('./pages/WatchlistQueues'));
 
@@ -76,6 +77,11 @@ function App() {
         <Route path="/proxies" element={
           <Suspense fallback={<LoadingSpinner />}>
             <Proxies />
+          </Suspense>
+        } />
+        <Route path="/scraped-brands" element={
+          <Suspense fallback={<LoadingSpinner />}>
+            <ScrapedBrands />
           </Suspense>
         } />
         <Route path="/pipeline-status" element={

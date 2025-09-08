@@ -158,28 +158,24 @@ async function getTypesenseStatus(
     const cached = getCachedData(cacheKey);
     if (cached) return cached;
 
-    // Use provided ads if available, otherwise fetch
-    let brandAds = ads;
-    if (!brandAds) {
-      const startDate = new Date(targetDate + "T00:00:00.000Z");
-      const endDate = new Date(targetDate + "T23:59:59.999Z");
+    // FIXED: Count ads by typesense_updated_at on target date
+    const startDate = new Date(targetDate + "T00:00:00.000Z");
+    const endDate = new Date(targetDate + "T23:59:59.999Z");
 
-      brandAds = await Ad.findAll({
-        where: {
-          brand_id: brandId,
-          typesense_updated_at: {
-            [Op.between]: [startDate, endDate],
-          },
-        }, 
-      });
-    } else {
-      brandAds = ads.filter((ad) => ad.brand_id === brandId);
-    }
+    // Count total ads processed on target date (typesense_updated_at)
+    const totalAdsProcessedToday = await Ad.count({
+      where: {
+        brand_id: brandId,
+        typesense_updated_at: {
+          [Op.between]: [startDate, endDate],
+        },
+      },
+    });
 
-    if (brandAds.length === 0) {
+    if (totalAdsProcessedToday === 0) {
       const result = {
         status: "NOT_PROCESSED",
-        message: "No ads found for this date",
+        message: "No ads processed on this date",
         completed: false,
         adsWithTypesense: 0,
         totalAds: 0,
@@ -190,19 +186,33 @@ async function getTypesenseStatus(
       return result;
     }
 
-    const adsWithTypesense = brandAds.filter((ad) => ad.typesense_id !== null);
-    const adsWithoutTypesense = brandAds.filter(
-      (ad) => ad.typesense_id === null
-    );
+    // Count ads with typesense_id among those processed today
+    const adsWithTypesenseCount = await Ad.count({
+      where: {
+        brand_id: brandId,
+        typesense_updated_at: {
+          [Op.between]: [startDate, endDate],
+        },
+        typesense_id: {
+          [Op.ne]: null,
+        },
+      },
+    });
 
-    // FIXED: If all ads have typesense_id, mark as completed
-    if (adsWithTypesense.length === brandAds.length) {
+    const adsWithoutTypesenseCount = totalAdsProcessedToday - adsWithTypesenseCount;
+
+    // FIXED: Use counts from typesense_updated_at
+    const totalAds = totalAdsProcessedToday; // Total ads processed on target date
+    const adsProcessedTodayCount = totalAdsProcessedToday; // All counted ads were processed today
+
+    // FIXED: If all ads processed today have typesense_id, mark as completed
+    if (adsWithTypesenseCount === totalAds) {
       const result = {
         status: "COMPLETED",
         message: "All ads indexed in Typesense",
         completed: true,
-        adsWithTypesense: adsWithTypesense.length,
-        totalAds: brandAds.length,
+        adsWithTypesense: adsWithTypesenseCount,
+        totalAds: totalAds,
         adsInQueue: 0,
         adsFailed: 0,
       };
@@ -215,84 +225,94 @@ async function getTypesenseStatus(
     let adsFailed = 0;
 
     if (bullJobData || failedJobData) {
-      const adIdsWithoutTypesense = adsWithoutTypesense.map((ad) => ad.id);
+      // Get ads that were processed today but don't have typesense_id
+      const adsProcessedTodayWithoutTypesense = await Ad.findAll({
+        where: {
+          brand_id: brandId,
+          typesense_updated_at: {
+            [Op.between]: [startDate, endDate],
+          },
+          typesense_id: null,
+        },
+        attributes: ['id'],
+      });
+
+      const adIdsWithoutTypesense = adsProcessedTodayWithoutTypesense.map((ad) => ad.id);
 
       for (const adId of adIdsWithoutTypesense) {
         if (failedJobData && failedJobData.has(adId)) {
           adsFailed++;
         } else if (bullJobData && bullJobData.has(adId)) {
           adsInQueue++;
+        } else {
+          adsFailed++; // Not in queue and not failed = actually failed
         }
       }
+    } else {
+      // If no Redis data, assume all without typesense_id are failed
+      adsFailed = adsWithoutTypesenseCount;
     }
 
-    // FIXED: Implement proper status logic based on requirements
-    let result;
+    // FIXED: If some ads processed today don't have typesense_id
+    if (adsWithTypesenseCount > 0 && adsWithTypesenseCount < totalAds) {
+      let status, message;
+      
+      if (adsInQueue > 0) {
+        status = "PROCESSING";
+        message = "Typesense indexing in progress";
+      } else {
+        status = "FAILED";
+        message = "Some ads failed Typesense indexing";
+      }
 
-    // If some ads have typesense_id and others are in queue - PROCESSING
-    if (adsWithTypesense.length > 0 && adsInQueue > 0) {
-      result = {
-        status: "PROCESSING",
-        message: "Typesense indexing in progress",
+      const result = {
+        status: status,
+        message: message,
         completed: false,
-        adsWithTypesense: adsWithTypesense.length,
-        totalAds: brandAds.length,
-        adsInQueue,
-        adsFailed,
+        adsWithTypesense: adsWithTypesenseCount,
+        totalAds: totalAds,
+        adsInQueue: adsInQueue,
+        adsFailed: adsFailed,
       };
+      setCachedData(cacheKey, result);
+      return result;
     }
-    // If some ads have typesense_id but others are not in queue - FAILED (partially)
-    else if (
-      adsWithTypesense.length > 0 &&
-      adsInQueue === 0 &&
-      adsWithoutTypesense.length > 0
-    ) {
-      result = {
-        status: "FAILED",
-        message: "Some Typesense indexing failed",
+
+    // FIXED: If no ads processed today have typesense_id
+    if (adsWithTypesenseCount === 0) {
+      let status, message;
+      
+      if (adsInQueue > 0) {
+        status = "WAITING";
+        message = "Ads waiting in Typesense queue";
+      } else {
+        status = "FAILED";
+        message = "No ads indexed in Typesense";
+      }
+
+      const result = {
+        status: status,
+        message: message,
         completed: false,
-        adsWithTypesense: adsWithTypesense.length,
-        totalAds: brandAds.length,
-        adsInQueue: 0,
-        adsFailed: adsWithoutTypesense.length,
+        adsWithTypesense: 0,
+        totalAds: totalAds,
+        adsInQueue: adsInQueue,
+        adsFailed: adsFailed,
       };
+      setCachedData(cacheKey, result);
+      return result;
     }
-    // If no ads have typesense_id but all are in queue - WAITING
-    else if (adsWithTypesense.length === 0 && adsInQueue > 0) {
-      result = {
-        status: "WAITING",
-        message: "Ads waiting in Typesense queue",
-        completed: false,
-        adsWithTypesense: adsWithTypesense.length,
-        totalAds: brandAds.length,
-        adsInQueue,
-        adsFailed,
-      };
-    }
-    // If no ads have typesense_id and none in queue - FAILED or NOT_PROCESSED
-    else if (adsWithTypesense.length === 0 && adsInQueue === 0) {
-      result = {
-        status: "FAILED",
-        message: "Typesense indexing failed or not started",
-        completed: false,
-        adsWithTypesense: adsWithTypesense.length,
-        totalAds: brandAds.length,
-        adsInQueue: 0,
-        adsFailed: adsWithoutTypesense.length,
-      };
-    }
-    // Default case
-    else {
-      result = {
-        status: "NOT_PROCESSED",
-        message: "Typesense indexing not initiated",
-        completed: false,
-        adsWithTypesense: adsWithTypesense.length,
-        totalAds: brandAds.length,
-        adsInQueue,
-        adsFailed: adsWithoutTypesense.length - adsInQueue,
-      };
-    }
+
+    // This should never be reached due to the conditions above
+    const result = {
+      status: "NOT_PROCESSED",
+      message: "Typesense indexing status unknown",
+      completed: false,
+      adsWithTypesense: adsWithTypesenseCount,
+      totalAds: totalAds,
+      adsInQueue: 0,
+      adsFailed: adsWithoutTypesenseCount,
+    };
 
     setCachedData(cacheKey, result);
     return result;

@@ -5,6 +5,7 @@ const queueRoutes = require("./routes/queueRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const pipelineStatusRoutes = require("./routes/pipelineStatus");
 const madanglesRoutes = require("./routes/madanglesRoutes");
+const scrapedBrandsRoutes = require("./routes/scrapedBrandsRoutes");
 
 const sequelize = require("./config/database");
 const redis = require("./config/redis");
@@ -37,6 +38,7 @@ app.use("/api/queue", queueRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/pipeline-status", pipelineStatusRoutes);
 app.use("/api/madangles", madanglesRoutes);
+app.use("/api/scraped-brands", scrapedBrandsRoutes);
 
 
 const server = app.listen(PORT, () => {

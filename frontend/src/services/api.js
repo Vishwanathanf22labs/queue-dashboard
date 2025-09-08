@@ -126,6 +126,29 @@ export const adminAPI = {
   checkStatus: () => api.get("/admin/status"),
 };
 
+export const scrapedBrandsAPI = {
+  getScrapedBrands: (page = 1, limit = 10, date = null) => {
+    const params = new URLSearchParams();
+    params.append("page", page);
+    params.append("limit", limit);
+    if (date) params.append("date", date);
+    return api.get(`/scraped-brands?${params.toString()}`);
+  },
+
+  getScrapedBrandsStats: (date = null) => {
+    const params = new URLSearchParams();
+    if (date) params.append("date", date);
+    return api.get(`/scraped-brands/stats?${params.toString()}`);
+  },
+
+  searchScrapedBrands: (query, date = null) => {
+    const params = new URLSearchParams();
+    params.append("query", query);
+    if (date) params.append("date", date);
+    return api.get(`/scraped-brands/search?${params.toString()}`);
+  }
+};
+
 export const proxyAPI = {
   addProxy: (proxyData) => api.post("/queue/proxy/add", proxyData),
   removeProxy: (proxyId) => api.delete(`/queue/proxy/remove/${proxyId}`),

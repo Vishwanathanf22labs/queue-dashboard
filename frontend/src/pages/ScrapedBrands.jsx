@@ -1,0 +1,394 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { scrapedBrandsAPI } from '../services/api';
+import Card from '../components/ui/Card';
+import SearchInput from '../components/ui/SearchInput';
+import Pagination from '../components/ui/Pagination';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
+import ErrorDisplay from '../components/ui/ErrorDisplay';
+import Badge from '../components/ui/Badge';
+import { Calendar, Search, TrendingUp, TrendingDown, Minus, BarChart3 } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+const ScrapedBrands = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Get date from URL params or default to today
+  const getInitialDate = () => {
+    const urlDate = searchParams.get('date');
+    if (urlDate && /^\d{4}-\d{2}-\d{2}$/.test(urlDate)) {
+      return urlDate;
+    }
+    return new Date().toISOString().split('T')[0];
+  };
+
+  const [dataState, setDataState] = useState({
+    brands: [],
+    stats: null,
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    selectedDate: getInitialDate()
+  });
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+
+  const updateDataState = useCallback((updates) => {
+    setDataState(prev => ({ ...prev, ...updates }));
+  }, []);
+
+  const loadScrapedBrands = useCallback(async (page = 1, date = null) => {
+    try {
+      setIsLoading(true);
+      const response = await scrapedBrandsAPI.getScrapedBrands(page, 10, date);
+
+      if (response.data.success) {
+        const brands = response.data.data.brands || [];
+        const pagination = response.data.data.pagination || {};
+        
+        updateDataState({
+          brands,
+          currentPage: pagination.currentPage || 1,
+          totalPages: pagination.totalPages || 1,
+          totalItems: pagination.totalItems || 0
+        });
+      } else {
+        toast.error(response.data.error || 'Failed to load scraped brands');
+      }
+    } catch (error) {
+      console.error('Error loading scraped brands:', error);
+      toast.error('Failed to load scraped brands');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [updateDataState]);
+
+  const loadStats = useCallback(async (date = null) => {
+    try {
+      const response = await scrapedBrandsAPI.getScrapedBrandsStats(date);
+      
+      if (response.data.success) {
+        updateDataState({ stats: response.data.data });
+      }
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    }
+  }, [updateDataState]);
+
+  const searchBrands = useCallback(async (query) => {
+    if (!query.trim()) {
+      setShowSearchResults(false);
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      const response = await scrapedBrandsAPI.searchScrapedBrands(query, dataState.selectedDate);
+      
+      if (response.data.success) {
+        setSearchResults(response.data.data.brands || []);
+        setShowSearchResults(true);
+      } else {
+        toast.error(response.data.error || 'Search failed');
+        setSearchResults([]);
+        setShowSearchResults(false);
+      }
+    } catch (error) {
+      console.error('Error searching brands:', error);
+      toast.error('Search failed');
+      setSearchResults([]);
+      setShowSearchResults(false);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [dataState.selectedDate]);
+
+  const handleDateChange = (event) => {
+    const newDate = event.target.value;
+    
+    // Update URL params to persist the selected date
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set('date', newDate);
+    setSearchParams(newSearchParams);
+    
+    updateDataState({ selectedDate: newDate, currentPage: 1 });
+  };
+
+  const handleSearch = (query) => {
+    setSearchTerm(query);
+    searchBrands(query);
+  };
+
+  const handlePageChange = (page) => {
+    updateDataState({ currentPage: page });
+  };
+
+  const getComparativeStatusIcon = (status) => {
+    switch (status) {
+      case 'increased':
+        return <TrendingUp className="h-4 w-4 text-green-500" />;
+      case 'decreased':
+        return <TrendingDown className="h-4 w-4 text-red-500" />;
+      case 'no change':
+        return <Minus className="h-4 w-4 text-gray-500" />;
+      default:
+        return <Minus className="h-4 w-4 text-gray-400" />;
+    }
+  };
+
+  const getComparativeStatusColor = (status) => {
+    switch (status) {
+      case 'increased':
+        return 'bg-green-100 text-green-800';
+      case 'decreased':
+        return 'bg-red-100 text-red-800';
+      case 'no change':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-500';
+    }
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  // Sync URL params with component state
+  useEffect(() => {
+    const urlDate = searchParams.get('date');
+    if (urlDate && urlDate !== dataState.selectedDate) {
+      updateDataState({ selectedDate: urlDate, currentPage: 1 });
+    }
+  }, [searchParams, dataState.selectedDate, updateDataState]);
+
+  // Load data on component mount and when date/page changes
+  useEffect(() => {
+    loadScrapedBrands(dataState.currentPage, dataState.selectedDate);
+    loadStats(dataState.selectedDate);
+  }, [dataState.currentPage, dataState.selectedDate, loadScrapedBrands, loadStats]);
+
+  if (isLoading && !dataState.brands.length) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+        <div className="max-w-7xl mx-auto">
+          <LoadingSpinner />
+        </div>
+      </div>
+    );
+  }
+
+  const displayBrands = showSearchResults ? searchResults : dataState.brands;
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+            Scraped Brands
+          </h1>
+          <p className="text-gray-600">
+            View scraped brands data for the selected date
+          </p>
+        </div>
+
+        {/* Stats Cards */}
+        {dataState.stats && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <Card className="p-4">
+              <div className="flex items-center">
+                <BarChart3 className="h-8 w-8 text-blue-500 mr-3" />
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total Brands</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {dataState.stats.totalBrands || 0}
+                  </p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center">
+                <TrendingUp className="h-8 w-8 text-green-500 mr-3" />
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Active Ads</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {dataState.stats.totalActiveAds || 0}
+                  </p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center">
+                <TrendingDown className="h-8 w-8 text-red-500 mr-3" />
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Inactive Ads</p>
+                  <p className="text-2xl font-bold text-red-600">
+                    {dataState.stats.totalInactiveAds || 0}
+                  </p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center">
+                <Minus className="h-8 w-8 text-gray-500 mr-3" />
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Stopped Ads</p>
+                  <p className="text-2xl font-bold text-gray-600">
+                    {dataState.stats.totalStoppedAds || 0}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Controls */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          {/* Date Picker */}
+          <div className="flex items-center space-x-2">
+            <Calendar className="h-5 w-5 text-gray-500" />
+            <input
+              type="date"
+              value={dataState.selectedDate}
+              onChange={handleDateChange}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Search */}
+          <div className="flex-1 max-w-md">
+            <SearchInput
+              value={searchTerm}
+              onChange={handleSearch}
+              placeholder="Search brands..."
+              leftIcon={<Search className="h-4 w-4" />}
+              loading={isSearching}
+            />
+          </div>
+        </div>
+
+        {/* Results */}
+        {showSearchResults && searchResults.length === 0 && searchTerm ? (
+          <Card className="p-8 text-center">
+            <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No brands found</h3>
+            <p className="text-gray-600">Try adjusting your search terms</p>
+          </Card>
+        ) : displayBrands.length === 0 ? (
+          <Card className="p-8 text-center">
+            <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No brands found</h3>
+            <p className="text-gray-600">No scraped brands data for the selected date</p>
+          </Card>
+        ) : (
+          <>
+            {/* Brands Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+              {displayBrands.map((brand) => (
+                <Card key={`${brand.brand_id}-${brand.started_at}`} className="p-4 hover:shadow-md transition-shadow">
+                  <div className="space-y-3">
+                    {/* Brand Name */}
+                    <div>
+                      <h3 className="font-semibold text-gray-900 truncate" title={brand.brand_name}>
+                        {brand.brand_name}
+                      </h3>
+                      <p className="text-sm text-gray-500">ID: {brand.brand_id}</p>
+                    </div>
+
+                    {/* Ads Counts */}
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="text-center p-2 bg-green-50 rounded">
+                        <p className="text-green-600 font-medium">
+                          {brand.active_ads || 0}
+                        </p>
+                        <p className="text-green-600 text-xs">Active</p>
+                      </div>
+                      <div className="text-center p-2 bg-red-50 rounded">
+                        <p className="text-red-600 font-medium">
+                          {brand.inactive_ads || 0}
+                        </p>
+                        <p className="text-red-600 text-xs">Inactive</p>
+                      </div>
+                    </div>
+
+                    {/* Stopped Ads */}
+                    {brand.stopped_ads && (
+                      <div className="text-center p-2 bg-gray-50 rounded">
+                        <p className="text-gray-600 font-medium">
+                          {brand.stopped_ads}
+                        </p>
+                        <p className="text-gray-600 text-xs">Stopped</p>
+                      </div>
+                    )}
+
+                    {/* Comparative Status */}
+                    {brand.comparative_status && (
+                      <div className="flex items-center justify-center">
+                        <Badge
+                          className={`${getComparativeStatusColor(brand.comparative_status)} flex items-center space-x-1`}
+                        >
+                          {getComparativeStatusIcon(brand.comparative_status)}
+                          <span className="capitalize">{brand.comparative_status}</span>
+                        </Badge>
+                      </div>
+                    )}
+
+                    {/* Started At */}
+                    <div className="text-xs text-gray-500 text-center">
+                      {formatDate(brand.started_at)}
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {!showSearchResults && dataState.totalPages > 1 && (
+              <div className="flex justify-center">
+                <Pagination
+                  currentPage={dataState.currentPage}
+                  totalPages={dataState.totalPages}
+                  onPageChange={handlePageChange}
+                  showInfo={true}
+                  totalItems={dataState.totalItems}
+                  itemsPerPage={10}
+                />
+              </div>
+            )}
+
+            {/* Search Results Info */}
+            {showSearchResults && (
+              <div className="text-center text-sm text-gray-600 mb-4">
+                Showing {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for "{searchTerm}"
+                <button
+                  onClick={() => {
+                    setShowSearchResults(false);
+                    setSearchTerm('');
+                    setSearchResults([]);
+                  }}
+                  className="ml-2 text-blue-600 hover:text-blue-800 underline"
+                >
+                  Clear search
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ScrapedBrands;
