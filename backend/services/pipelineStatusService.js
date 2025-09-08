@@ -12,11 +12,9 @@ const CACHE_TTL = 30000; // 30 seconds
 
 try {
   madanglesRedis = new Redis({
-    host:
-      process.env.MADANGLES_REDIS_HOST,
+    host: process.env.MADANGLES_REDIS_HOST,
     port: process.env.MADANGLES_REDIS_PORT,
-    password:
-      process.env.MADANGLES_REDIS_PASSWORD,
+    password: process.env.MADANGLES_REDIS_PASSWORD,
     maxRetriesPerRequest: 3,
     retryDelayOnFailover: 100,
     enableReadyCheck: false,
@@ -44,24 +42,24 @@ function getCacheKey(prefix, ...args) {
 async function getTypesenseBullQueueData() {
   try {
     if (!madanglesRedis) return new Map();
-    
+
     // Get Ad Update Bull queue data (for Typesense indexing)
-    const queueKeys = await madanglesRedis.keys('bull:ad-update:*');
+    const queueKeys = await madanglesRedis.keys("bull:ad-update:*");
     const jobData = new Map();
-    
+
     for (const key of queueKeys) {
-      const jobData = await madanglesRedis.hgetall(key);
-      if (jobData && jobData.data) {
-        const adId = JSON.parse(jobData.data).adid;
+      const jobDataRaw = await madanglesRedis.hgetall(key);
+      if (jobDataRaw && jobDataRaw.data) {
+        const adId = JSON.parse(jobDataRaw.data).adid;
         if (adId) {
           jobData.set(adId, true);
         }
       }
     }
-    
+
     return jobData;
   } catch (error) {
-    console.warn('Error getting Ad Update Bull queue data:', error.message);
+    console.warn("Error getting Ad Update Bull queue data:", error.message);
     return new Map();
   }
 }
@@ -69,52 +67,57 @@ async function getTypesenseBullQueueData() {
 async function getTypesenseFailedQueueData() {
   try {
     if (!madanglesRedis) return new Map();
-    
+
     // Get Ad Update failed queue data
-    const failedKeys = await madanglesRedis.keys('bull:ad-update:failed:*');
+    const failedKeys = await madanglesRedis.keys("bull:ad-update:failed:*");
     const failedData = new Map();
-    
+
     for (const key of failedKeys) {
-      const jobData = await madanglesRedis.hgetall(key);
-      if (jobData && jobData.data) {
-        const adId = JSON.parse(jobData.data).adid;
+      const jobDataRaw = await madanglesRedis.hgetall(key);
+      if (jobDataRaw && jobDataRaw.data) {
+        const adId = JSON.parse(jobDataRaw.data).adid;
         if (adId) {
           failedData.set(adId, true);
         }
       }
     }
-    
+
     return failedData;
   } catch (error) {
-    console.warn('Error getting Ad Update failed queue data:', error.message);
+    console.warn("Error getting Ad Update failed queue data:", error.message);
     return new Map();
   }
 }
 
 async function getFileUploadBullQueueData() {
   try {
-    if (!madanglesRedis) return new Map();
-    
-    // Get brand processing Bull queue data (for file upload)
-    const queueKeys = await madanglesRedis.keys('bull:brand-processing:*');
+    if (!redis) return new Map();
+
+    // Get brand processing Bull queue data (for file upload) - uses normal Redis
+    const queueKeys = await redis.keys("bull:brand-processing:*");
     const jobData = new Map();
-    
+
     for (const key of queueKeys) {
-      const jobData = await madanglesRedis.hgetall(key);
-      if (jobData && jobData.data) {
-        const brandId = JSON.parse(jobData.data).brandId;
+      const jobDataRaw = await redis.hgetall(key);
+      if (jobDataRaw && jobDataRaw.data) {
+        const brandId = JSON.parse(jobDataRaw.data).brandId;
         if (brandId) {
           jobData.set(brandId, true);
         }
       }
     }
-    
+
     return jobData;
   } catch (error) {
-    console.warn('Error getting brand processing Bull queue data:', error.message);
+    console.warn(
+      "Error getting brand processing Bull queue data:",
+      error.message
+    );
     return new Map();
   }
 }
+
+// REMOVED: Media upload queue doesn't exist - only brand-processing queue is used
 
 function getCachedData(key) {
   const cached = redisCache.get(key);
@@ -141,6 +144,7 @@ function setCachedData(key, data) {
 
 /**
  * Check Typesense status for a brand based on ads and Redis Bull queues
+ * FIXED: Proper status logic implementation based on requirements
  */
 async function getTypesenseStatus(
   brandId,
@@ -163,10 +167,10 @@ async function getTypesenseStatus(
       brandAds = await Ad.findAll({
         where: {
           brand_id: brandId,
-          created_at: {
+          typesense_updated_at: {
             [Op.between]: [startDate, endDate],
           },
-        },
+        }, 
       });
     } else {
       brandAds = ads.filter((ad) => ad.brand_id === brandId);
@@ -179,6 +183,8 @@ async function getTypesenseStatus(
         completed: false,
         adsWithTypesense: 0,
         totalAds: 0,
+        adsInQueue: 0,
+        adsFailed: 0,
       };
       setCachedData(cacheKey, result);
       return result;
@@ -189,6 +195,7 @@ async function getTypesenseStatus(
       (ad) => ad.typesense_id === null
     );
 
+    // FIXED: If all ads have typesense_id, mark as completed
     if (adsWithTypesense.length === brandAds.length) {
       const result = {
         status: "COMPLETED",
@@ -196,39 +203,62 @@ async function getTypesenseStatus(
         completed: true,
         adsWithTypesense: adsWithTypesense.length,
         totalAds: brandAds.length,
+        adsInQueue: 0,
+        adsFailed: 0,
       };
       setCachedData(cacheKey, result);
       return result;
     }
 
-    // Use provided job data if available
+    // FIXED: Check Redis queues for ads without typesense_id
     let adsInQueue = 0;
     let adsFailed = 0;
 
-    if (bullJobData && failedJobData) {
+    if (bullJobData || failedJobData) {
       const adIdsWithoutTypesense = adsWithoutTypesense.map((ad) => ad.id);
 
       for (const adId of adIdsWithoutTypesense) {
-        if (failedJobData.has(adId)) {
+        if (failedJobData && failedJobData.has(adId)) {
           adsFailed++;
-        } else if (bullJobData.has(adId)) {
+        } else if (bullJobData && bullJobData.has(adId)) {
           adsInQueue++;
         }
       }
     }
 
+    // FIXED: Implement proper status logic based on requirements
     let result;
-    if (adsFailed > 0) {
+
+    // If some ads have typesense_id and others are in queue - PROCESSING
+    if (adsWithTypesense.length > 0 && adsInQueue > 0) {
       result = {
-        status: "FAILED",
-        message: "Typesense indexing failed",
+        status: "PROCESSING",
+        message: "Typesense indexing in progress",
         completed: false,
         adsWithTypesense: adsWithTypesense.length,
         totalAds: brandAds.length,
         adsInQueue,
         adsFailed,
       };
-    } else if (adsInQueue > 0) {
+    }
+    // If some ads have typesense_id but others are not in queue - FAILED (partially)
+    else if (
+      adsWithTypesense.length > 0 &&
+      adsInQueue === 0 &&
+      adsWithoutTypesense.length > 0
+    ) {
+      result = {
+        status: "FAILED",
+        message: "Some Typesense indexing failed",
+        completed: false,
+        adsWithTypesense: adsWithTypesense.length,
+        totalAds: brandAds.length,
+        adsInQueue: 0,
+        adsFailed: adsWithoutTypesense.length,
+      };
+    }
+    // If no ads have typesense_id but all are in queue - WAITING
+    else if (adsWithTypesense.length === 0 && adsInQueue > 0) {
       result = {
         status: "WAITING",
         message: "Ads waiting in Typesense queue",
@@ -238,7 +268,21 @@ async function getTypesenseStatus(
         adsInQueue,
         adsFailed,
       };
-    } else {
+    }
+    // If no ads have typesense_id and none in queue - FAILED or NOT_PROCESSED
+    else if (adsWithTypesense.length === 0 && adsInQueue === 0) {
+      result = {
+        status: "FAILED",
+        message: "Typesense indexing failed or not started",
+        completed: false,
+        adsWithTypesense: adsWithTypesense.length,
+        totalAds: brandAds.length,
+        adsInQueue: 0,
+        adsFailed: adsWithoutTypesense.length,
+      };
+    }
+    // Default case
+    else {
       result = {
         status: "NOT_PROCESSED",
         message: "Typesense indexing not initiated",
@@ -246,7 +290,7 @@ async function getTypesenseStatus(
         adsWithTypesense: adsWithTypesense.length,
         totalAds: brandAds.length,
         adsInQueue,
-        adsFailed,
+        adsFailed: adsWithoutTypesense.length - adsInQueue,
       };
     }
 
@@ -260,12 +304,15 @@ async function getTypesenseStatus(
       completed: false,
       adsWithTypesense: 0,
       totalAds: 0,
+      adsInQueue: 0,
+      adsFailed: 0,
     };
   }
 }
 
 /**
  * Check file upload status for a brand based on ads_media and Redis Bull queues
+ * FIXED: Proper status logic implementation
  */
 async function getFileUploadStatus(
   brandId,
@@ -336,6 +383,14 @@ async function getFileUploadStatus(
       return result;
     }
 
+    // Get brand data
+    let brandData = brand;
+    if (!brandData) {
+      brandData = await Brand.findByPk(brandId);
+    }
+    const brandLogoUploaded = brandData && brandData.logo_url_aws;
+
+    // Check media upload status
     const mediaWithAllUrls = brandMediaItems.filter(
       (media) =>
         media.file_url_original &&
@@ -349,15 +404,10 @@ async function getFileUploadStatus(
         !media.file_url_preview
     );
 
-    let brandData = brand;
-    if (!brandData) {
-      brandData = await Brand.findByPk(brandId);
-    }
-    const brandLogoUploaded = brandData && brandData.logo_url_aws;
-
     const allMediaUploaded = mediaWithAllUrls.length === brandMediaItems.length;
     const fileUploadCompleted = allMediaUploaded && brandLogoUploaded;
 
+    // FIXED: If all files are uploaded, mark as completed
     if (fileUploadCompleted) {
       const result = {
         status: "COMPLETED",
@@ -366,47 +416,102 @@ async function getFileUploadStatus(
         mediaWithAllUrls: mediaWithAllUrls.length,
         totalMedia: brandMediaItems.length,
         brandLogoUploaded: true,
+        mediaInQueue: 0,
+        mediaFailed: 0,
       };
       setCachedData(cacheKey, result);
       return result;
     }
 
+    // FIXED: Check Redis queues for missing files
+    let mediaInQueue = 0;
+    let mediaFailed = 0;
     const brandHasProcessingJob = brandProcessingJobData
       ? brandProcessingJobData.has(brandId)
       : false;
-    const hasMissingFiles =
-      mediaWithoutAllUrls.length > 0 || !brandLogoUploaded;
 
+    // Only check brand-level processing job (no individual media queue)
+    // mediaInQueue is set to 0 since there's no individual media queue
+
+    // FIXED: Implement proper status logic based on requirements
     let result;
-    if (hasMissingFiles && brandHasProcessingJob) {
+
+    // If some files are uploaded and brand is processing - PROCESSING
+    if (
+      mediaWithAllUrls.length > 0 &&
+      brandHasProcessingJob
+    ) {
+      result = {
+        status: "PROCESSING",
+        message: "File upload in progress",
+        completed: false,
+        mediaWithAllUrls: mediaWithAllUrls.length,
+        totalMedia: brandMediaItems.length,
+        brandLogoUploaded: brandLogoUploaded || false,
+        mediaInQueue: 0, // No individual media queue
+        mediaFailed: mediaWithoutAllUrls.length,
+      };
+    }
+    // If no files are uploaded but brand is processing - WAITING
+    else if (
+      mediaWithAllUrls.length === 0 &&
+      brandHasProcessingJob
+    ) {
       result = {
         status: "WAITING",
-        message: "Brand is still being processed, files will be uploaded soon",
+        message: "Files waiting to be uploaded",
         completed: false,
         mediaWithAllUrls: mediaWithAllUrls.length,
         totalMedia: brandMediaItems.length,
-        brandLogoUploaded: brandLogoUploaded,
-        brandHasProcessingJob: true,
+        brandLogoUploaded: brandLogoUploaded || false,
+        mediaInQueue: 0, // No individual media queue
+        mediaFailed: 0,
       };
-    } else if (hasMissingFiles && !brandHasProcessingJob) {
+    }
+    // If some files are uploaded but brand is not processing - FAILED (partially)
+    else if (
+      mediaWithAllUrls.length > 0 &&
+      !brandHasProcessingJob
+    ) {
       result = {
         status: "FAILED",
-        message: "Brand processing completed but file upload failed",
+        message: "Some file uploads failed",
         completed: false,
         mediaWithAllUrls: mediaWithAllUrls.length,
         totalMedia: brandMediaItems.length,
-        brandLogoUploaded: brandLogoUploaded,
-        brandHasProcessingJob: false,
+        brandLogoUploaded: brandLogoUploaded || false,
+        mediaInQueue: 0,
+        mediaFailed: mediaWithoutAllUrls.length,
       };
-    } else {
+    }
+    // If no files are uploaded and none in queue - FAILED or NOT_PROCESSED
+    else if (
+      mediaWithAllUrls.length === 0 &&
+      mediaInQueue === 0 &&
+      !brandHasProcessingJob
+    ) {
+      result = {
+        status: "FAILED",
+        message: "File upload failed or not started",
+        completed: false,
+        mediaWithAllUrls: mediaWithAllUrls.length,
+        totalMedia: brandMediaItems.length,
+        brandLogoUploaded: brandLogoUploaded || false,
+        mediaInQueue: 0,
+        mediaFailed: mediaWithoutAllUrls.length,
+      };
+    }
+    // Default case
+    else {
       result = {
         status: "NOT_PROCESSED",
-        message: "Brand has no ads or media to upload",
+        message: "File upload not initiated",
         completed: false,
         mediaWithAllUrls: mediaWithAllUrls.length,
         totalMedia: brandMediaItems.length,
-        brandLogoUploaded: brandLogoUploaded,
-        brandHasProcessingJob: false,
+        brandLogoUploaded: brandLogoUploaded || false,
+        mediaInQueue: 0, // No individual media queue
+        mediaFailed: mediaWithoutAllUrls.length,
       };
     }
 
@@ -420,6 +525,8 @@ async function getFileUploadStatus(
       completed: false,
       mediaWithAllUrls: 0,
       totalMedia: 0,
+      mediaInQueue: 0,
+      mediaFailed: 0,
     };
   }
 }
@@ -509,8 +616,20 @@ async function getBrandScrapingStatus(brandId, date = null) {
           })
         : [];
 
+    // FIXED: Get all required Redis queue data
+    const bullJobData = await getTypesenseBullQueueData();
+    const failedJobData = await getTypesenseFailedQueueData();
+    const brandProcessingJobData = await getFileUploadBullQueueData();
+    // Media upload queue doesn't exist - only brand-processing queue is used
+
     // Get statuses with Redis queue checking for accurate status
-    const typesenseStatus = await getTypesenseStatus(brandId, targetDate, ads, bullJobData, failedJobData);
+    const typesenseStatus = await getTypesenseStatus(
+      brandId,
+      targetDate,
+      ads,
+      bullJobData,
+      failedJobData
+    );
     const fileUploadStatus = await getFileUploadStatus(
       brandId,
       targetDate,
@@ -528,7 +647,7 @@ async function getBrandScrapingStatus(brandId, date = null) {
       date: targetDate,
       scraping: {
         completed: scrapingCompleted,
-        status: dailyStatus?.status || "Unknown",
+        status: dailyStatus?.status === "Started" ? "Completed" : (dailyStatus?.status || "Unknown"),
         timestamp: dailyStatus?.created_at || null,
         startedAt: dailyStatus?.started_at || null,
         endedAt: dailyStatus?.ended_at || null,
@@ -561,6 +680,7 @@ async function getBrandScrapingStatus(brandId, date = null) {
         totalMedia: fileUploadStatus.totalMedia,
         mediaInQueue: fileUploadStatus.mediaInQueue || 0,
         mediaFailed: fileUploadStatus.mediaFailed || 0,
+        brandLogoUploaded: fileUploadStatus.brandLogoUploaded || false,
       },
     };
 
@@ -682,10 +802,11 @@ async function getAllBrandsScrapingStatus(page = 1, limit = 10, date = null) {
       }),
     ]);
 
-    // Get Redis Bull queue data for accurate status checking
+    // FIXED: Get all Redis Bull queue data for accurate status checking
     const bullJobData = await getTypesenseBullQueueData();
     const failedJobData = await getTypesenseFailedQueueData();
     const brandProcessingJobData = await getFileUploadBullQueueData();
+    // Media upload queue doesn't exist - only brand-processing queue is used
 
     // Process results efficiently
     const brandMap = new Map(brands.map((brand) => [brand.id, brand]));
@@ -774,56 +895,23 @@ async function getAllBrandsScrapingStatus(page = 1, limit = 10, date = null) {
       }
 
       // Calculate Typesense status
-      let typesenseStatus = "NOT_PROCESSED";
-      let typesenseCompleted = false;
-      let typesenseMessage = "No ads found for this date";
-      let adsWithTypesense = 0;
-      let totalAds = brandAds.length;
+      const typesenseStatus = await getTypesenseStatus(
+        brandId,
+        targetDate,
+        brandAds,
+        bullJobData,
+        failedJobData
+      );
 
-      if (brandAds.length > 0) {
-        const adsWithTypesenseList = brandAds.filter(
-          (ad) => ad.typesense_id !== null
-        );
-        adsWithTypesense = adsWithTypesenseList.length;
-
-        if (adsWithTypesense === brandAds.length) {
-          typesenseStatus = "COMPLETED";
-          typesenseCompleted = true;
-          typesenseMessage = "All ads indexed in Typesense";
-        } else {
-          typesenseStatus = "NOT_PROCESSED";
-          typesenseMessage = "Typesense indexing not initiated";
-        }
-      }
-
-      // Calculate file upload status
-      let fileUploadStatus = "NOT_PROCESSED";
-      let fileUploadCompleted = false;
-      let fileUploadMessage = "No media items found for this date";
-      let mediaWithAllUrls = 0;
-      let totalMedia = brandMediaItems.length;
-      const brandLogoUploaded = brand && brand.logo_url_aws;
-
-      if (brandMediaItems.length > 0) {
-        const mediaWithAllUrlsList = brandMediaItems.filter(
-          (media) =>
-            media.file_url_original &&
-            media.file_url_resized &&
-            media.file_url_preview
-        );
-        mediaWithAllUrls = mediaWithAllUrlsList.length;
-
-        const allMediaUploaded = mediaWithAllUrls === brandMediaItems.length;
-        fileUploadCompleted = allMediaUploaded && brandLogoUploaded;
-
-        if (fileUploadCompleted) {
-          fileUploadStatus = "COMPLETED";
-          fileUploadMessage = "All files and brand logo uploaded to S3";
-        } else {
-          fileUploadStatus = "NOT_PROCESSED";
-          fileUploadMessage = "Brand has no ads or media to upload";
-        }
-      }
+      // FIXED: Calculate file upload status with proper Redis queue checking
+      const fileUploadStatus = await getFileUploadStatus(
+        brandId,
+        targetDate,
+        brandAds,
+        brandMediaItems,
+        brand,
+        brandProcessingJobData
+      );
 
       statuses.push({
         brandId: brandId,
@@ -835,7 +923,7 @@ async function getAllBrandsScrapingStatus(page = 1, limit = 10, date = null) {
         pageId: brand.page_id,
         scraping: {
           completed: scrapingCompleted,
-          status: dailyStatus?.status || "Unknown",
+          status: dailyStatus?.status === "Started" ? "Completed" : (dailyStatus?.status || "Unknown"),
           timestamp: dailyStatus?.created_at || null,
           startedAt: dailyStatus?.started_at || null,
           endedAt: dailyStatus?.ended_at || null,
@@ -852,22 +940,23 @@ async function getAllBrandsScrapingStatus(page = 1, limit = 10, date = null) {
           timestamp: dailyStatus?.created_at || null,
         },
         typesense: {
-          completed: typesenseCompleted,
-          status: typesenseStatus,
-          message: typesenseMessage,
-          adsWithTypesense: adsWithTypesense,
-          totalAds: totalAds,
-          adsInQueue: 0,
-          adsFailed: 0,
+          completed: typesenseStatus.completed,
+          status: typesenseStatus.status,
+          message: typesenseStatus.message,
+          adsWithTypesense: typesenseStatus.adsWithTypesense,
+          totalAds: typesenseStatus.totalAds,
+          adsInQueue: typesenseStatus.adsInQueue || 0,
+          adsFailed: typesenseStatus.adsFailed || 0,
         },
         fileUpload: {
-          completed: fileUploadCompleted,
-          status: fileUploadStatus,
-          message: fileUploadMessage,
-          mediaWithAllUrls: mediaWithAllUrls,
-          totalMedia: totalMedia,
-          brandLogoUploaded: brandLogoUploaded || false,
-          brandHasProcessingJob: false,
+          completed: fileUploadStatus.completed,
+          status: fileUploadStatus.status,
+          message: fileUploadStatus.message,
+          mediaWithAllUrls: fileUploadStatus.mediaWithAllUrls,
+          totalMedia: fileUploadStatus.totalMedia,
+          mediaInQueue: fileUploadStatus.mediaInQueue || 0,
+          mediaFailed: fileUploadStatus.mediaFailed || 0,
+          brandLogoUploaded: fileUploadStatus.brandLogoUploaded || false,
         },
       });
     }
@@ -928,7 +1017,7 @@ async function getScrapingStats(date = null) {
 
     const completedScraping = brandsWithStatus.filter((brand) => {
       const latestStatus = brand.dailyStatuses?.[0];
-      return latestStatus?.status === "Started";
+      return latestStatus?.status === "Completed";
     }).length;
 
     const statusCounts = {
@@ -959,6 +1048,7 @@ async function getScrapingStats(date = null) {
 
     const fileUploadCounts = {
       COMPLETED: 0,
+      PROCESSING: 0,
       WAITING: 0,
       FAILED: 0,
       NOT_PROCESSED: 0,

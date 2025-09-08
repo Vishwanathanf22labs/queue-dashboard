@@ -102,6 +102,9 @@ async function getProxies(page = 1, limit = 10, filter = "all", search = "") {
       const successCount = parseInt(proxy.successCount || 0);
       const usageCount = failCount + successCount;
       
+      // Use stored creation date if available, otherwise fallback to current date
+      const createdDate = proxy.created_at ? new Date(proxy.created_at) : new Date();
+      
       return {
         ...proxy,
         failCount: failCount,
@@ -112,13 +115,13 @@ async function getProxies(page = 1, limit = 10, filter = "all", search = "") {
         // Use country from Redis if available, otherwise default
         country: proxy.country || "Unknown",
         type: proxy.type || "http",
-        added_at: new Date().toISOString(),
-        added_date: new Date().toLocaleDateString('en-US', { 
+        added_at: proxy.created_at || createdDate.toISOString(),
+        added_date: proxy.added_date || createdDate.toLocaleDateString('en-US', { 
           year: 'numeric', 
           month: 'long', 
           day: 'numeric' 
         }),
-        added_time: new Date().toLocaleTimeString('en-US', { 
+        added_time: proxy.added_time || createdDate.toLocaleTimeString('en-US', { 
           hour: '2-digit', 
           minute: '2-digit', 
           second: '2-digit',
@@ -257,19 +260,23 @@ async function getLastMonthProxies() {
         proxies: lastMonthProxies.map(proxy => {
           const failCount = parseInt(proxy.failCount || 0);
           const successCount = parseInt(proxy.successCount || 0);
+          
+          // Use stored creation date if available, otherwise fallback to current date
+          const createdDate = proxy.created_at ? new Date(proxy.created_at) : new Date();
+          
           return {
             id: proxy.id,
             ip: proxy.ip,
             port: proxy.port,
-            country: "Unknown",
+            country: proxy.country || "Unknown",
             type: proxy.type || "http",
-            added_at: new Date().toISOString(),
-            added_date: new Date().toLocaleDateString('en-US', { 
+            added_at: proxy.created_at || createdDate.toISOString(),
+            added_date: proxy.added_date || createdDate.toLocaleDateString('en-US', { 
               year: 'numeric', 
               month: 'long', 
               day: 'numeric' 
             }),
-            added_time: new Date().toLocaleTimeString('en-US', { 
+            added_time: proxy.added_time || createdDate.toLocaleTimeString('en-US', { 
               hour: '2-digit', 
               minute: '2-digit', 
               second: '2-digit',
@@ -357,6 +364,9 @@ async function getNextProxy() {
     // Format response
     const failCount = parseInt(bestProxy.failCount || 0);
     const usageCount = failCount + newSuccessCount;
+    
+    // Use stored creation date if available, otherwise fallback to current date
+    const createdDate = bestProxy.created_at ? new Date(bestProxy.created_at) : new Date();
 
     return {
       success: true,
@@ -369,15 +379,15 @@ async function getNextProxy() {
         is_working: true,
         active: true,
         // Add default values for UI compatibility
-        country: "Unknown",
-        type: proxy.type || "http",
-        added_at: new Date().toISOString(),
-        added_date: new Date().toLocaleDateString('en-US', { 
+        country: bestProxy.country || "Unknown",
+        type: bestProxy.type || "http",
+        added_at: bestProxy.created_at || createdDate.toISOString(),
+        added_date: bestProxy.added_date || createdDate.toLocaleDateString('en-US', { 
           year: 'numeric', 
           month: 'long', 
           day: 'numeric' 
         }),
-        added_time: new Date().toLocaleTimeString('en-US', { 
+        added_time: bestProxy.added_time || createdDate.toLocaleTimeString('en-US', { 
           hour: '2-digit', 
           minute: '2-digit', 
           second: '2-digit',

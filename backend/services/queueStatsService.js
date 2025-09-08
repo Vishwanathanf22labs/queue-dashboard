@@ -21,7 +21,6 @@ async function getBrandsScrapedStats(date = null) {
       brands_processed: parseInt(allStats.brands_processed || 0),
       brands_scrapped_failed: parseInt(allStats.brands_scrapped_failed || 0),
       ads_processed: parseInt(allStats.ads_processed || 0),
-
     };
 
     return brandsStats;
@@ -33,15 +32,37 @@ async function getBrandsScrapedStats(date = null) {
 
 async function getBrandsScrapedStatsForDays(days = 7) {
   try {
-    const stats = [];
     const today = new Date();
+    const dateStrings = [];
 
+    // 🚀 OPTIMIZATION 1: Pre-calculate all date strings
     for (let i = 0; i < days; i++) {
       const date = new Date(today.getTime() - i * MILLISECONDS_PER_DAY);
-      const dateString = date.toISOString().split("T")[0];
-      const dayStats = await getBrandsScrapedStats(dateString);
-      stats.push(dayStats);
+      dateStrings.push(date.toISOString().split("T")[0]);
     }
+
+    // 🚀 OPTIMIZATION 2: Use Redis pipeline for batch operations
+    const pipeline = redis.pipeline();
+    dateStrings.forEach((dateString) => {
+      const statsKey = `${REDIS_KEYS.STATS_PREFIX}${dateString}`;
+      pipeline.hgetall(statsKey);
+    });
+
+    const results = await pipeline.exec();
+
+    // 🚀 OPTIMIZATION 3: Process all results at once
+    const stats = results.map((result, index) => {
+      const allStats = result[1] || {}; // result[1] contains the actual data
+      const dateString = dateStrings[index];
+
+      return {
+        date: dateString,
+        brands_scraped: parseInt(allStats.brands_scrapped || 0),
+        brands_processed: parseInt(allStats.brands_processed || 0),
+        brands_scrapped_failed: parseInt(allStats.brands_scrapped_failed || 0),
+        ads_processed: parseInt(allStats.ads_processed || 0),
+      };
+    });
 
     return {
       period: `Last ${days} days`,
