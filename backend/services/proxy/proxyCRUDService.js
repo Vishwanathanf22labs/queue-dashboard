@@ -29,6 +29,7 @@ async function addProxy(ip, port = null, country = null, username = null, passwo
     }
 
     // Create proxy hash fields - only essential fields as shown in the image
+    const now = new Date();
     const proxyData = {
       proxy_url: `${ip}:${port}:${username}:${password}`,
       failCount: "0",
@@ -36,7 +37,19 @@ async function addProxy(ip, port = null, country = null, username = null, passwo
       active: "true",
       disabledAt: "",
       country: country || "Unknown",
-      type: type || "http"
+      type: type || "http",
+      created_at: now.toISOString(),
+      added_date: now.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      }),
+      added_time: now.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit',
+        hour12: true 
+      })
     };
 
     // Add to Redis hash
@@ -58,13 +71,13 @@ async function addProxy(ip, port = null, country = null, username = null, passwo
         username: username,
         password: password,
         type: type,
-        added_at: new Date().toISOString(),
-        added_date: new Date().toLocaleDateString('en-US', { 
+        added_at: now.toISOString(),
+        added_date: now.toLocaleDateString('en-US', { 
           year: 'numeric', 
           month: 'long', 
           day: 'numeric' 
         }),
-        added_time: new Date().toLocaleTimeString('en-US', { 
+        added_time: now.toLocaleTimeString('en-US', { 
           hour: '2-digit', 
           minute: '2-digit', 
           second: '2-digit',

@@ -1,17 +1,20 @@
 import { Routes, Route, useLocation } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import Layout from './components/layout/Layout';
-import Dashboard from './pages/Dashboard';
-import PendingQueue from './pages/PendingQueue';
-import FailedQueue from './pages/FailedQueue';
-import AddBrands from './pages/AddBrands';
-import QueueManagement from './pages/QueueManagement';
-import ScraperControlsPage from './pages/ScraperControls';
-import PipelineStatusPage from './pages/PipelineStatusPage';
-import Proxies from './pages/Proxies';
-import WatchlistBrands from './pages/WatchlistBrands';
-import WatchlistQueues from './pages/WatchlistQueues';
+import LoadingSpinner from './components/ui/LoadingSpinner';
 import useAdminStore from './stores/adminStore';
+
+// Dynamic imports for better code splitting
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const PendingQueue = lazy(() => import('./pages/PendingQueue'));
+const FailedQueue = lazy(() => import('./pages/FailedQueue'));
+const AddBrands = lazy(() => import('./pages/AddBrands'));
+const QueueManagement = lazy(() => import('./pages/QueueManagement'));
+const ScraperControlsPage = lazy(() => import('./pages/ScraperControls'));
+const PipelineStatusPage = lazy(() => import('./pages/PipelineStatusPage'));
+const Proxies = lazy(() => import('./pages/Proxies'));
+const WatchlistBrands = lazy(() => import('./pages/WatchlistBrands'));
+const WatchlistQueues = lazy(() => import('./pages/WatchlistQueues'));
 
 function App() {
   const { checkAdminStatus } = useAdminStore();
@@ -30,16 +33,56 @@ function App() {
   return (
     <Layout>
       <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/pending-queue" element={<PendingQueue />} />
-        <Route path="/failed-queue" element={<FailedQueue />} />
-        <Route path="/watchlist-brands" element={<WatchlistBrands />} />
-        <Route path="/watchlist-queues" element={<WatchlistQueues />} />
-        <Route path="/add-brands" element={<AddBrands />} />
-        <Route path="/queue-management" element={<QueueManagement />} />
-        <Route path="/scraper-controls" element={<ScraperControlsPage />} />
-        <Route path="/proxies" element={<Proxies />} />
-        <Route path="/pipeline-status" element={<PipelineStatusPage />} />
+        <Route path="/" element={
+          <Suspense fallback={<LoadingSpinner />}>
+            <Dashboard />
+          </Suspense>
+        } />
+        <Route path="/pending-queue" element={
+          <Suspense fallback={<LoadingSpinner />}>
+            <PendingQueue />
+          </Suspense>
+        } />
+        <Route path="/failed-queue" element={
+          <Suspense fallback={<LoadingSpinner />}>
+            <FailedQueue />
+          </Suspense>
+        } />
+        <Route path="/watchlist-brands" element={
+          <Suspense fallback={<LoadingSpinner />}>
+            <WatchlistBrands />
+          </Suspense>
+        } />
+        <Route path="/watchlist-queues" element={
+          <Suspense fallback={<LoadingSpinner />}>
+            <WatchlistQueues />
+          </Suspense>
+        } />
+        <Route path="/add-brands" element={
+          <Suspense fallback={<LoadingSpinner />}>
+            <AddBrands />
+          </Suspense>
+        } />
+        <Route path="/queue-management" element={
+          <Suspense fallback={<LoadingSpinner />}>
+            <QueueManagement />
+          </Suspense>
+        } />
+        <Route path="/scraper-controls" element={
+          <Suspense fallback={<LoadingSpinner />}>
+            <ScraperControlsPage />
+          </Suspense>
+        } />
+        <Route path="/proxies" element={
+          <Suspense fallback={<LoadingSpinner />}>
+            <Proxies />
+          </Suspense>
+        } />
+        <Route path="/pipeline-status" element={
+          <Suspense fallback={<LoadingSpinner />}>
+            <PipelineStatusPage />
+          </Suspense>
+        } />
       </Routes>
     </Layout>
   );

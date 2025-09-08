@@ -8,7 +8,8 @@ import {
   Search,
   Calendar,
   AlertCircle,
-  Eye
+  Eye,
+  Activity
 } from 'lucide-react';
 import api from '../services/api';
 import Card from '../components/ui/Card';
@@ -131,7 +132,7 @@ const PipelineStatusPage = () => {
     setSearchParams({ date });
   }, [setSearchParams]);
 
-  // Memoize status functions to prevent recreation on every render
+  // FIXED: Updated status functions to handle new status types
   const getStatusIcon = useCallback((status, completed) => {
     const completedStatuses = [
       'Started', 'Completed',
@@ -156,6 +157,7 @@ const PipelineStatusPage = () => {
       case 'In progress (no ads yet)':
       case 'In progress (not finished)':
       case 'WAITING':
+      case 'PROCESSING':
         return <Clock className="h-5 w-5 text-yellow-500" />;
       case 'Failed/blocked':
       case 'FAILED':
@@ -196,12 +198,14 @@ const PipelineStatusPage = () => {
       case 'In progress (no ads yet)':
       case 'In progress (not finished)':
       case 'WAITING':
+      case 'PROCESSING':
         return 'text-yellow-600';
       default:
         return 'text-gray-500';
     }
   }, []);
 
+  // FIXED: Updated status text to handle new PROCESSING status
   const getStatusText = useCallback((status, completed) => {
     if (completed) return 'Completed';
 
@@ -232,6 +236,8 @@ const PipelineStatusPage = () => {
         return 'Not started';
       case 'WAITING':
         return 'Waiting';
+      case 'PROCESSING':
+        return 'Processing';
       case 'FAILED':
         return 'Failed';
       case 'NOT_PROCESSED':
@@ -252,6 +258,36 @@ const PipelineStatusPage = () => {
     });
   }, []);
 
+  // FIXED: Enhanced progress indicator for file upload status
+  const getProgressIndicator = useCallback((completed, total, status) => {
+    if (total === 0) return null;
+
+    const percentage = Math.round((completed / total) * 100);
+    let colorClass = 'bg-gray-200';
+
+    if (status === 'COMPLETED') {
+      colorClass = 'bg-green-500';
+    } else if (status === 'PROCESSING' || status === 'WAITING') {
+      colorClass = 'bg-yellow-500';
+    } else if (status === 'FAILED') {
+      colorClass = 'bg-red-500';
+    }
+
+    return (
+      <div className="flex items-center gap-2 mt-1">
+        <div className="flex-1 bg-gray-200 rounded-full h-2">
+          <div
+            className={`h-2 rounded-full ${colorClass} transition-all duration-300`}
+            style={{ width: `${percentage}%` }}
+          />
+        </div>
+        <span className="text-xs text-gray-500 min-w-0">
+          {completed}/{total} ({percentage}%)
+        </span>
+      </div>
+    );
+  }, []);
+
   // Memoize brand card component to prevent unnecessary re-renders
   const BrandCard = React.memo(({ brand }) => (
     <Card key={brand.brandId} className="hover:shadow-lg transition-shadow duration-200">
@@ -267,9 +303,10 @@ const PipelineStatusPage = () => {
           )}
         </div>
         <div className="flex items-center gap-1">
-          {brand.scraping?.completed && (
-            <div className="w-2 h-2 bg-green-500 rounded-full" title="All stages complete" />
-          )}
+          {brand.scraping?.completed && brand.dbStored?.completed &&
+            brand.typesense?.completed && brand.fileUpload?.completed && (
+              <div className="w-2 h-2 bg-green-500 rounded-full" title="All stages complete" />
+            )}
         </div>
       </div>
 
@@ -324,6 +361,12 @@ const PipelineStatusPage = () => {
               <p className="text-xs text-gray-500">
                 {getStatusText(brand.typesense?.status, brand.typesense?.completed)}
               </p>
+              {/* Progress indicator for Typesense */}
+              {getProgressIndicator(
+                brand.typesense?.adsWithTypesense || 0,
+                brand.typesense?.totalAds || 0,
+                brand.typesense?.status
+              )}
             </div>
           </div>
           <div className="text-right">
@@ -335,51 +378,91 @@ const PipelineStatusPage = () => {
           </div>
         </div>
 
-        {/* File Upload Status */}
+        {/* FIXED: File Upload Status with enhanced display */}
         <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
           <div className="flex items-center gap-3">
             {getStatusIcon(brand.fileUpload?.status, brand.fileUpload?.completed)}
-            <div>
+            <div className="flex-1">
               <p className="text-sm font-medium text-gray-900">File Upload</p>
-              <p className="text-xs text-gray-500">
+              <p className={`text-xs ${getStatusColor(brand.fileUpload?.status, brand.fileUpload?.completed)}`}>
                 {getStatusText(brand.fileUpload?.status, brand.fileUpload?.completed)}
               </p>
+              {/* FIXED: Enhanced progress indicator for file upload */}
+              {getProgressIndicator(
+                brand.fileUpload?.mediaWithAllUrls || 0,
+                brand.fileUpload?.totalMedia || 0,
+                brand.fileUpload?.status
+              )}
             </div>
           </div>
           <div className="text-right">
             {brand.fileUpload?.totalMedia > 0 && (
-              <p className="text-xs text-gray-400">
-                {brand.fileUpload.mediaWithAllUrls}/{brand.fileUpload.totalMedia} files
-              </p>
+              <div className="space-y-1">
+                <p className="text-xs text-gray-400">
+                  {brand.fileUpload.mediaWithAllUrls}/{brand.fileUpload.totalMedia} files
+                </p>
+                {/* FIXED: Show queue and failed counts */}
+                {(brand.fileUpload?.mediaInQueue > 0 || brand.fileUpload?.mediaFailed > 0) && (
+                  <div className="flex flex-col gap-1">
+                    {brand.fileUpload.mediaInQueue > 0 && (
+                      <span className="text-xs text-yellow-600">
+                        {brand.fileUpload.mediaInQueue} queued
+                      </span>
+                    )}
+                    {brand.fileUpload.mediaFailed > 0 && (
+                      <span className="text-xs text-red-600">
+                        {brand.fileUpload.mediaFailed} failed
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Additional Info */}
+      {/* FIXED: Enhanced additional info section */}
       {(brand.typesense?.adsInQueue > 0 || brand.typesense?.adsFailed > 0 ||
         brand.fileUpload?.mediaInQueue > 0 || brand.fileUpload?.mediaFailed > 0) && (
           <div className="mt-4 pt-3 border-t border-gray-200">
-            <div className="flex flex-wrap gap-2 text-xs">
-              {brand.typesense?.adsInQueue > 0 && (
-                <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded">
-                  {brand.typesense.adsInQueue} in queue
-                </span>
+            <div className="flex items-center gap-2 mb-2">
+              <Activity className="h-4 w-4 text-gray-400" />
+              <span className="text-xs font-medium text-gray-600">Queue Status</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {/* Typesense Queue Info */}
+              {(brand.typesense?.adsInQueue > 0 || brand.typesense?.adsFailed > 0) && (
+                <div className="space-y-1">
+                  <span className="font-medium text-gray-600">Typesense:</span>
+                  {brand.typesense?.adsInQueue > 0 && (
+                    <div className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-center">
+                      {brand.typesense.adsInQueue} in queue
+                    </div>
+                  )}
+                  {brand.typesense?.adsFailed > 0 && (
+                    <div className="px-2 py-1 bg-red-100 text-red-800 rounded text-center">
+                      {brand.typesense.adsFailed} failed
+                    </div>
+                  )}
+                </div>
               )}
-              {brand.typesense?.adsFailed > 0 && (
-                <span className="px-2 py-1 bg-red-100 text-red-800 rounded">
-                  {brand.typesense.adsFailed} failed
-                </span>
-              )}
-              {brand.fileUpload?.mediaInQueue > 0 && (
-                <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded">
-                  {brand.fileUpload.mediaInQueue} files queued
-                </span>
-              )}
-              {brand.fileUpload?.mediaFailed > 0 && (
-                <span className="px-2 py-1 bg-red-100 text-red-800 rounded">
-                  {brand.fileUpload.mediaFailed} files failed
-                </span>
+
+              {/* File Upload Queue Info */}
+              {(brand.fileUpload?.mediaInQueue > 0 || brand.fileUpload?.mediaFailed > 0) && (
+                <div className="space-y-1">
+                  <span className="font-medium text-gray-600">Files:</span>
+                  {brand.fileUpload?.mediaInQueue > 0 && (
+                    <div className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-center">
+                      {brand.fileUpload.mediaInQueue} queued
+                    </div>
+                  )}
+                  {brand.fileUpload?.mediaFailed > 0 && (
+                    <div className="px-2 py-1 bg-red-100 text-red-800 rounded text-center">
+                      {brand.fileUpload.mediaFailed} failed
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
