@@ -128,12 +128,15 @@ async function getBrandProcessingQueue(
         try {
           const watchlistBrand = await WatchList.findOne({
             where: { brand_id: brandId },
-            attributes: ['brand_id'],
-            raw: true
+            attributes: ["brand_id"],
+            raw: true,
           });
           isInWatchlist = !!watchlistBrand;
         } catch (watchlistError) {
-          logger.warn(`Error checking watchlist for brand ${brandId}:`, watchlistError);
+          logger.warn(
+            `Error checking watchlist for brand ${brandId}:`,
+            watchlistError
+          );
           isInWatchlist = false;
         }
 
@@ -146,7 +149,7 @@ async function getBrandProcessingQueue(
             total_ads: totalAds,
             page_category: pageCategory || "Unknown",
             created_at: new Date(job.timestamp).toISOString(),
-            is_watchlist: false
+            is_watchlist: false,
           });
         }
       } catch (jobError) {
@@ -154,7 +157,9 @@ async function getBrandProcessingQueue(
       }
     }
 
-    brandProcessingData.sort((a, b) => parseInt(b.brand_id) - parseInt(a.brand_id));
+    brandProcessingData.sort(
+      (a, b) => parseInt(b.brand_id) - parseInt(a.brand_id)
+    );
 
     // Count only regular brands (not watchlist)
     const regularBrandsCount = brandProcessingData.length;
@@ -171,7 +176,6 @@ async function getBrandProcessingQueue(
         total_items: regularBrandsCount,
         total_pages: Math.ceil(regularBrandsCount / validLimit),
       },
-
     };
   } catch (error) {
     logger.error("Error in getBrandProcessingQueue:", error);
@@ -238,8 +242,8 @@ async function getWatchlistBrandsQueue(
           const WatchList = require("../models/WatchList");
           const isInWatchlist = await WatchList.findOne({
             where: { brand_id: parseInt(brandId) },
-            attributes: ['brand_id'],
-            raw: true
+            attributes: ["brand_id"],
+            raw: true,
           });
 
           // Only include if it's a watchlist brand
@@ -274,7 +278,6 @@ async function getWatchlistBrandsQueue(
         total_items: watchlistJobs.length,
         total_pages: Math.ceil(watchlistJobs.length / validLimit),
       },
-
     };
   } catch (error) {
     logger.error("Error in getWatchlistBrandsQueue:", error);
