@@ -9,7 +9,8 @@ import {
   Calendar,
   AlertCircle,
   Eye,
-  Activity
+  Activity,
+  ExternalLink
 } from 'lucide-react';
 import api from '../services/api';
 import Card from '../components/ui/Card';
@@ -491,6 +492,20 @@ const PipelineStatusPage = () => {
               )}
             </div>
           </div>
+        )}
+
+        {/* External Link Icon - Bottom Right */}
+        {brand.pageId && (
+          <button
+            onClick={() => {
+              const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=${brand.pageId}`;
+              window.open(url, '_blank', 'noopener,noreferrer');
+            }}
+            className="absolute bottom-4 right-4 p-2 text-gray-400 hover:text-blue-600 transition-colors bg-white rounded-full shadow-sm border border-gray-200"
+            title="View in Facebook Ad Library"
+          >
+            <ExternalLink className="h-4 w-4" />
+          </button>
         )}
     </Card>
   ));

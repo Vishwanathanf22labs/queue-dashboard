@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Brand, BrandsDailyStatus } = require('../models');
+const { Brand, BrandsDailyStatus, WatchList } = require('../models');
 
 class ScrapedBrandsService {
   /**
@@ -22,22 +22,69 @@ class ScrapedBrandsService {
       const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
       const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1);
 
-      // Calculate offset for pagination
-      const offset = (page - 1) * limit;
+      // Get watchlist brand IDs for marking and sorting
+      const watchlistRecords = await WatchList.findAll({
+        attributes: ["brand_id"],
+        raw: true
+      });
+      const watchlistBrandIds = watchlistRecords.map(record => record.brand_id);
 
-      // Get total count for pagination
-      const totalCount = await BrandsDailyStatus.count({
+      // Get all brand IDs first (without pagination) to sort properly
+      const allDailyStatusRecords = await BrandsDailyStatus.findAll({
         where: {
           started_at: {
             [Op.gte]: startOfDay,
             [Op.lt]: endOfDay
           }
-        }
+        },
+        attributes: ["brand_id"],
+        group: ["brand_id"],
+        order: [["brand_id", "DESC"]]
       });
+
+      // Sort brands: watchlist first, then regular
+      const sortedBrandIds = allDailyStatusRecords
+        .map(record => record.brand_id)
+        .sort((a, b) => {
+          const aIsWatchlist = watchlistBrandIds.includes(a);
+          const bIsWatchlist = watchlistBrandIds.includes(b);
+          
+          if (aIsWatchlist && !bIsWatchlist) return -1; // a (watchlist) comes first
+          if (!aIsWatchlist && bIsWatchlist) return 1;  // b (watchlist) comes first
+          return 0; // maintain original order for same type
+        });
+
+      // Update total count after sorting
+      const totalCount = sortedBrandIds.length;
+
+      // Calculate offset for pagination
+      const offset = (page - 1) * limit;
+
+      // Apply pagination to sorted results
+      const paginatedBrandIds = sortedBrandIds.slice(offset, offset + limit);
+
+      if (paginatedBrandIds.length === 0) {
+        return {
+          success: true,
+          data: {
+            brands: [],
+            pagination: {
+              currentPage: page,
+              totalPages: Math.ceil(totalCount / limit),
+              totalItems: totalCount,
+              itemsPerPage: limit,
+              hasNextPage: page < Math.ceil(totalCount / limit),
+              hasPrevPage: page > 1
+            },
+            queryDate: targetDate.toISOString().split('T')[0]
+          }
+        };
+      }
 
       // Get paginated data with brand information using Sequelize ORM
       const scrapedBrands = await BrandsDailyStatus.findAll({
         where: {
+          brand_id: { [Op.in]: paginatedBrandIds },
           started_at: {
             [Op.gte]: startOfDay,
             [Op.lt]: endOfDay
@@ -50,7 +97,8 @@ class ScrapedBrandsService {
             attributes: [
               'id',
               'name',
-              'actual_name'
+              'actual_name',
+              'page_id'
             ],
             required: true
           }
@@ -63,12 +111,10 @@ class ScrapedBrandsService {
           'comparative_status',
           'started_at'
         ],
-        order: [['started_at', 'DESC']],
-        limit: limit,
-        offset: offset
+        order: [['started_at', 'DESC']]
       });
 
-      // Transform the data to include brand_name with COALESCE logic
+      // Transform the data to include brand_name with COALESCE logic and watchlist flag
       const transformedBrands = scrapedBrands.map(item => ({
         brand_id: item.brand_id,
         active_ads: item.active_ads,
@@ -76,7 +122,9 @@ class ScrapedBrandsService {
         stopped_ads: item.stopped_ads,
         comparative_status: item.comparative_status,
         started_at: item.started_at,
-        brand_name: item.brand?.actual_name || item.brand?.name || 'Unknown'
+        brand_name: item.brand?.actual_name || item.brand?.name || 'Unknown',
+        page_id: item.brand?.page_id || null, // Add page_id for external link
+        isWatchlist: watchlistBrandIds.includes(item.brand_id) // Add watchlist flag
       }));
 
       // Calculate pagination info
@@ -128,6 +176,13 @@ class ScrapedBrandsService {
       const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
       const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1);
 
+      // Get watchlist brand IDs for marking
+      const watchlistRecords = await WatchList.findAll({
+        attributes: ["brand_id"],
+        raw: true
+      });
+      const watchlistBrandIds = watchlistRecords.map(record => record.brand_id);
+
       // Check if query is numeric for brand_id search
       const isNumericQuery = !isNaN(query) && !isNaN(parseInt(query));
       
@@ -154,7 +209,8 @@ class ScrapedBrandsService {
             attributes: [
               'id',
               'name',
-              'actual_name'
+              'actual_name',
+              'page_id'
             ],
             required: true,
             where: isNumericQuery ? {} : {
@@ -184,7 +240,7 @@ class ScrapedBrandsService {
         order: [['started_at', 'DESC']]
       });
 
-      // Transform the search results
+      // Transform the search results with watchlist flag
       const transformedSearchResults = searchResults.map(item => ({
         brand_id: item.brand_id,
         active_ads: item.active_ads,
@@ -192,7 +248,9 @@ class ScrapedBrandsService {
         stopped_ads: item.stopped_ads,
         comparative_status: item.comparative_status,
         started_at: item.started_at,
-        brand_name: item.brand?.actual_name || item.brand?.name || 'Unknown'
+        brand_name: item.brand?.actual_name || item.brand?.name || 'Unknown',
+        page_id: item.brand?.page_id || null, // Add page_id for external link
+        isWatchlist: watchlistBrandIds.includes(item.brand_id) // Add watchlist flag
       }));
 
       return {

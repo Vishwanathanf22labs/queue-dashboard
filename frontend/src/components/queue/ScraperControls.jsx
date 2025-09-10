@@ -36,13 +36,11 @@ const ScraperControls = () => {
   }, []);
 
   const handleScraperStart = (result) => {
-    console.log('Scraper started:', result);
     // Refresh status after starting
     fetchScraperStatus();
   };
 
   const handleScraperStop = (result) => {
-    console.log('Scraper stopped:', result);
     // Refresh status after stopping
     fetchScraperStatus();
   };
