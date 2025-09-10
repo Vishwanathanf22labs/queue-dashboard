@@ -21,51 +21,26 @@ async function getFileUploadStatus(
     const cached = getCachedData(cacheKey);
     if (cached) return cached;
 
-    let brandAds = ads;
-    if (!brandAds) {
-      const startDate = new Date(targetDate + "T00:00:00.000Z");
-      const endDate = new Date(targetDate + "T23:59:59.999Z");
+    // NEW LOGIC: Use your exact query to get the total media items
+    const userDefinedQuery = `
+      SELECT ami.*
+      FROM public.ads a
+      JOIN public.ads_media_items ami ON a.id = ami.ad_id
+      WHERE a.brand_id = :brandId
+        AND DATE(a.typesense_updated_at) = :targetDate
+        AND DATE(ami.updated_at) = :targetDate
+      ORDER BY ami.id DESC
+      LIMIT 200
+    `;
+    
+    const relevantMediaItems = await AdMediaItem.sequelize.query(userDefinedQuery, {
+      replacements: { brandId, targetDate },
+      type: AdMediaItem.sequelize.QueryTypes.SELECT
+    });
+    
+    const totalMediaItems = relevantMediaItems.length; // This should be 60 for brand 7061
 
-      brandAds = await Ad.findAll({
-        where: {
-          brand_id: brandId,
-          created_at: {
-            [Op.between]: [startDate, endDate],
-          },
-        },
-      });
-    } else {
-      brandAds = ads.filter((ad) => ad.brand_id === brandId);
-    }
-
-    if (brandAds.length === 0) {
-      const result = {
-        status: "NOT_PROCESSED",
-        message: "No ads found for this date",
-        completed: false,
-        mediaWithAllUrls: 0,
-        totalMedia: 0,
-      };
-      setCachedData(cacheKey, result);
-      return result;
-    }
-
-    const adIds = brandAds.map((ad) => ad.id);
-
-    let brandMediaItems = mediaItems;
-    if (!brandMediaItems) {
-      brandMediaItems = await AdMediaItem.findAll({
-        where: {
-          ad_id: { [Op.in]: adIds },
-        },
-      });
-    } else {
-      brandMediaItems = mediaItems.filter((media) =>
-        adIds.includes(media.ad_id)
-      );
-    }
-
-    if (brandMediaItems.length === 0) {
+    if (totalMediaItems === 0) {
       const result = {
         status: "NOT_PROCESSED",
         message: "No media items found for this date",
@@ -84,63 +59,27 @@ async function getFileUploadStatus(
     }
     const brandLogoUploaded = brandData && brandData.logo_url_aws;
 
-    // Check media upload status
-    const mediaWithAllUrls = brandMediaItems.filter(
-      (media) =>
-        media.file_url_original &&
-        media.file_url_resized &&
-        media.file_url_preview
-    );
-    const mediaWithoutAllUrls = brandMediaItems.filter(
-      (media) =>
-        !media.file_url_original ||
-        !media.file_url_resized ||
-        !media.file_url_preview
-    );
-
-    // NEW: Check for COMPLETED status using time-based logic
+    // Get latest brand status to determine started_at
     const latestBrandStatus = await BrandsDailyStatus.findOne({
       where: { brand_id: brandId },
       order: [['started_at', 'DESC']]
     });
 
-    let fileUploadCompleted = false;
+    // NEW COMPLETION LOGIC: Check if updated_at is on the same date as started_at
+    let completedMediaCount = 0;
     if (latestBrandStatus && latestBrandStatus.started_at) {
       const startedAt = new Date(latestBrandStatus.started_at);
       const startedAtDate = startedAt.toISOString().split('T')[0]; // Get date part only
       
-      // Check if all media items have updated_at >= started_at (same date or later)
-      const allMediaCompleted = brandMediaItems.every(media => {
+      completedMediaCount = relevantMediaItems.filter(media => {
         const mediaUpdatedAt = new Date(media.updated_at);
         const mediaUpdatedAtDate = mediaUpdatedAt.toISOString().split('T')[0]; // Get date part only
-        
-        // COMPLETED if: started_at == updated_at (same date) OR updated_at > started_at
-        return mediaUpdatedAtDate >= startedAtDate;
-      });
-      
-      fileUploadCompleted = allMediaCompleted;
+        return mediaUpdatedAtDate === startedAtDate; // Same date = completed
+      }).length;
     }
 
-    // If completed by time-based logic, mark as completed
-    if (fileUploadCompleted) {
-      const result = {
-        status: "COMPLETED",
-        message: "File upload completed (time-based check)",
-        completed: true,
-        mediaWithAllUrls: mediaWithAllUrls.length,
-        totalMedia: brandMediaItems.length,
-        brandLogoUploaded: brandLogoUploaded || false,
-        mediaInQueue: 0,
-        mediaFailed: 0,
-      };
-      setCachedData(cacheKey, result);
-      return result;
-    }
+    const isCompleted = completedMediaCount === totalMediaItems;
 
-    // FIXED: Check Redis queues for missing files
-    let mediaInQueue = 0;
-    let mediaFailed = 0;
-    
     // Get brand processing job data if not provided
     if (!brandProcessingJobData) {
       brandProcessingJobData = await getFileUploadBullQueueData(queueType);
@@ -150,88 +89,43 @@ async function getFileUploadStatus(
       ? brandProcessingJobData.has(brandId)
       : false;
 
-    // Only check brand-level processing job (no individual media queue)
-    // mediaInQueue is set to 0 since there's no individual media queue
-
-    // FIXED: Implement proper status logic based on requirements
     let result;
 
-    // If some files are uploaded and brand is processing - PROCESSING
-    if (
-      mediaWithAllUrls.length > 0 &&
-      brandHasProcessingJob
-    ) {
+    if (isCompleted) {
+      // All media items have updated_at >= started_at - COMPLETED
+      result = {
+        status: "COMPLETED",
+        message: "File upload completed",
+        completed: true,
+        mediaWithAllUrls: completedMediaCount,
+        totalMedia: totalMediaItems,
+        brandLogoUploaded: brandLogoUploaded || false,
+        mediaInQueue: 0,
+        mediaFailed: 0,
+      };
+    } else if (brandHasProcessingJob) {
+      // Brand is processing but not all files completed - PROCESSING
       result = {
         status: "PROCESSING",
         message: "File upload in progress",
         completed: false,
-        mediaWithAllUrls: mediaWithAllUrls.length,
-        totalMedia: brandMediaItems.length,
-        brandLogoUploaded: brandLogoUploaded || false,
-        mediaInQueue: 0, // No individual media queue
-        mediaFailed: mediaWithoutAllUrls.length,
-      };
-    }
-    // If no files are uploaded but brand is processing - WAITING
-    else if (
-      mediaWithAllUrls.length === 0 &&
-      brandHasProcessingJob
-    ) {
-      result = {
-        status: "WAITING",
-        message: "Files waiting to be uploaded",
-        completed: false,
-        mediaWithAllUrls: mediaWithAllUrls.length,
-        totalMedia: brandMediaItems.length,
-        brandLogoUploaded: brandLogoUploaded || false,
-        mediaInQueue: 0, // No individual media queue
-        mediaFailed: 0,
-      };
-    }
-    // If some files are uploaded but brand is not processing - FAILED (partially)
-    else if (
-      mediaWithAllUrls.length > 0 &&
-      !brandHasProcessingJob
-    ) {
-      result = {
-        status: "FAILED",
-        message: "Some file uploads failed",
-        completed: false,
-        mediaWithAllUrls: mediaWithAllUrls.length,
-        totalMedia: brandMediaItems.length,
+        mediaWithAllUrls: completedMediaCount,
+        totalMedia: totalMediaItems,
         brandLogoUploaded: brandLogoUploaded || false,
         mediaInQueue: 0,
-        mediaFailed: mediaWithoutAllUrls.length,
+        mediaFailed: totalMediaItems - completedMediaCount,
       };
-    }
-    // If no files are uploaded and none in queue - FAILED or NOT_PROCESSED
-    else if (
-      mediaWithAllUrls.length === 0 &&
-      mediaInQueue === 0 &&
-      !brandHasProcessingJob
-    ) {
+    } else {
+      // Brand not processing and not all files completed - FAILED
       result = {
         status: "FAILED",
-        message: "File upload failed or not started",
+        message: "File upload not completed",
         completed: false,
-        mediaWithAllUrls: mediaWithAllUrls.length,
-        totalMedia: brandMediaItems.length,
+        mediaWithAllUrls: completedMediaCount,
+        totalMedia: totalMediaItems,
         brandLogoUploaded: brandLogoUploaded || false,
         mediaInQueue: 0,
-        mediaFailed: mediaWithoutAllUrls.length,
-      };
-    }
-    // Default case
-    else {
-      result = {
-        status: "NOT_PROCESSED",
-        message: "File upload not initiated",
-        completed: false,
-        mediaWithAllUrls: mediaWithAllUrls.length,
-        totalMedia: brandMediaItems.length,
-        brandLogoUploaded: brandLogoUploaded || false,
-        mediaInQueue: 0, // No individual media queue
-        mediaFailed: mediaWithoutAllUrls.length,
+        mediaFailed: totalMediaItems - completedMediaCount,
       };
     }
 

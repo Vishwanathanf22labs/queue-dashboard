@@ -7,7 +7,7 @@ import Pagination from '../components/ui/Pagination';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import ErrorDisplay from '../components/ui/ErrorDisplay';
 import Badge from '../components/ui/Badge';
-import { Calendar, Search, TrendingUp, TrendingDown, Minus, BarChart3 } from 'lucide-react';
+import { Calendar, Search, TrendingUp, TrendingDown, Minus, BarChart3, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const ScrapedBrands = () => {
@@ -297,8 +297,17 @@ const ScrapedBrands = () => {
             {/* Brands Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
               {displayBrands.map((brand) => (
-                <Card key={`${brand.brand_id}-${brand.started_at}`} className="p-4 hover:shadow-md transition-shadow">
-                  <div className="space-y-3">
+                <Card key={`${brand.brand_id}-${brand.started_at}`} className="p-4 hover:shadow-md transition-shadow relative">
+                  {/* Watchlist Badge - Top Left Corner */}
+                  {brand.isWatchlist && (
+                    <div className="absolute top-3 left-3 z-10">
+                      <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">
+                        Watchlist
+                      </span>
+                    </div>
+                  )}
+                  
+                  <div className="space-y-3" style={{ paddingTop: brand.isWatchlist ? '32px' : '0' }}>
                     {/* Brand Name */}
                     <div>
                       <h3 className="font-semibold text-gray-900 truncate" title={brand.brand_name}>
@@ -350,6 +359,20 @@ const ScrapedBrands = () => {
                       {formatDate(brand.started_at)}
                     </div>
                   </div>
+
+                  {/* External Link Icon - Bottom Right */}
+                  {brand.page_id && (
+                    <button
+                      onClick={() => {
+                        const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=${brand.page_id}`;
+                        window.open(url, '_blank', 'noopener,noreferrer');
+                      }}
+                      className="absolute bottom-4 right-4 p-2 text-gray-400 hover:text-blue-600 transition-colors bg-white rounded-full shadow-sm border border-gray-200"
+                      title="View in Facebook Ad Library"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </button>
+                  )}
                 </Card>
               ))}
             </div>

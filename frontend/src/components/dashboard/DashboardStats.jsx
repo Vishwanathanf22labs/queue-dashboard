@@ -34,13 +34,6 @@ const DashboardStats = ({
       const elapsed = Math.floor((now - parsedState.startTime) / 1000);
       const remainingTime = Math.max(0, parsedState.timeLeft - elapsed);
       
-      console.log('Timer restoration debug:', {
-        savedTimeLeft: parsedState.timeLeft,
-        startTime: parsedState.startTime,
-        now: now,
-        elapsed: elapsed,
-        remainingTime: remainingTime
-      });
       
       if (remainingTime > 0 && parsedState.isRunning) {
         setTimerState({
