@@ -14,6 +14,8 @@ const useQueueStore = create((set, get) => ({
   watchlistBrandsQueue: null,
   scrapedStats: null,
   scrapedStatsLoading: false,
+  separateScrapedStats: null,
+  separateScrapedStatsLoading: false,
   loading: false,
   error: null,
 
@@ -134,6 +136,19 @@ const useQueueStore = create((set, get) => ({
     } catch (error) {
       console.error("Scraped Stats API error:", error);
       set({ error: error.message, scrapedStatsLoading: false });
+      throw error;
+    }
+  },
+
+  fetchSeparateScrapedStats: async (date = null, days = null) => {
+    try {
+      set({ separateScrapedStatsLoading: true, error: null });
+      const response = await queueAPI.getSeparateScrapedStats(date, days);
+      set({ separateScrapedStats: response.data, separateScrapedStatsLoading: false });
+      return response.data;
+    } catch (error) {
+      console.error("Separate Scraped Stats API error:", error);
+      set({ error: error.message, separateScrapedStatsLoading: false });
       throw error;
     }
   },

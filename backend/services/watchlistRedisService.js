@@ -1,4 +1,4 @@
-const redis = require('../config/redis');
+const { watchlistRedis } = require('../config/redis');
 const logger = require('../utils/logger');
 const { REDIS_KEYS } = require('../config/constants');
 
@@ -8,8 +8,8 @@ const { REDIS_KEYS } = require('../config/constants');
  */
 async function getWatchlistPendingCount() {
   try {
-    const key = REDIS_KEYS.WATCHLIST_PENDING;
-    const count = await redis.zcard(key);
+    const key = REDIS_KEYS.WATCHLIST.PENDING_BRANDS;
+    const count = await watchlistRedis.zcard(key);
     logger.info(`Watchlist pending count: ${count}`);
     return count;
   } catch (error) {
@@ -24,8 +24,8 @@ async function getWatchlistPendingCount() {
  */
 async function getWatchlistFailedCount() {
   try {
-    const key = REDIS_KEYS.WATCHLIST_FAILED;
-    const count = await redis.llen(key);
+    const key = REDIS_KEYS.WATCHLIST.FAILED_BRANDS;
+    const count = await watchlistRedis.llen(key);
     logger.info(`Watchlist failed count: ${count}`);
     return count;
   } catch (error) {
@@ -42,8 +42,8 @@ async function getWatchlistCompletedCount() {
   try {
     // Get current pending and failed page_ids from Redis
     const [pendingItems, failedItems] = await Promise.all([
-      redis.zrange(REDIS_KEYS.WATCHLIST_PENDING, 0, -1),
-      redis.lrange(REDIS_KEYS.WATCHLIST_FAILED, 0, -1)
+      watchlistRedis.zrange(REDIS_KEYS.WATCHLIST.PENDING_BRANDS, 0, -1),
+      watchlistRedis.lrange(REDIS_KEYS.WATCHLIST.FAILED_BRANDS, 0, -1)
     ]);
     
     // If both queues are empty, completed count is 0

@@ -63,6 +63,13 @@ export const queueAPI = {
     return api.get(`/queue/scraped-stats?${params.toString()}`);
   },
 
+  getSeparateScrapedStats: (date = null, days = null) => {
+    const params = new URLSearchParams();
+    if (date) params.append("date", date);
+    if (days) params.append("days", days);
+    return api.get(`/queue/scraped-stats/separate?${params.toString()}`);
+  },
+
   addSingleBrand: (data) => api.post("/queue/add-single", data),
 
   addBulkBrandsFromCSV: (file) => {
@@ -115,6 +122,8 @@ export const queueAPI = {
   getQueueManagementStats: () => api.get("/queue/queue-management/stats"),
 
   getScraperStatus: () => api.get("/queue/scraper/status"),
+  startScraper: () => api.post("/queue/scraper/start"),
+  stopScraper: () => api.post("/queue/scraper/stop"),
 
   changeBrandScore: (queueType, brandName, newScore) =>
     api.put(`/queue/change-score`, { queueType, brandName, newScore }),

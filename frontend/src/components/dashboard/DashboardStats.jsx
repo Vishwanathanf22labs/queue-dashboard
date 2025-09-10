@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Card from '../ui/Card';
-import { Clock, AlertTriangle, Play, Eye, List, XCircle } from 'lucide-react';
+import { Clock, AlertTriangle, Play, Eye, List, XCircle, BarChart3 } from 'lucide-react';
 
 const DashboardStats = ({ 
   pendingCount, 
@@ -257,7 +257,7 @@ const DashboardStats = ({
         <Card>
           <div className="flex items-center">
             <div className="p-2 sm:p-3 bg-indigo-100 rounded-lg">
-              <Eye className="h-5 w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8 text-indigo-600" />
+              <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8 text-indigo-600" />
             </div>
              <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
                <p className="text-xs sm:text-sm font-medium text-gray-600 break-words">Ads Processed</p>

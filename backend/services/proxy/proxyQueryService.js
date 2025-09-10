@@ -1,8 +1,8 @@
-const redis = require("../../config/redis");
+const { globalRedis } = require("../../config/redis");
 const logger = require("../../utils/logger");
 const { REDIS_KEYS } = require("../../config/constants");
 
-const PROXY_IPS_KEY = REDIS_KEYS.PROXY_IPS;
+const PROXY_IPS_KEY = REDIS_KEYS.GLOBAL.PROXY_IPS;
 
 /**
  * Get all proxies with pagination and filters
@@ -13,12 +13,12 @@ async function getProxies(page = 1, limit = 10, filter = "all", search = "") {
     const end = start + limit - 1;
     
     // Get all proxy keys
-    const proxyKeys = await redis.keys(`${PROXY_IPS_KEY}:*`);
+    const proxyKeys = await globalRedis.keys(`${PROXY_IPS_KEY}:*`);
     
     // Get all proxy data from hashes
     let allProxies = [];
     for (const key of proxyKeys) {
-      const proxyData = await redis.hgetall(key);
+      const proxyData = await globalRedis.hgetall(key);
       if (Object.keys(proxyData).length > 0) {
         // Parse the proxy key to extract IP, port, username, password
         const keyParts = key.split(':');
@@ -161,12 +161,12 @@ async function getProxies(page = 1, limit = 10, filter = "all", search = "") {
 async function getAvailableProxies() {
   try {
     // Get all proxy keys
-    const proxyKeys = await redis.keys(`${PROXY_IPS_KEY}:*`);
+    const proxyKeys = await globalRedis.keys(`${PROXY_IPS_KEY}:*`);
     
     // Get all proxy data from hashes
     const allProxies = [];
     for (const key of proxyKeys) {
-      const proxyData = await redis.hgetall(key);
+      const proxyData = await globalRedis.hgetall(key);
       if (Object.keys(proxyData).length > 0) {
         const keyParts = key.split(':');
         const proxy = {
@@ -224,12 +224,12 @@ async function getAvailableProxies() {
 async function getLastMonthProxies() {
   try {
     // Get all proxy keys
-    const proxyKeys = await redis.keys(`${PROXY_IPS_KEY}:*`);
+    const proxyKeys = await globalRedis.keys(`${PROXY_IPS_KEY}:*`);
     
     // Get all proxy data from hashes
     const allProxies = [];
     for (const key of proxyKeys) {
-      const proxyData = await redis.hgetall(key);
+      const proxyData = await globalRedis.hgetall(key);
       if (Object.keys(proxyData).length > 0) {
         const keyParts = key.split(':');
         const proxy = {
@@ -303,7 +303,7 @@ async function getLastMonthProxies() {
 async function getNextProxy() {
   try {
     // Get all proxy keys
-    const proxyKeys = await redis.keys(`${PROXY_IPS_KEY}:*`);
+    const proxyKeys = await globalRedis.keys(`${PROXY_IPS_KEY}:*`);
     
     if (proxyKeys.length === 0) {
       return {
@@ -316,7 +316,7 @@ async function getNextProxy() {
     // Get all proxy data from hashes
     const allProxies = [];
     for (const key of proxyKeys) {
-      const proxyData = await redis.hgetall(key);
+      const proxyData = await globalRedis.hgetall(key);
       if (Object.keys(proxyData).length > 0) {
         const keyParts = key.split(':');
         const proxy = {
@@ -357,7 +357,7 @@ async function getNextProxy() {
     const newSuccessCount = parseInt(bestProxy.successCount || 0) + 1;
 
     // Update in Redis hash
-    await redis.hset(bestProxy.id, {
+    await globalRedis.hset(bestProxy.id, {
       successCount: newSuccessCount.toString()
     });
 
@@ -411,13 +411,13 @@ async function getNextProxy() {
 async function getProxyStats() {
   try {
     // Get all proxy keys
-    const proxyKeys = await redis.keys(`${PROXY_IPS_KEY}:*`);
+    const proxyKeys = await globalRedis.keys(`${PROXY_IPS_KEY}:*`);
     const totalProxies = proxyKeys.length;
     
     // Get all proxy data from hashes
     const allProxies = [];
     for (const key of proxyKeys) {
-      const proxyData = await redis.hgetall(key);
+      const proxyData = await globalRedis.hgetall(key);
       if (Object.keys(proxyData).length > 0) {
         allProxies.push({
           id: key,
@@ -460,12 +460,12 @@ async function getProxyStats() {
 async function searchProxies(query, criteria = "all") {
   try {
     // Get all proxy keys
-    const proxyKeys = await redis.keys(`${PROXY_IPS_KEY}:*`);
+    const proxyKeys = await globalRedis.keys(`${PROXY_IPS_KEY}:*`);
     
     // Get all proxy data from hashes
     const allProxies = [];
     for (const key of proxyKeys) {
-      const proxyData = await redis.hgetall(key);
+      const proxyData = await globalRedis.hgetall(key);
       if (Object.keys(proxyData).length > 0) {
         const keyParts = key.split(':');
         const proxy = {
@@ -534,7 +534,7 @@ async function searchProxies(query, criteria = "all") {
  */
 async function getProxyManagementStats() {
   try {
-    const stats = await redis.hgetall(REDIS_KEYS.PROXY_STATS);
+    const stats = await globalRedis.hgetall(REDIS_KEYS.GLOBAL.PROXY_STATS);
     
     return {
       success: true,

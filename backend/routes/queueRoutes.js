@@ -22,6 +22,7 @@ router.get("/stats", queueController.getQueueStats);
 router.get("/brand-processing", queueController.getBrandProcessingQueue);
 router.get("/watchlist-brands", queueController.getWatchlistBrandsQueue);
 router.get("/scraped-stats", queueController.getBrandsScrapedStats);
+router.get("/scraped-stats/separate", queueController.getSeparateBrandsScrapedStats);
 
 // Brand search endpoint (READ operation - no auth required)
 router.get("/search-brands", queueController.searchBrands);
@@ -64,8 +65,10 @@ router.use("/queue-management", queueManagementRoutes);
 // Proxy Management Routes - Admin only
 router.use("/proxy", proxyManagementRoutes);
 
-// Scraper Status Route - Public (no auth required)
+// Scraper Control Routes - Admin only
 router.get('/scraper/status', scraperControlController.getScraperStatus);
+router.post('/scraper/start', adminAuth, scraperControlController.startScraper);
+router.post('/scraper/stop', adminAuth, scraperControlController.stopScraper);
 
 // Manual cleanup endpoint - Admin only (for testing/debugging)
 router.post('/cleanup-completed-brands', adminAuth, async (req, res) => {

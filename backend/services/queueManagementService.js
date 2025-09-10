@@ -1,26 +1,36 @@
 const queueClearService = require("./queueClearService");
 const queueMoveService = require("./queueMoveService");
 const queueRemoveService = require("./queueRemoveService");
-const redis = require("../config/redis");
-const { QUEUES } = require("../config/constants");
+const { getQueueRedis, getGlobalRedis } = require("../utils/redisSelector");
+const { QUEUES, REDIS_KEYS } = require("../config/constants");
 const logger = require("../utils/logger");
 const Brand = require("../models/Brand");
 
 async function getQueueStats() {
   try {
-    const pendingCount = await redis.zcard(QUEUES.PENDING_BRANDS);
-    const failedCount = await redis.llen(QUEUES.FAILED_BRANDS);
-    const watchlistPendingCount = await redis.zcard(QUEUES.WATCHLIST_PENDING);
-    const watchlistFailedCount = await redis.llen(QUEUES.WATCHLIST_FAILED);
+    // Get regular Redis instance
+    const regularRedis = getQueueRedis('regular');
+    const watchlistRedis = getQueueRedis('watchlist');
+    
+    // Get regular queue counts
+    const regularPendingCount = await regularRedis.zcard(REDIS_KEYS.REGULAR.PENDING_BRANDS);
+    const regularFailedCount = await regularRedis.llen(REDIS_KEYS.REGULAR.FAILED_BRANDS);
+    
+    // Get watchlist queue counts
+    const watchlistPendingCount = await watchlistRedis.zcard(REDIS_KEYS.WATCHLIST.PENDING_BRANDS);
+    const watchlistFailedCount = await watchlistRedis.llen(REDIS_KEYS.WATCHLIST.FAILED_BRANDS);
 
     return {
-      pending_count: pendingCount,
-      failed_count: failedCount,
+      // Regular queue stats
+      pending_count: regularPendingCount,
+      failed_count: regularFailedCount,
+      // Watchlist queue stats
       watchlist_pending_count: watchlistPendingCount,
       watchlist_failed_count: watchlistFailedCount,
+      // Combined stats
       total_count:
-        pendingCount +
-        failedCount +
+        regularPendingCount +
+        regularFailedCount +
         watchlistPendingCount +
         watchlistFailedCount,
       timestamp: new Date().toISOString(),
@@ -33,25 +43,29 @@ async function getQueueStats() {
 
 async function changeBrandScore(queueType, brandName, newScore) {
   try {
-    // Define queue configurations
+    // Define queue configurations with new Redis structure
     const queueConfigs = {
       pending: {
-        queueKey: QUEUES.PENDING_BRANDS,
+        redis: getQueueRedis('regular'),
+        queueKey: REDIS_KEYS.REGULAR.PENDING_BRANDS,
         type: "sortedSet",
-        description: "pending queue",
+        description: "regular pending queue",
       },
       failed: {
-        queueKey: QUEUES.FAILED_BRANDS,
+        redis: getQueueRedis('regular'),
+        queueKey: REDIS_KEYS.REGULAR.FAILED_BRANDS,
         type: "list",
-        description: "failed queue",
+        description: "regular failed queue",
       },
       watchlist_pending: {
-        queueKey: QUEUES.WATCHLIST_PENDING,
+        redis: getQueueRedis('watchlist'),
+        queueKey: REDIS_KEYS.WATCHLIST.PENDING_BRANDS,
         type: "sortedSet",
         description: "watchlist pending queue",
       },
       watchlist_failed: {
-        queueKey: QUEUES.WATCHLIST_FAILED,
+        redis: getQueueRedis('watchlist'),
+        queueKey: REDIS_KEYS.WATCHLIST.FAILED_BRANDS,
         type: "list",
         description: "watchlist failed queue",
       },
@@ -64,7 +78,7 @@ async function changeBrandScore(queueType, brandName, newScore) {
 
     if (config.type === "sortedSet") {
       // Handle sorted set queues (pending and watchlist_pending)
-      const allItems = await redis.zrange(config.queueKey, 0, -1, "WITHSCORES");
+      const allItems = await config.redis.zrange(config.queueKey, 0, -1, "WITHSCORES");
 
       let brandFound = false;
       for (let i = 0; i < allItems.length; i += 2) {
@@ -78,8 +92,8 @@ async function changeBrandScore(queueType, brandName, newScore) {
 
             if (brand && brand.name.toLowerCase() === brandName.toLowerCase()) {
               // Remove the old entry and add with new score
-              await redis.zrem(config.queueKey, member);
-              await redis.zadd(config.queueKey, newScore, member);
+              await config.redis.zrem(config.queueKey, member);
+              await config.redis.zadd(config.queueKey, newScore, member);
               brandFound = true;
               break;
             }
@@ -105,7 +119,7 @@ async function changeBrandScore(queueType, brandName, newScore) {
       };
     } else if (config.type === "list") {
       // Handle list queues (failed and watchlist_failed)
-      const allItems = await redis.lrange(config.queueKey, 0, -1);
+      const allItems = await config.redis.lrange(config.queueKey, 0, -1);
 
       let brandFound = false;
       let brandMember = null;
@@ -166,18 +180,18 @@ async function changeBrandScore(queueType, brandName, newScore) {
       }
 
       // Remove the brand from its current position
-      await redis.lrem(config.queueKey, 1, brandMember);
+      await config.redis.lrem(config.queueKey, 1, brandMember);
 
       // Insert the brand at the new position
       if (newIndex === 0) {
         // Insert at the beginning
-        await redis.lpush(config.queueKey, brandMember);
+        await config.redis.lpush(config.queueKey, brandMember);
       } else {
         // Get the updated items after removal
-        const updatedItems = await redis.lrange(config.queueKey, 0, -1);
+        const updatedItems = await config.redis.lrange(config.queueKey, 0, -1);
         if (newIndex - 1 < updatedItems.length) {
           // Insert after the element at newIndex-1
-          await redis.linsert(
+          await config.redis.linsert(
             config.queueKey,
             "AFTER",
             updatedItems[newIndex - 1],
@@ -185,7 +199,7 @@ async function changeBrandScore(queueType, brandName, newScore) {
           );
         } else {
           // Insert at the end
-          await redis.rpush(config.queueKey, brandMember);
+          await config.redis.rpush(config.queueKey, brandMember);
         }
       }
 

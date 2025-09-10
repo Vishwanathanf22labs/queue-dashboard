@@ -25,13 +25,14 @@ async function clearAllQueues(req, res) {
 
 async function clearPendingQueue(req, res) {
   try {
-    logger.info("Clear pending queue request received");
+    const { queueType = 'regular' } = req.query;
+    logger.info(`Clear ${queueType} pending queue request received`);
 
-    const result = await queueManagementService.clearPendingQueue();
+    const result = await queueManagementService.clearPendingQueue(queueType);
 
     res.status(200).json({
       success: true,
-      message: "Pending queue cleared successfully",
+      message: `${queueType} pending queue cleared successfully`,
       data: result,
       timestamp: new Date().toISOString(),
     });
@@ -47,13 +48,14 @@ async function clearPendingQueue(req, res) {
 
 async function clearFailedQueue(req, res) {
   try {
-    logger.info("Clear failed queue request received");
+    const { queueType = 'regular' } = req.query;
+    logger.info(`Clear ${queueType} failed queue request received`);
 
-    const result = await queueManagementService.clearFailedQueue();
+    const result = await queueManagementService.clearFailedQueue(queueType);
 
     res.status(200).json({
       success: true,
-      message: "Failed queue cleared successfully",
+      message: `${queueType} failed queue cleared successfully`,
       data: result,
       timestamp: new Date().toISOString(),
     });
@@ -70,15 +72,17 @@ async function clearFailedQueue(req, res) {
 async function movePendingToFailed(req, res) {
   try {
     const { id } = req.params;
-    logger.info(`Move pending to failed request received for queue ID: ${id}`);
+    const { queueType = 'regular' } = req.query;
+    logger.info(`Move ${queueType} pending to failed request received for queue ID: ${id}`);
 
     const result = await queueManagementService.movePendingToFailed(
-      parseInt(id)
+      parseInt(id),
+      queueType
     );
 
     res.status(200).json({
       success: true,
-      message: "Brand moved from pending to failed queue successfully",
+      message: `Brand moved from ${queueType} pending to failed queue successfully`,
       data: result,
       timestamp: new Date().toISOString(),
     });
@@ -95,15 +99,17 @@ async function movePendingToFailed(req, res) {
 async function moveFailedToPending(req, res) {
   try {
     const { id } = req.params;
-    logger.info(`Move failed to pending request received for brand ID: ${id}`);
+    const { queueType = 'regular' } = req.query;
+    logger.info(`Move ${queueType} failed to pending request received for brand ID: ${id}`);
 
     const result = await queueManagementService.moveFailedToPending(
-      parseInt(id)
+      parseInt(id),
+      queueType
     );
 
     res.status(200).json({
       success: true,
-      message: "Brand moved from failed to pending queue successfully",
+      message: `Brand moved from ${queueType} failed to pending queue successfully`,
       data: result,
       timestamp: new Date().toISOString(),
     });
@@ -120,15 +126,17 @@ async function moveFailedToPending(req, res) {
 async function removePendingBrand(req, res) {
   try {
     const { id } = req.params;
-    logger.info(`Remove pending brand request received for brand ID: ${id}`);
+    const { queueType = 'regular' } = req.query;
+    logger.info(`Remove ${queueType} pending brand request received for brand ID: ${id}`);
 
     const result = await queueManagementService.removePendingBrand(
-      parseInt(id)
+      parseInt(id),
+      queueType
     );
 
     res.status(200).json({
       success: true,
-      message: "Brand removed from pending queue successfully",
+      message: `Brand removed from ${queueType} pending queue successfully`,
       data: result,
       timestamp: new Date().toISOString(),
     });
@@ -145,13 +153,14 @@ async function removePendingBrand(req, res) {
 async function removeFailedBrand(req, res) {
   try {
     const { id } = req.params;
-    logger.info(`Remove failed brand request received for brand ID: ${id}`);
+    const { queueType = 'regular' } = req.query;
+    logger.info(`Remove ${queueType} failed brand request received for brand ID: ${id}`);
 
-    const result = await queueManagementService.removeFailedBrand(parseInt(id));
+    const result = await queueManagementService.removeFailedBrand(parseInt(id), queueType);
 
     res.status(200).json({
       success: true,
-      message: "Brand removed from failed queue successfully",
+      message: `Brand removed from ${queueType} failed queue successfully`,
       data: result,
       timestamp: new Date().toISOString(),
     });

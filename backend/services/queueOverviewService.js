@@ -1,14 +1,15 @@
-const redis = require("../config/redis");
+const { getQueueRedis, getGlobalRedis } = require("../utils/redisSelector");
 const Brand = require("../models/Brand");
 const logger = require("../utils/logger");
-const { QUEUES } = require("../config/constants");
+const { QUEUES, REDIS_KEYS } = require("../config/constants");
 const watchlistRedisService = require("./watchlistRedisService");
-const WatchList = require("../models/WatchList"); // Added import for WatchList
+const WatchList = require("../models/WatchList");
 
 // Cleanup function to remove completed/failed brands from currently processing queue
 async function cleanupCompletedBrands() {
   try {
-    const currentlyProcessingBrands = await redis.lrange(QUEUES.CURRENTLY_PROCESSING, 0, -1);
+    const globalRedis = getGlobalRedis();
+    const currentlyProcessingBrands = await globalRedis.lrange(REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING, 0, -1);
     
     if (!currentlyProcessingBrands || currentlyProcessingBrands.length === 0) {
       return;
@@ -24,7 +25,7 @@ async function cleanupCompletedBrands() {
         
         // Keep only brands that are actively processing (not completed or failed)
         if (status && (status === 'complete' || status === 'failed' || status === 'error')) {
-          logger.info(`Cleanup: Removing ${status} brand ${processingData.brandId} from ${QUEUES.CURRENTLY_PROCESSING} Redis key`);
+          logger.info(`Cleanup: Removing ${status} brand ${processingData.brandId} from ${REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING} Redis key`);
           removedCount++;
         } else {
           // Keep this brand in the list (processing, active, etc.)
@@ -40,11 +41,11 @@ async function cleanupCompletedBrands() {
     // If we removed any brands, update the Redis key
     if (removedCount > 0) {
       // Clear the current list
-      await redis.del(QUEUES.CURRENTLY_PROCESSING);
+      await globalRedis.del(REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING);
       
       // Add back only the brands to keep
       if (brandsToKeep.length > 0) {
-        await redis.rpush(QUEUES.CURRENTLY_PROCESSING, ...brandsToKeep);
+        await globalRedis.rpush(REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING, ...brandsToKeep);
       }
       
       logger.info(`Cleanup completed: removed ${removedCount} completed/failed brands, kept ${brandsToKeep.length} active brands`);
@@ -87,10 +88,17 @@ startCleanupInterval();
 
 async function getQueueOverview() {
   try {
-    const pendingCount = await redis.zcard(QUEUES.PENDING_BRANDS);
-
-    // Use same Redis approach as pending count for consistency
-    const failedCount = await redis.llen(QUEUES.FAILED_BRANDS);
+    // Get regular Redis instance
+    const regularRedis = getQueueRedis('regular');
+    const watchlistRedis = getQueueRedis('watchlist');
+    
+    // Get regular queue counts
+    const regularPendingCount = await regularRedis.zcard(REDIS_KEYS.REGULAR.PENDING_BRANDS);
+    const regularFailedCount = await regularRedis.llen(REDIS_KEYS.REGULAR.FAILED_BRANDS);
+    
+    // Get watchlist queue counts
+    const watchlistPendingCount = await watchlistRedis.zcard(REDIS_KEYS.WATCHLIST.PENDING_BRANDS);
+    const watchlistFailedCount = await watchlistRedis.llen(REDIS_KEYS.WATCHLIST.FAILED_BRANDS);
 
     let activeBrandsCount = 0;
     try {
@@ -102,8 +110,6 @@ async function getQueueOverview() {
       logger.error("Error counting active brands from database:", dbError);
       activeBrandsCount = 0;
     }
-
-
 
     const currentlyProcessing = await getCurrentlyProcessing();
 
@@ -121,9 +127,13 @@ async function getQueueOverview() {
 
     return {
       queue_counts: {
-        pending: pendingCount,
-        failed: failedCount,
+        // Regular queue counts
+        pending: regularPendingCount,
+        failed: regularFailedCount,
         active: activeBrandsCount,
+        // Watchlist queue counts
+        watchlist_pending: watchlistPendingCount,
+        watchlist_failed: watchlistFailedCount,
       },
       currently_processing: currentlyProcessing,
       watchlist_stats: watchlistStats,
@@ -137,7 +147,8 @@ async function getQueueOverview() {
 async function getCurrentlyProcessing() {
   try {
     // Get ALL currently processing brands from Redis key (cleanup runs automatically every 5 minutes)
-    const currentlyProcessingBrands = await redis.lrange(QUEUES.CURRENTLY_PROCESSING, 0, -1);
+    const globalRedis = getGlobalRedis();
+    const currentlyProcessingBrands = await globalRedis.lrange(REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING, 0, -1);
     
     if (!currentlyProcessingBrands || currentlyProcessingBrands.length === 0) {
       return null;
@@ -235,9 +246,17 @@ async function getCurrentlyProcessing() {
 
 async function getQueueStatistics() {
   try {
-    const pendingCount = await redis.zcard(QUEUES.PENDING_BRANDS);
-
-    const failedCount = await redis.llen(QUEUES.FAILED_BRANDS);
+    // Get regular Redis instance
+    const regularRedis = getQueueRedis('regular');
+    const watchlistRedis = getQueueRedis('watchlist');
+    
+    // Get regular queue counts
+    const regularPendingCount = await regularRedis.zcard(REDIS_KEYS.REGULAR.PENDING_BRANDS);
+    const regularFailedCount = await regularRedis.llen(REDIS_KEYS.REGULAR.FAILED_BRANDS);
+    
+    // Get watchlist queue counts
+    const watchlistPendingCount = await watchlistRedis.zcard(REDIS_KEYS.WATCHLIST.PENDING_BRANDS);
+    const watchlistFailedCount = await watchlistRedis.llen(REDIS_KEYS.WATCHLIST.FAILED_BRANDS);
 
     const activeBrandsCount = await Brand.count({
       where: { status: "Active" },
@@ -247,9 +266,18 @@ async function getQueueStatistics() {
 
     return {
       queue_stats: {
-        pending_count: pendingCount,
-        failed_count: failedCount,
-        total_queued: pendingCount + failedCount,
+        // Regular queue stats
+        pending_count: regularPendingCount,
+        failed_count: regularFailedCount,
+        total_queued: regularPendingCount + regularFailedCount,
+        // Watchlist queue stats
+        watchlist_pending_count: watchlistPendingCount,
+        watchlist_failed_count: watchlistFailedCount,
+        watchlist_total_queued: watchlistPendingCount + watchlistFailedCount,
+        // Combined stats
+        total_pending: regularPendingCount + watchlistPendingCount,
+        total_failed: regularFailedCount + watchlistFailedCount,
+        total_queued_all: regularPendingCount + regularFailedCount + watchlistPendingCount + watchlistFailedCount,
       },
       brand_stats: {
         total_brands: totalBrandsCount,

@@ -27,6 +27,17 @@ async function addBulkBrandsFromCSV(req, res) {
       });
     }
 
+    // Get queueType from query params or body
+    const { queueType = 'regular' } = req.query || req.body;
+
+    // Validate queueType
+    if (!['regular', 'watchlist'].includes(queueType)) {
+      return res.status(400).json({
+        success: false,
+        message: "queueType must be 'regular' or 'watchlist'"
+      });
+    }
+
     // Parse CSV content
     const csvContent = req.file.buffer.toString("utf-8");
     const lines = csvContent.split("\n").filter((line) => line.trim());
@@ -59,7 +70,7 @@ async function addBulkBrandsFromCSV(req, res) {
     }
 
     // Add brands to queue
-    const result = await queueService.addBulkBrandsToQueue(brands);
+    const result = await queueService.addBulkBrandsToQueue(brands, queueType);
 
     // Debug logging to see the actual result structure
     logger.info('CSV Upload Result Structure:', JSON.stringify(result, null, 2));
@@ -120,7 +131,7 @@ async function addBulkBrandsFromCSV(req, res) {
     // Build appropriate message based on results
     let message = "";
     if (totalAdded > 0) {
-      message = `${totalAdded} brands added to pending queue`;
+      message = `${totalAdded} brands added to ${queueType} pending queue`;
       if (duplicates > 0) {
         message += `, ${duplicates} already in queue`;
       }
@@ -128,11 +139,11 @@ async function addBulkBrandsFromCSV(req, res) {
         message += `, ${totalErrors} failed`;
       }
     } else if (duplicates > 0) {
-      message = `All brands already in queue (${duplicates} found)`;
+      message = `All brands already in ${queueType} queue (${duplicates} found)`;
     } else if (totalErrors > 0) {
       message = `No brands added: ${totalErrors} failed`;
     } else {
-      message = "No brands added to queue";
+      message = `No brands added to ${queueType} queue`;
     }
 
     res.status(201).json({
@@ -149,6 +160,7 @@ async function addBulkBrandsFromCSV(req, res) {
         },
         results: result.results || result,
       },
+      queue_type: result.queue_type || queueType,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

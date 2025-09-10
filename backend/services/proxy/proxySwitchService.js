@@ -1,8 +1,8 @@
-const redis = require("../../config/redis");
+const { globalRedis } = require("../../config/redis");
 const logger = require("../../utils/logger");
 const { REDIS_KEYS } = require("../../config/constants");
 
-const PROXY_IPS_KEY = REDIS_KEYS.PROXY_IPS;
+const PROXY_IPS_KEY = REDIS_KEYS.GLOBAL.PROXY_IPS;
 
 /**
  * Auto-switch to next working proxy when current fails
@@ -54,7 +54,7 @@ async function switchToNextWorkingProxy(failedProxyKey) {
 async function getNextAvailableProxy() {
   try {
     // Get all proxy keys
-    const proxyKeys = await redis.keys(`${PROXY_IPS_KEY}:*`);
+    const proxyKeys = await globalRedis.keys(`${PROXY_IPS_KEY}:*`);
     
     if (proxyKeys.length === 0) {
       return {
@@ -67,7 +67,7 @@ async function getNextAvailableProxy() {
     // Get all proxy data from hashes
     const allProxies = [];
     for (const key of proxyKeys) {
-      const proxyData = await redis.hgetall(key);
+      const proxyData = await globalRedis.hgetall(key);
       if (Object.keys(proxyData).length > 0) {
         const keyParts = key.split(':');
         const proxy = {
@@ -109,7 +109,7 @@ async function getNextAvailableProxy() {
     const newSuccessCount = parseInt(bestProxy.successCount || 0) + 1;
 
     // Update in Redis hash
-    await redis.hset(bestProxy.id, {
+    await globalRedis.hset(bestProxy.id, {
       successCount: newSuccessCount.toString()
     });
 
@@ -168,12 +168,12 @@ function calculateProxyScore(proxy) {
 async function getProxyRotationHistory() {
   try {
     // Get all proxy keys
-    const proxyKeys = await redis.keys(`${PROXY_IPS_KEY}:*`);
+    const proxyKeys = await globalRedis.keys(`${PROXY_IPS_KEY}:*`);
     
     // Get all proxy data from hashes
     const allProxies = [];
     for (const key of proxyKeys) {
-      const proxyData = await redis.hgetall(key);
+      const proxyData = await globalRedis.hgetall(key);
       if (Object.keys(proxyData).length > 0) {
         const keyParts = key.split(':');
         const proxy = {
@@ -233,7 +233,7 @@ async function getProxyRotationHistory() {
 async function forceRotateToProxy(targetProxyKey) {
   try {
     // Check if target proxy exists
-    const targetProxy = await redis.hgetall(targetProxyKey);
+    const targetProxy = await globalRedis.hgetall(targetProxyKey);
     
     if (Object.keys(targetProxy).length === 0) {
       return {
@@ -255,7 +255,7 @@ async function forceRotateToProxy(targetProxyKey) {
     const newSuccessCount = parseInt(targetProxy.successCount || 0) + 1;
     
     // Update in Redis hash
-    await redis.hset(targetProxyKey, {
+    await globalRedis.hset(targetProxyKey, {
       successCount: newSuccessCount.toString()
     });
     
@@ -292,7 +292,7 @@ async function forceRotateToProxy(targetProxyKey) {
 async function getFailoverRecommendations() {
   try {
     // Get all proxy keys
-    const proxyKeys = await redis.keys(`${PROXY_IPS_KEY}:*`);
+    const proxyKeys = await globalRedis.keys(`${PROXY_IPS_KEY}:*`);
     
     const recommendations = {
       critical: [], // Proxies that need immediate attention
@@ -302,7 +302,7 @@ async function getFailoverRecommendations() {
     
     // Get all proxy data from hashes
     for (const key of proxyKeys) {
-      const proxyData = await redis.hgetall(key);
+      const proxyData = await globalRedis.hgetall(key);
       if (Object.keys(proxyData).length > 0) {
         const keyParts = key.split(':');
         const failCount = parseInt(proxyData.failCount || 0);
@@ -392,7 +392,7 @@ function calculateHealthScore(failCount, successCount, isActive) {
 async function updateProxyStatus(proxyKey, isWorking) {
   try {
     // Check if proxy exists
-    const existingProxy = await redis.hgetall(proxyKey);
+    const existingProxy = await globalRedis.hgetall(proxyKey);
     if (Object.keys(existingProxy).length === 0) {
       return {
         success: false,
@@ -407,7 +407,7 @@ async function updateProxyStatus(proxyKey, isWorking) {
     };
 
     // Update in Redis hash
-    await redis.hset(proxyKey, updateFields);
+    await globalRedis.hset(proxyKey, updateFields);
     
     return {
       success: true,

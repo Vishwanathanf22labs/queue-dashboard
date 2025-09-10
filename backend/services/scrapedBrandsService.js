@@ -128,31 +128,25 @@ class ScrapedBrandsService {
       const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
       const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1);
 
+      // Check if query is numeric for brand_id search
+      const isNumericQuery = !isNaN(query) && !isNaN(parseInt(query));
+      
+      // Build where clause based on query type
+      let whereClause = {
+        started_at: {
+          [Op.gte]: startOfDay,
+          [Op.lt]: endOfDay
+        }
+      };
+      
+      // If query is numeric, search by brand_id
+      if (isNumericQuery) {
+        whereClause.brand_id = parseInt(query);
+      }
+
       // Search across all pages using Sequelize ORM
       const searchResults = await BrandsDailyStatus.findAll({
-        where: {
-          started_at: {
-            [Op.gte]: startOfDay,
-            [Op.lt]: endOfDay
-          },
-          [Op.or]: [
-            {
-              '$brand.actual_name$': {
-                [Op.iLike]: `%${query}%`
-              }
-            },
-            {
-              '$brand.name$': {
-                [Op.iLike]: `%${query}%`
-              }
-            },
-            {
-              brand_id: {
-                [Op.like]: `%${query}%`
-              }
-            }
-          ]
-        },
+        where: whereClause,
         include: [
           {
             model: Brand,
@@ -162,7 +156,21 @@ class ScrapedBrandsService {
               'name',
               'actual_name'
             ],
-            required: true
+            required: true,
+            where: isNumericQuery ? {} : {
+              [Op.or]: [
+                {
+                  actual_name: {
+                    [Op.iLike]: `%${query}%`
+                  }
+                },
+                {
+                  name: {
+                    [Op.iLike]: `%${query}%`
+                  }
+                }
+              ]
+            }
           }
         ],
         attributes: [
