@@ -56,18 +56,21 @@ const PipelineStatusPage = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Memoize filtered brands
+  // Memoize filtered brands (sorting is now done at backend level)
   const filteredBrands = useMemo(() => {
-    if (!debouncedSearchTerm.trim()) {
-      return data.brands;
+    const brands = data.brands || [];
+    
+    // Filter by search term
+    if (debouncedSearchTerm.trim()) {
+      const lowerSearchTerm = debouncedSearchTerm.toLowerCase();
+      return brands.filter(brand =>
+        brand.brandName?.toLowerCase().includes(lowerSearchTerm) ||
+        brand.brandId?.toString().includes(debouncedSearchTerm) ||
+        brand.pageId?.toLowerCase().includes(lowerSearchTerm)
+      );
     }
-
-    const lowerSearchTerm = debouncedSearchTerm.toLowerCase();
-    return data.brands.filter(brand =>
-      brand.brandName?.toLowerCase().includes(lowerSearchTerm) ||
-      brand.brandId?.toString().includes(debouncedSearchTerm) ||
-      brand.pageId?.toLowerCase().includes(lowerSearchTerm)
-    );
+    
+    return brands;
   }, [data.brands, debouncedSearchTerm]);
 
   // Memoize API call to prevent unnecessary calls
@@ -262,7 +265,17 @@ const PipelineStatusPage = () => {
   const getProgressIndicator = useCallback((completed, total, status) => {
     if (total === 0) return null;
 
-    const percentage = Math.round((completed / total) * 100);
+    // For COMPLETED status, show 100% progress regardless of URL completion
+    let displayCompleted = completed;
+    let displayTotal = total;
+    let percentage = Math.round((completed / total) * 100);
+    
+    if (status === 'COMPLETED') {
+      displayCompleted = total; // Show all files as completed
+      displayTotal = total;
+      percentage = 100;
+    }
+
     let colorClass = 'bg-gray-200';
 
     if (status === 'COMPLETED') {
@@ -282,7 +295,7 @@ const PipelineStatusPage = () => {
           />
         </div>
         <span className="text-xs text-gray-500 min-w-0">
-          {completed}/{total} ({percentage}%)
+          {displayCompleted}/{displayTotal} ({percentage}%)
         </span>
       </div>
     );
@@ -290,10 +303,19 @@ const PipelineStatusPage = () => {
 
   // Memoize brand card component to prevent unnecessary re-renders
   const BrandCard = React.memo(({ brand }) => (
-    <Card key={brand.brandId} className="hover:shadow-lg transition-shadow duration-200">
+    <Card key={brand.brandId} className="hover:shadow-lg transition-shadow duration-200 relative">
+      {/* Watchlist Badge - Top Left Corner */}
+      {brand.isWatchlist && (
+        <div className="absolute top-3 left-3 z-10">
+          <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">
+            Watchlist
+          </span>
+        </div>
+      )}
+      
       {/* Brand Header */}
       <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
+        <div className="flex-1" style={{ paddingTop: brand.isWatchlist ? '32px' : '0' }}>
           <h3 className="text-lg font-semibold text-gray-900 truncate">
             {brand.brandName || 'Unknown Brand'}
           </h3>
@@ -399,7 +421,10 @@ const PipelineStatusPage = () => {
             {brand.fileUpload?.totalMedia > 0 && (
               <div className="space-y-1">
                 <p className="text-xs text-gray-400">
-                  {brand.fileUpload.mediaWithAllUrls}/{brand.fileUpload.totalMedia} files
+                  {brand.fileUpload?.status === 'COMPLETED' 
+                    ? `${brand.fileUpload.totalMedia}/${brand.fileUpload.totalMedia} files`
+                    : `${brand.fileUpload.mediaWithAllUrls}/${brand.fileUpload.totalMedia} files`
+                  }
                 </p>
                 {/* FIXED: Show queue and failed counts */}
                 {(brand.fileUpload?.mediaInQueue > 0 || brand.fileUpload?.mediaFailed > 0) && (

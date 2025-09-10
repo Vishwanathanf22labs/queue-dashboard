@@ -1,11 +1,13 @@
-const redis = require("../config/redis");
+const { getQueueRedis, getGlobalRedis } = require("../utils/redisSelector");
 const Brand = require("../models/Brand");
 const logger = require("../utils/logger");
-const { QUEUES, BATCH_SIZE } = require("../config/constants");
+const { QUEUES, BATCH_SIZE, REDIS_KEYS } = require("../config/constants");
 const { Op } = require("sequelize");
 
-async function getExistingPageIds() {
-  const existingItems = await redis.zrange(QUEUES.PENDING_BRANDS, 0, -1, 'WITHSCORES');
+async function getExistingPageIds(queueType = 'regular') {
+  const redis = getQueueRedis(queueType);
+  const queueKey = REDIS_KEYS[queueType.toUpperCase()].PENDING_BRANDS;
+  const existingItems = await redis.zrange(queueKey, 0, -1, 'WITHSCORES');
   const existingPageIds = new Set();
 
   // existingItems is [member1, score1, member2, score2, ...]
@@ -24,7 +26,7 @@ async function getExistingPageIds() {
   return existingPageIds;
 }
 
-async function addSingleBrandToQueue(brandData) {
+async function addSingleBrandToQueue(brandData, queueType = 'regular') {
   try {
     const { id, page_id, score } = brandData;
 
@@ -40,12 +42,12 @@ async function addSingleBrandToQueue(brandData) {
       throw new Error(`Brand with page_id ${page_id} not found in database`);
     }
 
-    const existingPageIds = await getExistingPageIds();
+    const existingPageIds = await getExistingPageIds(queueType);
     const alreadyExists = existingPageIds.has(page_id);
 
     if (alreadyExists) {
       throw new Error(
-        `Brand with page_id ${page_id} already exists in pending queue`
+        `Brand with page_id ${page_id} already exists in ${queueType} pending queue`
       );
     }
 
@@ -53,28 +55,33 @@ async function addSingleBrandToQueue(brandData) {
       id,
       page_id
     });
+    
+    const redis = getQueueRedis(queueType);
+    const queueKey = REDIS_KEYS[queueType.toUpperCase()].PENDING_BRANDS;
+    
     // Use pipeline for consistency, even for single item
     const pipeline = redis.pipeline();
     // Add to sorted set with user-provided score (or default to 0)
     const queueScore = score !== undefined && score !== null ? score : 0;
-    logger.info(`Adding brand to pending queue: ${JSON.stringify({ id, page_id, score: queueScore, queueItem })}`);
-    pipeline.zadd(QUEUES.PENDING_BRANDS, queueScore, queueItem);
+    logger.info(`Adding brand to ${queueType} pending queue: ${JSON.stringify({ id, page_id, score: queueScore, queueItem })}`);
+    pipeline.zadd(queueKey, queueScore, queueItem);
     await pipeline.exec();
 
-    logger.info(`Added single brand to queue: ${page_id}`);
+    logger.info(`Added single brand to ${queueType} queue: ${page_id}`);
 
     return {
       success: true,
-      message: "Brand added to pending queue successfully",
+      message: `Brand added to ${queueType} pending queue successfully`,
       brand: { id, page_id },
+      queue_type: queueType,
     };
   } catch (error) {
-    logger.error("Error in addSingleBrandToQueue:", error);
+    logger.error(`Error in addSingleBrandToQueue (${queueType}):`, error);
     throw error;
   }
 }
 
-async function addBulkBrandsFromCSVToQueue(brandsData) {
+async function addBulkBrandsFromCSVToQueue(brandsData, queueType = 'regular') {
   try {
     if (!Array.isArray(brandsData) || brandsData.length === 0) {
       throw new Error("brandsData must be a non-empty array");
@@ -86,7 +93,7 @@ async function addBulkBrandsFromCSVToQueue(brandsData) {
       skipped: [],
     };
 
-    const existingPageIds = await getExistingPageIds();
+    const existingPageIds = await getExistingPageIds(queueType);
 
     const pageIds = brandsData.map((b) => b.page_id);
     const existingBrands = await Brand.findAll({
@@ -97,6 +104,8 @@ async function addBulkBrandsFromCSVToQueue(brandsData) {
 
     const existingPageIdsInDB = new Set(existingBrands.map((b) => b.page_id));
 
+    const redis = getQueueRedis(queueType);
+    const queueKey = REDIS_KEYS[queueType.toUpperCase()].PENDING_BRANDS;
     const pipeline = redis.pipeline();
     let addedCount = 0;
 
@@ -115,7 +124,7 @@ async function addBulkBrandsFromCSVToQueue(brandsData) {
         if (existingPageIds.has(page_id)) {
           results.skipped.push({
             brand: brandData,
-            reason: "Already exists in pending queue",
+            reason: `Already exists in ${queueType} pending queue`,
           });
           continue;
         }
@@ -134,7 +143,7 @@ async function addBulkBrandsFromCSVToQueue(brandsData) {
         });
         // Add to sorted set with user-provided score (or default to 0)
         const queueScore = score !== undefined && score !== null ? parseFloat(score) : 0;
-        pipeline.zadd(QUEUES.PENDING_BRANDS, queueScore, queueItem);
+        pipeline.zadd(queueKey, queueScore, queueItem);
 
         existingPageIds.add(page_id);
         results.success.push({ id, page_id });
@@ -153,12 +162,12 @@ async function addBulkBrandsFromCSVToQueue(brandsData) {
     }
 
     logger.info(
-      `Bulk add completed: ${results.success.length} success, ${results.failed.length} failed, ${results.skipped.length} skipped`
+      `Bulk add completed (${queueType}): ${results.success.length} success, ${results.failed.length} failed, ${results.skipped.length} skipped`
     );
 
     return {
       success: true,
-      message: "Bulk operation completed",
+      message: `Bulk operation completed for ${queueType} queue`,
       results: {
         total_processed: brandsData.length,
         success_count: results.success.length,
@@ -166,14 +175,15 @@ async function addBulkBrandsFromCSVToQueue(brandsData) {
         skipped_count: results.skipped.length,
         details: results,
       },
+      queue_type: queueType,
     };
   } catch (error) {
-    logger.error("Error in addBulkBrandsToQueue:", error);
+    logger.error(`Error in addBulkBrandsToQueue (${queueType}):`, error);
     throw error;
   }
 }
 
-async function addAllBrandsToQueue(statusFilter = null) {
+async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular') {
   try {
     // Build where clause
     const whereClause = {
@@ -202,16 +212,19 @@ async function addAllBrandsToQueue(statusFilter = null) {
           added_count: 0,
           skipped_count: 0,
         },
+        queue_type: queueType,
       };
     }
 
-    const existingPageIds = await getExistingPageIds();
+    const existingPageIds = await getExistingPageIds(queueType);
 
     let addedCount = 0;
     let skippedCount = 0;
 
     const batchSize = BATCH_SIZE;
     const totalBrands = allBrands.length;
+    const redis = getQueueRedis(queueType);
+    const queueKey = REDIS_KEYS[queueType.toUpperCase()].PENDING_BRANDS;
 
     for (let i = 0; i < totalBrands; i += batchSize) {
       const batch = allBrands.slice(i, i + batchSize);
@@ -225,7 +238,7 @@ async function addAllBrandsToQueue(statusFilter = null) {
           });
           // Add to sorted set with default score 0 (normal priority)
           const defaultScore = 0;
-          pipeline.zadd(QUEUES.PENDING_BRANDS, defaultScore, queueItem);
+          pipeline.zadd(queueKey, defaultScore, queueItem);
           existingPageIds.add(brand.page_id);
           addedCount++;
         } else {
@@ -237,20 +250,21 @@ async function addAllBrandsToQueue(statusFilter = null) {
     }
 
     logger.info(
-      `Added ${statusFilter ? statusFilter.toLowerCase() : 'all'} brands to queue: ${addedCount} added, ${skippedCount} skipped`
+      `Added ${statusFilter ? statusFilter.toLowerCase() : 'all'} brands to ${queueType} queue: ${addedCount} added, ${skippedCount} skipped`
     );
 
     return {
       success: true,
-      message: `${statusFilter ? statusFilter : 'All'} brands operation completed`,
+      message: `${statusFilter ? statusFilter : 'All'} brands operation completed for ${queueType} queue`,
       results: {
         total_brands: totalBrands,
         added_count: addedCount,
         skipped_count: skippedCount,
       },
+      queue_type: queueType,
     };
   } catch (error) {
-    logger.error("Error in addAllBrandsToQueue:", error);
+    logger.error(`Error in addAllBrandsToQueue (${queueType}):`, error);
     throw error;
   }
 }

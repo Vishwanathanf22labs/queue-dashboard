@@ -1,12 +1,14 @@
-const redis = require("../config/redis");
+const { getQueueRedis, getGlobalRedis } = require("../utils/redisSelector");
 const logger = require("../utils/logger");
-const { QUEUES } = require("../config/constants");
+const { QUEUES, REDIS_KEYS } = require("../config/constants");
 
-async function removePendingBrand(brandId) {
+async function removePendingBrand(brandId, queueType = 'regular') {
   try {
-    logger.info(`Removing brand with ID ${brandId} from pending queue`);
+    logger.info(`Removing brand with ID ${brandId} from ${queueType} pending queue`);
 
-    const pendingBrands = await redis.zrange(QUEUES.PENDING_BRANDS, 0, -1, 'WITHSCORES');
+    const redis = getQueueRedis(queueType);
+    const queueKey = REDIS_KEYS[queueType.toUpperCase()].PENDING_BRANDS;
+    const pendingBrands = await redis.zrange(queueKey, 0, -1, 'WITHSCORES');
 
     let brandToRemove = null;
     let brandMember = null;
@@ -38,21 +40,22 @@ async function removePendingBrand(brandId) {
     }
 
     if (!brandMember) {
-      throw new Error(`Brand with ID ${brandId} not found in pending queue`);
+      throw new Error(`Brand with ID ${brandId} not found in ${queueType} pending queue`);
     }
 
-    await redis.zrem(QUEUES.PENDING_BRANDS, brandMember);
+    await redis.zrem(queueKey, brandMember);
 
     logger.info(
       `Successfully removed brand ${
         brandToRemove?.brand_name || brandId
-      } from pending queue`
+      } from ${queueType} pending queue`
     );
 
     return {
       removed_brand: brandToRemove,
       brand_id: brandId,
-      message: "Brand removed from pending queue successfully",
+      queue_type: queueType,
+      message: `Brand removed from ${queueType} pending queue successfully`,
     };
   } catch (error) {
     logger.error(`Error removing brand from pending queue:`, error);
@@ -60,11 +63,13 @@ async function removePendingBrand(brandId) {
   }
 }
 
-async function removeFailedBrand(brandId) {
+async function removeFailedBrand(brandId, queueType = 'regular') {
   try {
-    logger.info(`Removing brand with ID ${brandId} from failed queue`);
+    logger.info(`Removing brand with ID ${brandId} from ${queueType} failed queue`);
 
-    const failedBrands = await redis.lrange(QUEUES.FAILED_BRANDS, 0, -1);
+    const redis = getQueueRedis(queueType);
+    const queueKey = REDIS_KEYS[queueType.toUpperCase()].FAILED_BRANDS;
+    const failedBrands = await redis.lrange(queueKey, 0, -1);
 
     let brandToRemove = null;
     let brandIndex = -1;
@@ -90,21 +95,22 @@ async function removeFailedBrand(brandId) {
     }
 
     if (brandIndex === -1) {
-      throw new Error(`Brand with ID ${brandId} not found in failed queue`);
+      throw new Error(`Brand with ID ${brandId} not found in ${queueType} failed queue`);
     }
 
-    await redis.lrem(QUEUES.FAILED_BRANDS, 1, failedBrands[brandIndex]);
+    await redis.lrem(queueKey, 1, failedBrands[brandIndex]);
 
     logger.info(
       `Successfully removed brand ${
         brandToRemove?.brand_name || brandId
-      } from failed queue`
+      } from ${queueType} failed queue`
     );
 
     return {
       removed_brand: brandToRemove,
       brand_id: brandId,
-      message: "Brand removed from failed queue successfully",
+      queue_type: queueType,
+      message: `Brand removed from ${queueType} failed queue successfully`,
     };
   } catch (error) {
     logger.error(`Error removing brand from failed queue:`, error);

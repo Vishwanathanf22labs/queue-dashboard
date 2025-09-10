@@ -3,7 +3,7 @@ import LoadingState from '../components/ui/LoadingState';
 import ErrorDisplay from '../components/ui/ErrorDisplay';
 import Button from '../components/ui/Button';
 import toast from 'react-hot-toast';
-import ScrapedStats from '../components/queue/ScrapedStats';
+import SeparateScrapedStats from '../components/queue/SeparateScrapedStats';
 import BrandProcessingQueue from '../components/queue/BrandProcessingQueue';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardStats from '../components/dashboard/DashboardStats';
@@ -22,13 +22,13 @@ const Dashboard = () => {
     nextWatchlistBrand,
     loading,
     error,
-    scrapedStats,
+    separateScrapedStats,
     fetchOverview,
     fetchNextBrand,
     fetchNextWatchlistBrand,
     fetchBrandProcessingQueue,
     fetchWatchlistBrandsQueue,
-    fetchScrapedStats,
+    fetchSeparateScrapedStats,
     brandProcessingQueue,
     watchlistBrandsQueue
   } = useQueueStore();
@@ -37,16 +37,24 @@ const Dashboard = () => {
   const pendingCount = overview?.queue_counts?.pending || 0;
   const failedCount = overview?.queue_counts?.failed || 0;
   const activeCount = overview?.queue_counts?.active || 0;
-  // Get today's stats from scrapedStats instead of overview
+  // Get today's stats from separateScrapedStats
   const today = new Date().toISOString().split('T')[0];
-  const todayStats = scrapedStats?.stats?.find(stat => stat.date === today);
+  
+  // Get today's stats for both regular and watchlist
+  const todayRegularStats = separateScrapedStats?.regular?.find(stat => stat.date === today);
+  const todayWatchlistStats = separateScrapedStats?.watchlist?.find(stat => stat.date === today);
   
   // Fallback to most recent day if today's data is not available
-  const fallbackStats = scrapedStats?.stats?.[0]; // First item is most recent
-  const statsToUse = todayStats || fallbackStats;
+  const fallbackRegularStats = separateScrapedStats?.regular?.[0];
+  const fallbackWatchlistStats = separateScrapedStats?.watchlist?.[0];
   
-  const brandsScrapedToday = statsToUse?.brands_scraped || 0;
-  const adsProcessed = statsToUse?.ads_processed || 0;
+  const regularStatsToUse = todayRegularStats || fallbackRegularStats;
+  const watchlistStatsToUse = todayWatchlistStats || fallbackWatchlistStats;
+  
+  // Combine regular and watchlist stats for total counts
+  const brandsScrapedToday = (regularStatsToUse?.brands_scraped || 0) + (watchlistStatsToUse?.brands_scraped || 0);
+  const adsProcessed = (regularStatsToUse?.ads_processed || 0) + (watchlistStatsToUse?.ads_processed || 0);
+  const watchlistBrandsScraped = watchlistStatsToUse?.brands_scraped || 0;
   
   const watchlistPendingCount = overview?.watchlist_stats?.pending_count || 0;
   const watchlistFailedCount = overview?.watchlist_stats?.failed_count || 0;
@@ -150,7 +158,7 @@ const Dashboard = () => {
       const promises = [
         fetchBrandProcessingQueue(1, 10),
         fetchWatchlistBrandsQueue(1, 10),
-        fetchScrapedStats(null, 7),
+        fetchSeparateScrapedStats(null, 7),
         fetchScraperStatus()
       ];
 
@@ -336,7 +344,7 @@ const Dashboard = () => {
 
       <BrandProcessingQueue onPageChange={handleQueuePageChange} />
 
-      <ScrapedStats />
+      <SeparateScrapedStats />
     </div>
   );
 };

@@ -1,28 +1,44 @@
-const redis = require("../config/redis");
+const { getQueueRedis, getGlobalRedis } = require("../utils/redisSelector");
 const logger = require("../utils/logger");
-const { QUEUES } = require("../config/constants");
+const { QUEUES, REDIS_KEYS } = require("../config/constants");
 
 async function clearAllQueues() {
   try {
-    logger.info("Clearing all queues (pending and failed)");
+    logger.info("Clearing all queues (regular and watchlist pending and failed)");
 
-    const pendingCount = await redis.zcard(QUEUES.PENDING_BRANDS);
-    const failedCount = await redis.llen(QUEUES.FAILED_BRANDS);
+    // Get both Redis instances
+    const regularRedis = getQueueRedis('regular');
+    const watchlistRedis = getQueueRedis('watchlist');
 
-    await redis.del(QUEUES.PENDING_BRANDS);
-    await redis.del(QUEUES.FAILED_BRANDS);
+    // Get counts from all queues
+    const regularPendingCount = await regularRedis.zcard(REDIS_KEYS.REGULAR.PENDING_BRANDS);
+    const regularFailedCount = await regularRedis.llen(REDIS_KEYS.REGULAR.FAILED_BRANDS);
+    const watchlistPendingCount = await watchlistRedis.zcard(REDIS_KEYS.WATCHLIST.PENDING_BRANDS);
+    const watchlistFailedCount = await watchlistRedis.llen(REDIS_KEYS.WATCHLIST.FAILED_BRANDS);
 
-    const totalCleared = pendingCount + failedCount;
+    // Clear all queues
+    await regularRedis.del(REDIS_KEYS.REGULAR.PENDING_BRANDS);
+    await regularRedis.del(REDIS_KEYS.REGULAR.FAILED_BRANDS);
+    await watchlistRedis.del(REDIS_KEYS.WATCHLIST.PENDING_BRANDS);
+    await watchlistRedis.del(REDIS_KEYS.WATCHLIST.FAILED_BRANDS);
+
+    const totalCleared = regularPendingCount + regularFailedCount + watchlistPendingCount + watchlistFailedCount;
 
     logger.info(
-      `Successfully cleared all queues. Removed ${pendingCount} pending + ${failedCount} failed = ${totalCleared} total brands`
+      `Successfully cleared all queues. Removed ${regularPendingCount} regular pending + ${regularFailedCount} regular failed + ${watchlistPendingCount} watchlist pending + ${watchlistFailedCount} watchlist failed = ${totalCleared} total brands`
     );
 
     return {
-      cleared_pending: pendingCount,
-      cleared_failed: failedCount,
+      regular: {
+        cleared_pending: regularPendingCount,
+        cleared_failed: regularFailedCount,
+      },
+      watchlist: {
+        cleared_pending: watchlistPendingCount,
+        cleared_failed: watchlistFailedCount,
+      },
       total_cleared: totalCleared,
-      message: `Cleared all queues: ${pendingCount} pending + ${failedCount} failed = ${totalCleared} total brands`,
+      message: `Cleared all queues: ${totalCleared} total brands (regular: ${regularPendingCount + regularFailedCount}, watchlist: ${watchlistPendingCount + watchlistFailedCount})`,
     };
   } catch (error) {
     logger.error("Error clearing all queues:", error);
@@ -30,46 +46,52 @@ async function clearAllQueues() {
   }
 }
 
-async function clearPendingQueue() {
+async function clearPendingQueue(queueType = 'regular') {
   try {
-    logger.info("Clearing entire pending queue");
+    logger.info(`Clearing entire ${queueType} pending queue`);
 
-    const pendingCount = await redis.zcard(QUEUES.PENDING_BRANDS);
+    const redis = getQueueRedis(queueType);
+    const queueKey = REDIS_KEYS[queueType.toUpperCase()].PENDING_BRANDS;
+    const pendingCount = await redis.zcard(queueKey);
 
-    await redis.del(QUEUES.PENDING_BRANDS);
+    await redis.del(queueKey);
 
     logger.info(
-      `Successfully cleared pending queue. Removed ${pendingCount} brands`
+      `Successfully cleared ${queueType} pending queue. Removed ${pendingCount} brands`
     );
 
     return {
       cleared_count: pendingCount,
-      message: `Cleared ${pendingCount} brands from pending queue`,
+      queue_type: queueType,
+      message: `Cleared ${pendingCount} brands from ${queueType} pending queue`,
     };
   } catch (error) {
-    logger.error("Error clearing pending queue:", error);
+    logger.error(`Error clearing ${queueType} pending queue:`, error);
     throw error;
   }
 }
 
-async function clearFailedQueue() {
+async function clearFailedQueue(queueType = 'regular') {
   try {
-    logger.info("Clearing entire failed queue");
+    logger.info(`Clearing entire ${queueType} failed queue`);
 
-    const failedCount = await redis.llen(QUEUES.FAILED_BRANDS);
+    const redis = getQueueRedis(queueType);
+    const queueKey = REDIS_KEYS[queueType.toUpperCase()].FAILED_BRANDS;
+    const failedCount = await redis.llen(queueKey);
 
-    await redis.del(QUEUES.FAILED_BRANDS);
+    await redis.del(queueKey);
 
     logger.info(
-      `Successfully cleared failed queue. Removed ${failedCount} brands`
+      `Successfully cleared ${queueType} failed queue. Removed ${failedCount} brands`
     );
 
     return {
       cleared_count: failedCount,
-      message: `Cleared ${failedCount} brands from failed queue`,
+      queue_type: queueType,
+      message: `Cleared ${failedCount} brands from ${queueType} failed queue`,
     };
   } catch (error) {
-    logger.error("Error clearing failed queue:", error);
+    logger.error(`Error clearing ${queueType} failed queue:`, error);
     throw error;
   }
 }

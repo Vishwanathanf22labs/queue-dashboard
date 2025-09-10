@@ -17,11 +17,12 @@ async function getQueueOverview(req, res) {
 
 async function getPendingBrands(req, res) {
   try {
-    const { page = 1, limit = 10, search = null } = req.query;
+    const { page = 1, limit = 10, search = null, queueType = 'regular' } = req.query;
     const pendingBrands = await queueService.getPendingBrands(
       parseInt(page),
       parseInt(limit),
-      search
+      search,
+      queueType
     );
 
     res.status(200).json({
@@ -41,11 +42,12 @@ async function getPendingBrands(req, res) {
 
 async function getFailedBrands(req, res) {
   try {
-    const { page = 1, limit = 10, search = null } = req.query;
+    const { page = 1, limit = 10, search = null, queueType = 'regular' } = req.query;
     const failedBrands = await queueService.getFailedBrands(
       parseInt(page),
       parseInt(limit),
-      search
+      search,
+      queueType
     );
 
     res.status(200).json({
@@ -83,7 +85,8 @@ async function getCurrentlyProcessing(req, res) {
 
 async function getNextBrand(req, res) {
   try {
-    const nextBrands = await queueService.getNextBrand();
+    const { queueType = 'regular' } = req.query;
+    const nextBrands = await queueService.getNextBrand(queueType);
     res.status(200).json({
       success: true,
       data: nextBrands,
@@ -139,10 +142,11 @@ async function getQueueStats(req, res) {
 
 async function getBrandProcessingQueue(req, res) {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 10, queueType = 'regular' } = req.query;
     const processingData = await queueService.getBrandProcessingQueue(
       parseInt(page),
-      parseInt(limit)
+      parseInt(limit),
+      queueType
     );
 
     res.status(200).json(processingData);
@@ -192,6 +196,28 @@ async function getBrandsScrapedStats(req, res) {
     res.status(500).json({
       success: false,
       message: "Failed to fetch brands scraped statistics",
+      error: error.message,
+    });
+  }
+}
+
+async function getSeparateBrandsScrapedStats(req, res) {
+  try {
+    const { date, days } = req.query;
+
+    let stats;
+    if (days) {
+      stats = await queueService.getSeparateBrandsScrapedStatsForDays(parseInt(days));
+    } else {
+      stats = await queueService.getSeparateBrandsScrapedStats(date);
+    }
+
+    res.status(200).json(stats);
+  } catch (error) {
+    logger.error("Error in getSeparateBrandsScrapedStats:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch separate brands scraped statistics",
       error: error.message,
     });
   }
@@ -358,6 +384,7 @@ module.exports = {
   getBrandProcessingQueue,
   getWatchlistBrandsQueue,
   getBrandsScrapedStats,
+  getSeparateBrandsScrapedStats,
   searchBrands,
   getWatchlistBrands,
   getWatchlistPendingBrands,

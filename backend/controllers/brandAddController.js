@@ -3,7 +3,7 @@ const logger = require("../utils/logger");
 
 async function addSingleBrand(req, res) {
   try {
-    const { id, page_id, score } = req.body;
+    const { id, page_id, score, queueType = 'regular' } = req.body;
 
     if (!id || !page_id) {
       return res.status(400).json({
@@ -12,8 +12,17 @@ async function addSingleBrand(req, res) {
         example: {
           id: 5325,
           page_id: "114512100010596",
-          score: 1
+          score: 1,
+          queueType: "regular" // or "watchlist"
         },
+      });
+    }
+
+    // Validate queueType
+    if (!['regular', 'watchlist'].includes(queueType)) {
+      return res.status(400).json({
+        success: false,
+        message: "queueType must be 'regular' or 'watchlist'"
       });
     }
 
@@ -27,12 +36,13 @@ async function addSingleBrand(req, res) {
       });
     }
 
-    const result = await queueService.addSingleBrandToQueue({ id, page_id, score: validScore });
+    const result = await queueService.addSingleBrandToQueue({ id, page_id, score: validScore }, queueType);
 
     res.status(201).json({
       success: true,
       message: result.message,
       data: result.brand,
+      queue_type: result.queue_type,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
@@ -47,7 +57,7 @@ async function addSingleBrand(req, res) {
 
 async function addAllBrands(req, res) {
   try {
-    const { status } = req.query; // Get status filter from query params
+    const { status, queueType = 'regular' } = req.query; // Get status filter and queueType from query params
     
     // Validate status filter if provided
     if (status && !['Active', 'Inactive'].includes(status)) {
@@ -57,12 +67,21 @@ async function addAllBrands(req, res) {
       });
     }
 
-    const result = await queueService.addAllBrandsToQueue(status);
+    // Validate queueType
+    if (!['regular', 'watchlist'].includes(queueType)) {
+      return res.status(400).json({
+        success: false,
+        message: "queueType must be 'regular' or 'watchlist'"
+      });
+    }
+
+    const result = await queueService.addAllBrandsToQueue(status, queueType);
     
     res.json({
       success: true,
       message: result.message,
-      data: result.results
+      data: result.results,
+      queue_type: result.queue_type
     });
   } catch (error) {
     logger.error("Error in addAllBrands:", error);
