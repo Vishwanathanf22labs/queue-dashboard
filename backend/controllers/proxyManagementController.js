@@ -5,7 +5,7 @@ const scraperControlService = require("../services/scraperControlService");
 
 async function addProxy(req, res) {
   try {
-    const { ip, port, country, username, password, type } = req.body;
+    const { ip, port, country, username, password, type, namespace } = req.body;
 
     // Validate required fields
     if (!ip) {
@@ -32,7 +32,7 @@ async function addProxy(req, res) {
       });
     }
 
-    const result = await proxyManagementService.addProxy(ip, port, country, username, password, type);
+    const result = await proxyManagementService.addProxy(ip, port, country, username, password, type, namespace);
     
     if (result.success) {
       res.status(201).json(result);

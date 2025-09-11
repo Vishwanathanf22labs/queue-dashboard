@@ -8,7 +8,7 @@ const PROXY_STATS_KEY = REDIS_KEYS.GLOBAL.PROXY_STATS;
 /**
  * Add a new proxy to the system using Redis hash storage
  */
-async function addProxy(ip, port = null, country = null, username = null, password = null, type = "http") {
+async function addProxy(ip, port = null, country = null, username = null, password = null, type = "http", namespace = null) {
   try {
     // Validate IP format
     if (!isValidIP(ip)) {
@@ -38,6 +38,7 @@ async function addProxy(ip, port = null, country = null, username = null, passwo
       disabledAt: "",
       country: country || "Unknown",
       type: type || "http",
+      namespace: namespace || "",
       created_at: now.toISOString(),
       added_date: now.toLocaleDateString('en-US', { 
         year: 'numeric', 

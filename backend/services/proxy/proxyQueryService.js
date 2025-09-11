@@ -112,6 +112,8 @@ async function getProxies(page = 1, limit = 10, filter = "all", search = "") {
         usage_count: usageCount,
         is_working: proxy.active === "true",
         active: proxy.active === "true",
+        // Add failure reason logic
+        failure_reason: proxy.deActivate ? "cooldown" : (proxy.active === "false" ? "health check" : null),
         // Use country from Redis if available, otherwise default
         country: proxy.country || "Unknown",
         type: proxy.type || "http",
@@ -285,7 +287,8 @@ async function getLastMonthProxies() {
             is_working: proxy.active === "true",
             usage_count: failCount + successCount,
             failCount: failCount,
-            successCount: successCount
+            successCount: successCount,
+            failure_reason: proxy.deActivate ? "cooldown" : (proxy.active === "false" ? "health check" : null)
           };
         })
       }
@@ -378,6 +381,7 @@ async function getNextProxy() {
         failCount: failCount,
         is_working: true,
         active: true,
+        failure_reason: null,
         // Add default values for UI compatibility
         country: bestProxy.country || "Unknown",
         type: bestProxy.type || "http",
@@ -517,7 +521,8 @@ async function searchProxies(query, criteria = "all") {
             successCount: successCount,
             usage_count: failCount + successCount,
             is_working: proxy.active === "true",
-            active: proxy.active === "true"
+            active: proxy.active === "true",
+            failure_reason: proxy.deActivate ? "cooldown" : (proxy.active === "false" ? "health check" : null)
           };
         })
       }
