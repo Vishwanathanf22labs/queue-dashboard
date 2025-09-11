@@ -74,7 +74,7 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated }) => {
                 </div>
                 <div className="ml-3 flex-shrink-0">
                   <Badge variant={proxy.is_working ? 'success' : 'error'} size="sm">
-                    {proxy.is_working ? 'Working' : 'Failed'}
+                    {proxy.is_working ? 'Working' : (proxy.failure_reason === 'cooldown' ? 'cooldown' : (proxy.failure_reason === 'health check' ? 'fail hc' : 'failed'))}
                   </Badge>
                 </div>
               </div>
@@ -207,7 +207,7 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated }) => {
                     size="sm"
                     className="text-xs px-1 py-0.5"
                   >
-                    {proxy.is_working ? 'Good' : 'FAIL'}
+                    {proxy.is_working ? 'Good' : (proxy.failure_reason === 'cooldown' ? 'cooldown' : (proxy.failure_reason === 'health check' ? 'fail hc' : 'failed'))}
                   </Badge>
                 </div>
 

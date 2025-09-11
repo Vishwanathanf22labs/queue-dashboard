@@ -14,7 +14,8 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies }) => {
       country: '',
       type: 'http',
       username: '',
-      password: ''
+      password: '',
+      namespace: ''
     },
     isLoading: false
   });
@@ -63,7 +64,8 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies }) => {
             country: '',
             type: 'http',
             username: '',
-            password: ''
+            password: '',
+            namespace: ''
           },
           isLoading: false
         }));
@@ -150,6 +152,17 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies }) => {
             onChange={(value) => handleInputChange('password', value)}
             placeholder="proxypass"
             showPasswordToggle
+            fullWidth
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-4">
+          <Input
+            label="Namespace (Optional)"
+            name="namespace"
+            value={state.formData.namespace}
+            onChange={(value) => handleInputChange('namespace', value)}
+            placeholder="Enter namespace for this proxy"
             fullWidth
           />
         </div>
