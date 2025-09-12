@@ -103,7 +103,7 @@ const DashboardStats = ({
             <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
               <p className="text-xs sm:text-sm font-medium text-gray-600 break-words">Watchlist Completed</p>
               <div className="space-y-1">
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-green-600">0</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-green-600">{watchlistCompletedCount}</p>
                 {watchlistPendingCount === 0 && (
                   <p className="text-xs text-gray-700">cooldown applied</p>
                 )}
