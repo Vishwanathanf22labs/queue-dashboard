@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { queueAPI } from '../../services/api';
 import StartScraperButton from '../scraper/StartScraperButton';
 import StopScraperButton from '../scraper/StopScraperButton';
-import LoadingState from '../ui/LoadingState';
+import LoadingSpinner from '../ui/LoadingSpinner';
 import ErrorDisplay from '../ui/ErrorDisplay';
 
 const ScraperControls = () => {
@@ -96,7 +96,7 @@ const ScraperControls = () => {
   const isRunning = scraperStatus === 'running';
 
   if (isLoading) {
-    return <LoadingState message="Loading scraper status..." />;
+    return <LoadingSpinner />;
   }
 
   if (error) {

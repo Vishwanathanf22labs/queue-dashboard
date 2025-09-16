@@ -2,7 +2,7 @@ import { useState } from 'react';
 import useQueueStore from '../../stores/queueStore';
 import Card from '../ui/Card';
 import Table from '../ui/Table';
-import LoadingState from '../ui/LoadingState';
+import LoadingSpinner from '../ui/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { Filter, Eye, EyeOff } from 'lucide-react';
 import CustomDropdown from '../ui/CustomDropdown';
@@ -170,7 +170,7 @@ const SeparateScrapedStats = () => {
       {separateScrapedStatsLoading ? (
         <Card>
           <div className="p-4 sm:p-6">
-            <LoadingState size="lg" message="Loading separate scraped statistics..." />
+            <LoadingSpinner />
           </div>
         </Card>
       ) : (

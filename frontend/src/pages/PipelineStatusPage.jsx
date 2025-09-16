@@ -17,7 +17,7 @@ import Card from '../components/ui/Card';
 import Pagination from '../components/ui/Pagination';
 import SearchInput from '../components/ui/SearchInput';
 import Button from '../components/ui/Button';
-import LoadingState from '../components/ui/LoadingState';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 import ErrorDisplay from '../components/ui/ErrorDisplay';
 
 const PipelineStatusPage = () => {
@@ -126,7 +126,6 @@ const PipelineStatusPage = () => {
 
   const handlePageChange = useCallback((newPage) => {
     setCurrentPage(newPage);
-    setLoading(true);
   }, []);
 
   const handleDateChange = useCallback((date) => {
@@ -511,7 +510,7 @@ const PipelineStatusPage = () => {
   ));
 
   if (loading && !refreshing) {
-    return <LoadingState message="Loading pipeline status..." />;
+    return <LoadingSpinner />;
   }
 
   return (
@@ -547,7 +546,11 @@ const PipelineStatusPage = () => {
                 size="sm"
                 className="flex items-center gap-2"
               >
-                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                {refreshing ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
                 {refreshing ? 'Refreshing...' : 'Refresh'}
               </Button>
             </div>

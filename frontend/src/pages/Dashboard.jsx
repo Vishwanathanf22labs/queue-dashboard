@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import LoadingState from '../components/ui/LoadingState';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 import ErrorDisplay from '../components/ui/ErrorDisplay';
 import Button from '../components/ui/Button';
 import toast from 'react-hot-toast';
@@ -13,7 +13,6 @@ import useQueueStore from '../stores/queueStore';
 import { queueAPI } from '../services/api';
 import WatchlistProcessingStatus from '../components/dashboard/WatchlistProcessingStatus';
 import WatchlistAdsCountTable from '../components/queue/WatchlistAdsCountTable';
-import { StatsSkeleton, ProcessingStatusSkeleton, QuickActionsSkeleton, TableSkeleton } from '../components/ui/Skeleton';
 
 const Dashboard = () => {
   const {
@@ -258,25 +257,9 @@ const Dashboard = () => {
     };
   }, []);
 
-  // Show skeleton loading while initial data is loading
+  // Show loading spinner while initial data is loading
   if (loading && !overview) {
-    return (
-      <div className="space-y-3 sm:space-y-4 lg:space-y-6 overflow-x-hidden">
-        <DashboardHeader
-          refreshInterval={0}
-          isRefreshing={false}
-          onManualRefresh={handleManualRefresh}
-          onIntervalChange={changeRefreshInterval}
-        />
-        
-        <StatsSkeleton />
-        <ProcessingStatusSkeleton />
-        <QuickActionsSkeleton />
-        <TableSkeleton />
-        <TableSkeleton />
-        <TableSkeleton />
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (error) {

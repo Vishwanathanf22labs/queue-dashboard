@@ -1,17 +1,32 @@
 import { useState } from 'react';
 import Card from '../ui/Card';
-import LoadingState from '../ui/LoadingState';
+import LoadingSpinner from '../ui/LoadingSpinner';
 import ErrorDisplay from '../ui/ErrorDisplay';
 import Table from '../ui/Table';
 import Pagination from '../ui/Pagination';
 import useQueueStore from '../../stores/queueStore';
-import { Users, Eye, ExternalLink } from 'lucide-react';
+import { Users, Eye, ExternalLink, Circle } from 'lucide-react';
 import { openFacebookAdLibrary } from '../../utils/facebookAdLibrary';
 
 const BrandProcessingQueue = ({ onPageChange }) => {
   const { brandProcessingQueue, loading, error } = useQueueStore();
 
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Status indicator component - only show green dot for active
+  const StatusIndicator = ({ status }) => {
+    if (status === 'active') {
+      return (
+        <Circle 
+          className="h-2 w-2 text-green-500" 
+          fill="currentColor"
+          title="Active"
+        />
+      );
+    }
+    return null; // No dot for other statuses
+  };
+
 
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage);
@@ -29,7 +44,7 @@ const BrandProcessingQueue = ({ onPageChange }) => {
   if (loading && !brandProcessingQueue) {
     return (
       <Card>
-        <LoadingState size="lg" message="Loading brand processing queue..." />
+        <LoadingSpinner />
       </Card>
     );
   }
@@ -75,8 +90,9 @@ const BrandProcessingQueue = ({ onPageChange }) => {
         <div>
           <div className="flex items-center space-x-2">
             <div className="text-sm font-medium text-gray-900 max-w-[115px] sm:max-w-none truncate">
-              {brand.brand_name || brand.page_name || 'Unknown'}
+              {brand.brand_name || brand.page_name || brand.actual_name || 'Unknown'}
             </div>
+            <StatusIndicator status={brand.job_status} />
             {brand.page_id && (
               <button
                 onClick={() => openFacebookAdLibrary(brand.page_id)}
@@ -152,7 +168,9 @@ const BrandProcessingQueue = ({ onPageChange }) => {
 
       <Card id="brands-table-section">
         <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mb-3 sm:mb-4">
-          <h3 className="text-base sm:text-lg font-semibold text-gray-900">Regular Brands in Queue</h3>
+          <div>
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900">Regular Brands in Queue</h3>
+          </div>
           <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-2">
             {loading && (
               <div className="flex items-center space-x-2">
@@ -167,7 +185,7 @@ const BrandProcessingQueue = ({ onPageChange }) => {
         </div>
 
         {loading ? (
-          <LoadingState size="lg" message="Loading brands..." />
+          <LoadingSpinner />
         ) : !loading && currentPageBrands && currentPageBrands.length > 0 ? (
           <>
             {/* Desktop Table View */}
@@ -190,8 +208,9 @@ const BrandProcessingQueue = ({ onPageChange }) => {
                       <div className="flex-1 pr-3">
                         <div className="flex items-center space-x-2 mb-1">
                           <h3 className="font-semibold text-gray-900 text-lg leading-tight">
-                            {brand.brand_name || brand.page_name || 'Unknown'}
+                            {brand.brand_name || brand.page_name || brand.actual_name || 'Unknown'}
                           </h3>
+                          <StatusIndicator status={brand.job_status} />
                           {brand.page_id && (
                             <button
                               onClick={() => openFacebookAdLibrary(brand.page_id)}

@@ -1,17 +1,14 @@
 import ScraperControls from '../components/queue/ScraperControls';
 import PriorityQueueManager from '../components/queue/PriorityQueueManager';
 import AdminAccessRequired from '../components/ui/AdminAccessRequired';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 import useAdminStore from '../stores/adminStore';
 
 const ScraperControlsPage = () => {
   const { isAdmin, isLoading: adminLoading } = useAdminStore();
 
   if (adminLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (!isAdmin) {

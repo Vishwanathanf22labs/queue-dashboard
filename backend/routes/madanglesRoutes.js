@@ -1,7 +1,11 @@
 const express = require('express');
 const multer = require('multer');
 const adminAuth = require('../middleware/adminAuth');
-const { uploadCsvToMadangles } = require('../controllers/madanglesCsvController');
+const { 
+  uploadCsvToMadangles, 
+  checkScrapingStatus, 
+  addScrapedBrandsToQueue 
+} = require('../controllers/madanglesCsvController');
 
 const router = express.Router();
 
@@ -26,5 +30,19 @@ const upload = multer({
  * Requires admin authentication
  */
 router.post('/upload-csv', adminAuth, upload.single('file'), uploadCsvToMadangles);
+
+/**
+ * POST /api/madangles/check-scraping-status
+ * Check if scraped brands exist in database
+ * Requires admin authentication
+ */
+router.post('/check-scraping-status', adminAuth, checkScrapingStatus);
+
+/**
+ * POST /api/madangles/add-to-queue
+ * Add scraped brands to regular or watchlist pending queue
+ * Requires admin authentication
+ */
+router.post('/add-to-queue', adminAuth, addScrapedBrandsToQueue);
 
 module.exports = router;

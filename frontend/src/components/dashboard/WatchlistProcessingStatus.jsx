@@ -33,7 +33,7 @@ const WatchlistProcessingStatus = ({
     <div className="grid gap-4 sm:gap-6 grid-cols-1">
       <Card>
         <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">
-          Watchlist Currently Processing
+          Watchlist Currently Scraping
         </h3>
         
         {watchlistProcessingBrands.length > 0 ? (
@@ -60,7 +60,7 @@ const WatchlistProcessingStatus = ({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center space-x-2">
                         <p className="font-medium text-gray-900 text-sm truncate">
-                          {brand.brand_name || 'Unknown Brand'}
+                          {brand.brand_name || brand.page_name || brand.actual_name || 'Unknown Brand'}
                         </p>
                         {brand.page_id && (
                           <button
@@ -158,7 +158,7 @@ const WatchlistProcessingStatus = ({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center space-x-2">
                         <p className="font-medium text-gray-900 text-sm truncate">
-                          {brand.brand_name || 'Unknown Brand'}
+                          {brand.brand_name || brand.page_name || brand.actual_name || 'Unknown Brand'}
                         </p>
                         {brand.page_id && (
                           <button

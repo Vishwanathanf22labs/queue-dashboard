@@ -39,6 +39,54 @@ export const uploadCsvToMadangles = async (file) => {
 };
 
 /**
+ * Check scraping completion status by checking if page_ids exist in database
+ * @param {Array} pageIds - Array of page_ids to check
+ * @returns {Promise} Scraping status information
+ */
+export const checkScrapingStatus = async (pageIds) => {
+  try {
+    const response = await api.post('/madangles/check-scraping-status', { pageIds });
+    return response.data;
+  } catch (error) {
+    console.error('Error checking scraping status:', error);
+    
+    if (error.response) {
+      throw new Error(error.response.data?.message || 'Failed to check scraping status');
+    } else if (error.request) {
+      throw new Error('No response from server. Please check your connection.');
+    } else {
+      throw new Error(error.message || 'An unexpected error occurred');
+    }
+  }
+};
+
+/**
+ * Add scraped brands to queue (regular or watchlist)
+ * @param {Array} pageIds - Array of page_ids to add to queue
+ * @param {string} queueType - 'regular' or 'watchlist'
+ * @returns {Promise} Queue addition result
+ */
+export const addScrapedBrandsToQueue = async (pageIds, queueType = 'regular') => {
+  try {
+    const response = await api.post('/madangles/add-to-queue', { 
+      pageIds, 
+      queueType 
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error adding brands to queue:', error);
+    
+    if (error.response) {
+      throw new Error(error.response.data?.message || 'Failed to add brands to queue');
+    } else if (error.request) {
+      throw new Error('No response from server. Please check your connection.');
+    } else {
+      throw new Error(error.message || 'An unexpected error occurred');
+    }
+  }
+};
+
+/**
  * Get madangles-scraper service status
  * @returns {Promise} Service status information
  */
@@ -54,5 +102,7 @@ export const getMadanglesStatus = async () => {
 
 export default {
   uploadCsvToMadangles,
+  checkScrapingStatus,
+  addScrapedBrandsToQueue,
   getMadanglesStatus,
 };

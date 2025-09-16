@@ -47,7 +47,7 @@ const ProcessingStatus = ({
   return (
     <div className="grid gap-4 sm:gap-6 grid-cols-1">
       <Card>
-        <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Currently Processing</h3>
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Currently Scraping</h3>
         {nonWatchlistProcessingBrands.length > 0 ? (
           <div className="space-y-4">
             {/* Header with count */}
@@ -82,7 +82,7 @@ const ProcessingStatus = ({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center space-x-2">
                         <p className="font-medium text-gray-900 text-sm truncate">
-                          {brand.brand_name || 'Unknown Brand'}
+                          {brand.brand_name || brand.page_name || brand.actual_name || 'Unknown Brand'}
                         </p>
                         {brand.page_id && (
                           <button
@@ -196,7 +196,7 @@ const ProcessingStatus = ({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center space-x-2">
                         <p className="font-medium text-gray-900 text-sm truncate">
-                          {brand.brand_name || 'Unknown Brand'}
+                          {brand.brand_name || brand.page_name || brand.actual_name || 'Unknown Brand'}
                         </p>
                         {brand.page_id && (
                           <button

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
-import LoadingState from '../components/ui/LoadingState';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 import ErrorDisplay from '../components/ui/ErrorDisplay';
 import Table from '../components/ui/Table';
 import Pagination from '../components/ui/Pagination';
@@ -12,7 +12,7 @@ import { AlertCircle, Search, Users, Hash, Tag, XCircle, RefreshCw, ExternalLink
 import SearchInput from '../components/ui/SearchInput';
 
 const FailedQueue = () => {
-  const { fetchFailedBrands } = useQueueStore();
+  const { fetchFailedBrands, loading } = useQueueStore();
   const [queueState, setQueueState] = useState({
     searchTerm: '',
     currentPage: 1,
@@ -217,6 +217,11 @@ const FailedQueue = () => {
   const filteredBrands = brands;
 
   const totalPages = pagination.total_pages || 1;
+
+  // Show loading state while initial data is loading
+  if (loading && brands.length === 0) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <div className="space-y-3 sm:space-y-4 lg:space-y-6 xl:space-y-8">
