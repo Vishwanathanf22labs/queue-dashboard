@@ -9,6 +9,7 @@ import Card from '../components/ui/Card';
 import toast from 'react-hot-toast';
 import useAdminStore from '../stores/adminStore';
 import AdminAccessRequired from '../components/ui/AdminAccessRequired';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { Search } from 'lucide-react';
 import CustomDropdown from '../components/ui/CustomDropdown';
 
@@ -197,11 +198,7 @@ const Proxies = () => {
 
 
   if (adminLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
 
@@ -219,15 +216,7 @@ const Proxies = () => {
   }
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading proxies...</p>
-          <p className="text-sm text-gray-400 mt-2">This may take a few seconds</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   return (

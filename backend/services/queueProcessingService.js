@@ -115,6 +115,7 @@ async function getBrandProcessingQueue(
 
     logger.info(`Total Jobs Created (${queueType}):`, totalJobsCreated);
 
+    // Get all jobs from all states
     const [waiting, active, delayed, completed, failed] = await Promise.all([
       queue.getJobs(["waiting"], 0, JOB_FETCH_LIMIT),
       queue.getJobs(["active"], 0, JOB_FETCH_LIMIT),
@@ -123,16 +124,47 @@ async function getBrandProcessingQueue(
       queue.getJobs(["failed"], 0, JOB_FETCH_LIMIT),
     ]);
 
+    // Also get all individual job keys from Redis
+    const jobKeys = await redis.keys("bull:brand-processing:[0-9]*");
+    const individualJobs = [];
+    
+    for (const key of jobKeys) {
+      try {
+        const jobData = await redis.hgetall(key);
+        if (jobData && jobData.data) {
+          const job = JSON.parse(jobData.data);
+          const jobId = key.split(':').pop();
+          individualJobs.push({
+            id: jobId,
+            data: job,
+            timestamp: parseInt(jobData.timestamp) || Date.now(),
+            state: jobData.state || 'unknown'
+          });
+        }
+      } catch (error) {
+        logger.warn(`Error parsing job ${key}:`, error.message);
+      }
+    }
+
+    // Show ALL jobs with their states
     const allJobs = [
-      ...active,
-      ...waiting,
-      ...delayed,
-      ...completed,
-      ...failed,
+      ...active.map(job => ({ ...job, state: 'active' })),
+      ...waiting.map(job => ({ ...job, state: 'waiting' })),
+      ...delayed.map(job => ({ ...job, state: 'delayed' })),
+      ...completed.map(job => ({ ...job, state: 'completed' })),
+      ...failed.map(job => ({ ...job, state: 'failed' })),
+      ...individualJobs
     ];
+
+    // Remove duplicates based on job ID
+    const uniqueJobs = allJobs.filter((job, index, self) => 
+      index === self.findIndex(j => j.id === job.id)
+    );
+
+    logger.info(`Found ${uniqueJobs.length} total jobs (${active.length} active, ${delayed.length} delayed, ${waiting.length} waiting, ${completed.length} completed, ${failed.length} failed)`);
     const brandProcessingData = [];
 
-    for (const job of allJobs) {
+    for (const job of uniqueJobs) {
       try {
         const brandId = job.data.brandId;
         const pageCategory = job.data.brandDetails?.page_category;
@@ -153,6 +185,8 @@ async function getBrandProcessingQueue(
           created_at: new Date(job.timestamp).toISOString(),
           is_watchlist: queueType === 'watchlist',
           queue_type: queueType,
+          job_status: job.state || 'unknown',
+          job_id: job.id
         });
       } catch (jobError) {
         logger.error(`Error processing job ${job.id}:`, jobError);

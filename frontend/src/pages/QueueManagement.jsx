@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import AdminAccessRequired from '../components/ui/AdminAccessRequired';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 import QueueControls from '../components/queueManagement/QueueControls';
 import QueueStats from '../components/queueManagement/QueueStats';
 import PendingQueue from '../components/queueManagement/PendingQueue';
@@ -306,11 +307,7 @@ const QueueManagement = () => {
   };
 
   if (adminLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (!isAdmin) {

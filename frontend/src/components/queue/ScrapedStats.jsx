@@ -2,7 +2,7 @@ import { useState } from 'react';
 import useQueueStore from '../../stores/queueStore';
 import Card from '../ui/Card';
 import Table from '../ui/Table';
-import LoadingState from '../ui/LoadingState';
+import LoadingSpinner from '../ui/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { Filter } from 'lucide-react';
 import CustomDropdown from '../ui/CustomDropdown';
@@ -100,7 +100,7 @@ const ScrapedStats = () => {
         <div className="p-4 sm:p-6">
           <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4 sm:mb-6">Daily Breakdown</h3>
           {scrapedStatsLoading ? (
-            <LoadingState size="lg" message="Loading daily breakdown..." />
+            <LoadingSpinner />
           ) : !scrapedStatsLoading && dailyStats && dailyStats.length > 0 ? (
             <>
               <div className="hidden lg:block">

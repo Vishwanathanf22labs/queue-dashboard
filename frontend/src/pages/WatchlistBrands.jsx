@@ -5,7 +5,7 @@ import Button from '../components/ui/Button';
 import SearchInput from '../components/ui/SearchInput';
 import Table from '../components/ui/Table';
 import Pagination from '../components/ui/Pagination';
-import LoadingState from '../components/ui/LoadingState';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 import ErrorDisplay from '../components/ui/ErrorDisplay';
 import { Eye, Clock, CheckCircle, XCircle, Search, ExternalLink } from 'lucide-react';
 import useQueueStore from '../stores/queueStore';
@@ -263,7 +263,7 @@ const WatchlistBrands = () => {
     });
 
   if (loading) {
-    return <LoadingState size="lg" message="Loading watchlist brands..." />;
+    return <LoadingSpinner />;
   }
 
   if (error) {

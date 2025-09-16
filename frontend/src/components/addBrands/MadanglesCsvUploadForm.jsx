@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import Button from '../ui/Button';
-import { uploadCsvToMadangles } from '../../services/madanglesApi';
-import { Upload, FileText, X, CheckCircle, AlertCircle, Eye } from 'lucide-react';
+import { uploadCsvToMadangles, checkScrapingStatus, addScrapedBrandsToQueue } from '../../services/madanglesApi';
+import { Upload, FileText, X, CheckCircle, AlertCircle, Eye, Plus, Clock, Users } from 'lucide-react';
 
 const MadanglesCsvUploadForm = () => {
   const [csvState, setCsvState] = useState({
@@ -11,12 +11,27 @@ const MadanglesCsvUploadForm = () => {
     uploadResult: null,
     csvPreview: null,
     showPreview: false,
-    showConfirmModal: false
+    showConfirmModal: false,
+    showQueueButtons: false,
+    scrapedBrands: [],
+    pollingStatus: null,
+    queueAdditionStatus: null
   });
 
   const fileInputRef = useRef(null);
 
-  const { file: csvFile, uploadStatus: csvUploadStatus, uploadResult: csvUploadResult, csvPreview, showPreview, showConfirmModal } = csvState;
+  const { 
+    file: csvFile, 
+    uploadStatus: csvUploadStatus, 
+    uploadResult: csvUploadResult, 
+    csvPreview, 
+    showPreview, 
+    showConfirmModal,
+    showQueueButtons,
+    scrapedBrands,
+    pollingStatus,
+    queueAdditionStatus
+  } = csvState;
 
   useEffect(() => {
     try {
@@ -205,18 +220,9 @@ const MadanglesCsvUploadForm = () => {
           uploadStatus: { type: 'success', message: result.message }
         }));
 
-        // Clear form after 3 seconds
-        setTimeout(() => {
-          setCsvState(prev => ({ 
-            ...prev, 
-            uploadStatus: null,
-            file: null,
-            csvPreview: null
-          }));
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-          }
-        }, 3000);
+        // Start polling for scraping completion
+        const pageIds = csvPreview.data.map(row => row.page_id);
+        startDatabasePolling(pageIds);
 
       } else {
         throw new Error('Invalid response from server');
@@ -236,12 +242,132 @@ const MadanglesCsvUploadForm = () => {
     }
   };
 
+  // Database polling function
+  const startDatabasePolling = async (pageIds) => {
+    const maxAttempts = 30; // 1 minute total
+    const interval = 2000; // 2 seconds
+    
+    setCsvState(prev => ({
+      ...prev,
+      pollingStatus: { type: 'polling', message: 'Waiting for scraping to complete...' }
+    }));
+    
+    for (let i = 0; i < maxAttempts; i++) {
+      try {
+        const response = await checkScrapingStatus(pageIds);
+        const { completed, scrapedBrands, totalFound, totalExpected, progress } = response.data;
+        
+        if (completed) {
+          setCsvState(prev => ({
+            ...prev,
+            pollingStatus: null, // Hide polling status
+            showQueueButtons: true,
+            scrapedBrands: scrapedBrands
+          }));
+          return;
+        } else {
+          // Update progress
+          const progressPercent = Math.min(90, progress || (i / maxAttempts) * 100);
+          setCsvState(prev => ({
+            ...prev,
+            pollingStatus: { 
+              type: 'polling', 
+              message: `Scraping progress: ${totalFound}/${totalExpected} brands (${progressPercent.toFixed(0)}%)` 
+            }
+          }));
+        }
+      } catch (error) {
+        console.log(`Polling attempt ${i + 1} failed:`, error.message);
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, interval));
+    }
+    
+    // Timeout
+    setCsvState(prev => ({
+      ...prev,
+      pollingStatus: { 
+        type: 'warning', 
+        message: 'Scraping is taking longer than expected. You can check manually later.' 
+      },
+      showQueueButtons: true // Show buttons anyway, let user decide
+    }));
+    toast.warning('Scraping is taking longer than expected. You can add to queue manually.');
+  };
+
+  // Add brands to queue function
+  const handleAddToQueue = async (queueType) => {
+    try {
+      const pageIds = scrapedBrands.map(brand => brand.page_id);
+      
+      setCsvState(prev => ({
+        ...prev,
+        queueAdditionStatus: { type: 'adding', message: `Adding brands to ${queueType} queue...` }
+      }));
+
+      const result = await addScrapedBrandsToQueue(pageIds, queueType);
+      
+      if (result && result.success) {
+        const { successCount, failedCount, skippedCount } = result.data;
+        let message = `Successfully added ${successCount} brands to ${queueType} pending queue!`;
+        
+        if (skippedCount > 0) {
+          message += ` (${skippedCount} already in queue)`;
+        }
+        if (failedCount > 0) {
+          message += ` (${failedCount} failed)`;
+        }
+        
+        toast.success(message);
+        
+        setCsvState(prev => ({
+          ...prev,
+          queueAdditionStatus: { type: 'success', message: message }
+        }));
+
+        // Clear form after 3 seconds
+        setTimeout(() => {
+          setCsvState(prev => ({ 
+            ...prev, 
+            uploadStatus: null,
+            file: null,
+            csvPreview: null,
+            showQueueButtons: false,
+            scrapedBrands: [],
+            pollingStatus: null,
+            queueAdditionStatus: null
+          }));
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+        }, 3000);
+
+      } else {
+        throw new Error('Invalid response from server');
+      }
+
+    } catch (error) {
+      console.error('Error adding brands to queue:', error);
+      const errorMessage = error.message || `Failed to add brands to ${queueType} queue`;
+      toast.error(errorMessage);
+
+      setCsvState(prev => ({
+        ...prev,
+        queueAdditionStatus: { type: 'error', message: errorMessage }
+      }));
+    }
+  };
+
   const clearUpload = () => {
     setCsvState(prev => ({
       ...prev,
       file: null,
       csvPreview: null,
-      uploadStatus: null
+      uploadStatus: null,
+      showQueueButtons: false,
+      scrapedBrands: [],
+      pollingStatus: null,
+      queueAdditionStatus: null
     }));
     saveUploadResult(null);
 
@@ -419,6 +545,112 @@ const MadanglesCsvUploadForm = () => {
                 <AlertCircle className="h-4 w-4 text-red-600" />
               )}
               <span className="text-sm font-medium">{csvUploadStatus.message}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Polling Status */}
+        {pollingStatus && (
+          <div className={`mt-4 p-3 rounded-lg ${pollingStatus.type === 'polling'
+            ? 'bg-yellow-50 border border-yellow-200 text-yellow-800'
+            : pollingStatus.type === 'success'
+              ? 'bg-green-50 border border-green-200 text-green-800'
+              : pollingStatus.type === 'warning'
+                ? 'bg-orange-50 border border-orange-200 text-orange-800'
+                : 'bg-gray-50 border border-gray-200 text-gray-800'
+            }`}>
+            <div className="flex items-center space-x-2">
+              {pollingStatus.type === 'polling' && (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600"></div>
+              )}
+              {pollingStatus.type === 'success' && (
+                <CheckCircle className="h-4 w-4 text-green-600" />
+              )}
+              {pollingStatus.type === 'warning' && (
+                <AlertCircle className="h-4 w-4 text-orange-600" />
+              )}
+              <span className="text-sm font-medium">{pollingStatus.message}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Queue Addition Status */}
+        {queueAdditionStatus && (
+          <div className={`mt-4 p-3 rounded-lg ${queueAdditionStatus.type === 'adding'
+            ? 'bg-blue-50 border border-blue-200 text-blue-800'
+            : queueAdditionStatus.type === 'success'
+              ? 'bg-green-50 border border-green-200 text-green-800'
+              : queueAdditionStatus.type === 'error'
+                ? 'bg-red-50 border border-red-200 text-red-800'
+                : 'bg-gray-50 border border-gray-200 text-gray-800'
+            }`}>
+            <div className="flex items-center space-x-2">
+              {queueAdditionStatus.type === 'adding' && (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              )}
+              {queueAdditionStatus.type === 'success' && (
+                <CheckCircle className="h-4 w-4 text-green-600" />
+              )}
+              {queueAdditionStatus.type === 'error' && (
+                <AlertCircle className="h-4 w-4 text-red-600" />
+              )}
+              <span className="text-sm font-medium">{queueAdditionStatus.message}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Queue Buttons */}
+        {showQueueButtons && scrapedBrands.length > 0 && (
+          <div className="mt-6 border border-gray-200 rounded-lg p-4 bg-gray-50">
+            <div className="mb-4">
+              <p className="text-sm text-gray-700 mb-3">
+                Choose which queue to add the brands to:
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Button
+                  onClick={() => handleAddToQueue('regular')}
+                  variant="primary"
+                  disabled={queueAdditionStatus?.type === 'adding'}
+                  className="flex items-center justify-center space-x-2"
+                >
+                  <Users className="h-4 w-4" />
+                  <span>Add to Regular Queue</span>
+                </Button>
+                
+                <Button
+                  onClick={() => handleAddToQueue('watchlist')}
+                  variant="secondary"
+                  disabled={queueAdditionStatus?.type === 'adding'}
+                  className="flex items-center justify-center space-x-2"
+                >
+                  <Clock className="h-4 w-4" />
+                  <span>Add to Watchlist Queue</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Scraped Brands Preview */}
+            <div className="bg-white rounded border border-gray-200 p-3">
+              <h5 className="text-sm font-medium text-gray-900 mb-2">Brands ({scrapedBrands.length}):</h5>
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                {scrapedBrands.map((brand, index) => (
+                  <div key={index} className="flex items-center justify-between text-xs">
+                    <div className="flex items-center space-x-2">
+                      {brand.logo_url && (
+                        <img 
+                          src={brand.logo_url} 
+                          alt={brand.name}
+                          className="w-4 h-4 rounded"
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                      )}
+                      <span className="font-medium">{brand.name}</span>
+                    </div>
+                    <span className="text-gray-500 font-mono">{brand.page_id}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}

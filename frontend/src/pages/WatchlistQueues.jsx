@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
-import LoadingState from '../components/ui/LoadingState';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 import ErrorDisplay from '../components/ui/ErrorDisplay';
 import Table from '../components/ui/Table';
 import Pagination from '../components/ui/Pagination';
@@ -300,11 +300,7 @@ const WatchlistQueues = () => {
   }, [searchTerm]);
 
   if (isSearching) {
-    return (
-      <div className="space-y-4">
-        <LoadingState size="lg" message={`Searching watchlist ${activeTab} brands...`} />
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   const currentColumns = activeTab === 'pending' ? pendingColumns : failedColumns;

@@ -12,7 +12,7 @@ import toast from 'react-hot-toast';
 
 const ScrapedBrands = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  
+
   // Get date from URL params or default to today
   const getInitialDate = () => {
     const urlDate = searchParams.get('date');
@@ -49,7 +49,7 @@ const ScrapedBrands = () => {
       if (response.data.success) {
         const brands = response.data.data.brands || [];
         const pagination = response.data.data.pagination || {};
-        
+
         updateDataState({
           brands,
           currentPage: pagination.currentPage || 1,
@@ -70,7 +70,7 @@ const ScrapedBrands = () => {
   const loadStats = useCallback(async (date = null) => {
     try {
       const response = await scrapedBrandsAPI.getScrapedBrandsStats(date);
-      
+
       if (response.data.success) {
         updateDataState({ stats: response.data.data });
       }
@@ -89,7 +89,7 @@ const ScrapedBrands = () => {
     try {
       setIsSearching(true);
       const response = await scrapedBrandsAPI.searchScrapedBrands(query, dataState.selectedDate);
-      
+
       if (response.data.success) {
         setSearchResults(response.data.data.brands || []);
         setShowSearchResults(true);
@@ -110,12 +110,12 @@ const ScrapedBrands = () => {
 
   const handleDateChange = (event) => {
     const newDate = event.target.value;
-    
+
     // Update URL params to persist the selected date
     const newSearchParams = new URLSearchParams(searchParams);
     newSearchParams.set('date', newDate);
     setSearchParams(newSearchParams);
-    
+
     updateDataState({ selectedDate: newDate, currentPage: 1 });
   };
 
@@ -306,7 +306,7 @@ const ScrapedBrands = () => {
                       </span>
                     </div>
                   )}
-                  
+
                   <div className="space-y-3" style={{ paddingTop: brand.isWatchlist ? '32px' : '0' }}>
                     {/* Brand Name */}
                     <div>

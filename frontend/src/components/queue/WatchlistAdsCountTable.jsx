@@ -1,19 +1,33 @@
 import { useState } from 'react';
 import Card from '../ui/Card';
-import LoadingState from '../ui/LoadingState';
+import LoadingSpinner from '../ui/LoadingSpinner';
 import ErrorDisplay from '../ui/ErrorDisplay';
 import Table from '../ui/Table';
 import Pagination from '../ui/Pagination';
-import { Eye, Users, ExternalLink } from 'lucide-react';
+import { Eye, Users, ExternalLink, Circle } from 'lucide-react';
 import { openFacebookAdLibrary } from '../../utils/facebookAdLibrary';
 
 const WatchlistAdsCountTable = ({ watchlistBrandsQueue, loading, error, onPageChange }) => {
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Status indicator component - only show green dot for active
+  const StatusIndicator = ({ status }) => {
+    if (status === 'active') {
+      return (
+        <Circle 
+          className="h-2 w-2 text-green-500" 
+          fill="currentColor"
+          title="Active"
+        />
+      );
+    }
+    return null; // No dot for other statuses
+  };
+
   if (loading && !watchlistBrandsQueue) {
     return (
       <Card>
-        <LoadingState size="lg" message="Loading watchlist ads count..." />
+        <LoadingSpinner />
       </Card>
     );
   }
@@ -63,8 +77,9 @@ const WatchlistAdsCountTable = ({ watchlistBrandsQueue, loading, error, onPageCh
         <div>
           <div className="flex items-center space-x-2">
             <div className="text-sm font-medium text-gray-900 max-w-[115px] sm:max-w-none truncate">
-              {brand.brand_name || brand.page_name || 'Unknown'}
+              {brand.brand_name || brand.page_name || brand.actual_name || 'Unknown'}
             </div>
+            <StatusIndicator status={brand.job_status} />
             {brand.page_id && (
               <button
                 onClick={() => openFacebookAdLibrary(brand.page_id)}
@@ -162,7 +177,7 @@ const WatchlistAdsCountTable = ({ watchlistBrandsQueue, loading, error, onPageCh
         </div>
 
         {loading ? (
-          <LoadingState size="lg" message="Loading watchlist brands..." />
+          <LoadingSpinner />
         ) : !loading && watchlistBrands && watchlistBrands.length > 0 ? (
           <>
             {/* Desktop Table View */}
@@ -185,8 +200,9 @@ const WatchlistAdsCountTable = ({ watchlistBrandsQueue, loading, error, onPageCh
                       <div className="flex-1 pr-3">
                         <div className="flex items-center space-x-2 mb-1">
                           <h3 className="font-semibold text-gray-900 text-lg leading-tight">
-                            {brand.brand_name || brand.page_name || 'Unknown'}
+                            {brand.brand_name || brand.page_name || brand.actual_name || 'Unknown'}
                           </h3>
+                          <StatusIndicator status={brand.job_status} />
                           {brand.page_id && (
                             <button
                               onClick={() => openFacebookAdLibrary(brand.page_id)}

@@ -1,7 +1,7 @@
 import Card from '../ui/Card';
 import Table from '../ui/Table';
 import Pagination from '../ui/Pagination';
-import LoadingState from '../ui/LoadingState';
+import LoadingSpinner from '../ui/LoadingSpinner';
 import ErrorDisplay from '../ui/ErrorDisplay';
 import SearchInput from '../ui/SearchInput';
 import Button from '../ui/Button';
@@ -170,7 +170,7 @@ const FailedQueue = ({
             <Button onClick={() => onSearch('')}>Retry</Button>
           </ErrorDisplay>
         ) : failed.loading ? (
-          <LoadingState size="lg" message="Loading failed brands..." />
+          <LoadingSpinner />
         ) : failed.isSearching ? (
           <div className="text-center py-12 sm:py-16">
             <div className="flex flex-col items-center space-y-4">
@@ -211,7 +211,7 @@ const FailedQueue = ({
           </Card>
         ) : failed.loading ? (
           <Card>
-            <LoadingState size="lg" message="Loading failed brands..." />
+            <LoadingSpinner />
           </Card>
         ) : failed.isSearching ? (
           <Card>
