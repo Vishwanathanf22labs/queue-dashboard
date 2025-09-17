@@ -29,7 +29,11 @@ const QueueManagement = () => {
     removePendingBrand,
     removeFailedBrand,
     movePendingToFailed,
-    moveFailedToPending
+    moveFailedToPending,
+    clearWatchlistPendingQueue,
+    clearWatchlistFailedQueue,
+    moveAllWatchlistPendingToFailed,
+    moveAllWatchlistFailedToPending
   } = useQueueStore();
 
   const [state, setState] = useState({
@@ -228,6 +232,18 @@ const QueueManagement = () => {
           break;
         case 'Move All Failed to Pending':
           response = await moveAllFailedToPending();
+          break;
+        case 'Clear Watchlist Pending Queue':
+          response = await clearWatchlistPendingQueue();
+          break;
+        case 'Clear Watchlist Failed Queue':
+          response = await clearWatchlistFailedQueue();
+          break;
+        case 'Move All Watchlist Pending to Failed':
+          response = await moveAllWatchlistPendingToFailed();
+          break;
+        case 'Move All Watchlist Failed to Pending':
+          response = await moveAllWatchlistFailedToPending();
           break;
         default:
           throw new Error('Unknown action');

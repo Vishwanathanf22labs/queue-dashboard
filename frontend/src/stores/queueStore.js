@@ -101,10 +101,10 @@ const useQueueStore = create((set, get) => ({
     }
   },
 
-  fetchBrandProcessingQueue: async (page = 1, limit = 10) => {
+  fetchBrandProcessingQueue: async (page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc') => {
     try {
       set({ loading: true, error: null });
-      const response = await queueAPI.getBrandProcessingQueue(page, limit);
+      const response = await queueAPI.getBrandProcessingQueue(page, limit, sortBy, sortOrder);
       set({ brandProcessingQueue: response.data, loading: false });
       return response.data;
     } catch (error) {
@@ -114,10 +114,10 @@ const useQueueStore = create((set, get) => ({
     }
   },
 
-  fetchWatchlistBrandsQueue: async (page = 1, limit = 10) => {
+  fetchWatchlistBrandsQueue: async (page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc') => {
     try {
       set({ loading: true, error: null });
-      const response = await queueAPI.getWatchlistBrandsQueue(page, limit);
+      const response = await queueAPI.getWatchlistBrandsQueue(page, limit, sortBy, sortOrder);
       set({ watchlistBrandsQueue: response.data, loading: false });
       return response.data;
     } catch (error) {
@@ -437,6 +437,70 @@ const useQueueStore = create((set, get) => ({
         error.response?.data?.message ||
         error.message ||
         "Failed to move watchlist brands to pending queue";
+      set({ error: errorMessage, loading: false });
+      throw error;
+    }
+  },
+
+  clearWatchlistPendingQueue: async () => {
+    try {
+      set({ loading: true, error: null });
+      const response = await queueAPI.clearWatchlistPendingQueue();
+      set({ loading: false });
+      return response.data;
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to clear watchlist pending queue";
+      set({ error: errorMessage, loading: false });
+      throw error;
+    }
+  },
+
+  clearWatchlistFailedQueue: async () => {
+    try {
+      set({ loading: true, error: null });
+      const response = await queueAPI.clearWatchlistFailedQueue();
+      set({ loading: false });
+      return response.data;
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to clear watchlist failed queue";
+      set({ error: errorMessage, loading: false });
+      throw error;
+    }
+  },
+
+  moveAllWatchlistPendingToFailed: async () => {
+    try {
+      set({ loading: true, error: null });
+      const response = await queueAPI.moveAllWatchlistPendingToFailed();
+      set({ loading: false });
+      return response.data;
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to move all watchlist pending brands to failed queue";
+      set({ error: errorMessage, loading: false });
+      throw error;
+    }
+  },
+
+  moveAllWatchlistFailedToPending: async () => {
+    try {
+      set({ loading: true, error: null });
+      const response = await queueAPI.moveAllWatchlistFailedToPending();
+      set({ loading: false });
+      return response.data;
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to move all watchlist failed brands to pending queue";
       set({ error: errorMessage, loading: false });
       throw error;
     }

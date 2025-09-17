@@ -225,4 +225,8 @@ module.exports = {
   changeBrandScore,
   moveWatchlistFailedToPending: queueMoveService.moveWatchlistFailedToPending,
   moveWatchlistToPending: queueMoveService.moveWatchlistToPending,
+  clearWatchlistPendingQueue: queueClearService.clearWatchlistPendingQueue,
+  clearWatchlistFailedQueue: queueClearService.clearWatchlistFailedQueue,
+  moveAllWatchlistPendingToFailed: queueMoveService.moveAllWatchlistPendingToFailed,
+  moveAllWatchlistFailedToPending: queueMoveService.moveAllWatchlistFailedToPending,
 };

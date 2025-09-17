@@ -50,11 +50,23 @@ export const queueAPI = {
 
   getStats: () => api.get("/queue/stats"),
 
-  getBrandProcessingQueue: (page = 1, limit = 10) =>
-    api.get(`/queue/brand-processing?page=${page}&limit=${limit}`),
+  getBrandProcessingQueue: (page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc') => {
+    const params = new URLSearchParams();
+    params.append("page", page);
+    params.append("limit", limit);
+    params.append("sortBy", sortBy);
+    params.append("sortOrder", sortOrder);
+    return api.get(`/queue/brand-processing?${params.toString()}`);
+  },
 
-  getWatchlistBrandsQueue: (page = 1, limit = 10) =>
-    api.get(`/queue/watchlist-brands?page=${page}&limit=${limit}`),
+  getWatchlistBrandsQueue: (page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc') => {
+    const params = new URLSearchParams();
+    params.append("page", page);
+    params.append("limit", limit);
+    params.append("sortBy", sortBy);
+    params.append("sortOrder", sortOrder);
+    return api.get(`/queue/watchlist-brands?${params.toString()}`);
+  },
 
   getScrapedStats: (date = null, days = null) => {
     const params = new URLSearchParams();
@@ -119,6 +131,18 @@ export const queueAPI = {
       `/queue/queue-management/watchlist/failed/${brandId}/move-to-pending`
     ),
 
+  // Watchlist specific clear operations
+  clearWatchlistPendingQueue: () =>
+    api.delete("/queue/queue-management/watchlist/pending/clear"),
+  clearWatchlistFailedQueue: () =>
+    api.delete("/queue/queue-management/watchlist/failed/clear"),
+
+  // Watchlist specific bulk move operations
+  moveAllWatchlistPendingToFailed: () =>
+    api.put("/queue/queue-management/watchlist/pending/move-all-to-failed"),
+  moveAllWatchlistFailedToPending: () =>
+    api.put("/queue/queue-management/watchlist/failed/move-all-to-pending"),
+
   getQueueManagementStats: () => api.get("/queue/queue-management/stats"),
 
   getScraperStatus: () => api.get("/queue/scraper/status"),
@@ -136,11 +160,13 @@ export const adminAPI = {
 };
 
 export const scrapedBrandsAPI = {
-  getScrapedBrands: (page = 1, limit = 10, date = null) => {
+  getScrapedBrands: (page = 1, limit = 10, date = null, sortBy = 'normal', sortOrder = 'desc') => {
     const params = new URLSearchParams();
     params.append("page", page);
     params.append("limit", limit);
     if (date) params.append("date", date);
+    params.append("sortBy", sortBy);
+    params.append("sortOrder", sortOrder);
     return api.get(`/scraped-brands?${params.toString()}`);
   },
 
@@ -155,6 +181,25 @@ export const scrapedBrandsAPI = {
     params.append("query", query);
     if (date) params.append("date", date);
     return api.get(`/scraped-brands/search?${params.toString()}`);
+  }
+};
+
+export const pipelineAPI = {
+  getAllBrandsStatus: (page = 1, limit = 10, date = null, sortBy = 'normal', sortOrder = 'desc') => {
+    const params = new URLSearchParams();
+    params.append("page", page);
+    params.append("limit", limit);
+    if (date) params.append("date", date);
+    params.append("sortBy", sortBy);
+    params.append("sortOrder", sortOrder);
+    return api.get(`/pipeline-status/all?${params.toString()}`);
+  },
+  
+  searchBrandsStatus: (query, date = null) => {
+    const params = new URLSearchParams();
+    params.append("query", query);
+    if (date) params.append("date", date);
+    return api.get(`/pipeline-status/search?${params.toString()}`);
   }
 };
 

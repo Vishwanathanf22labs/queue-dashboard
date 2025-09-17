@@ -182,19 +182,35 @@ const Dashboard = () => {
     }
   };
 
-  const handleQueuePageChange = async (newPage) => {
+  const handleQueuePageChange = async (newPage, sortBy = 'normal', sortOrder = 'desc') => {
     try {
-      await fetchBrandProcessingQueue(newPage, 10);
+      await fetchBrandProcessingQueue(newPage, 10, sortBy, sortOrder);
     } catch (error) {
       toast.error(`Failed to load page ${newPage}: ${error.message || error}`);
     }
   };
 
-  const handleWatchlistPageChange = async (newPage) => {
+  const handleWatchlistPageChange = async (newPage, sortBy = 'normal', sortOrder = 'desc') => {
     try {
-      await fetchWatchlistBrandsQueue(newPage, 10);
+      await fetchWatchlistBrandsQueue(newPage, 10, sortBy, sortOrder);
     } catch (error) {
       toast.error(`Failed to load watchlist page ${newPage}: ${error.message || error}`);
+    }
+  };
+
+  const handleQueueSortChange = async (sortBy, sortOrder) => {
+    try {
+      await fetchBrandProcessingQueue(1, 10, sortBy, sortOrder);
+    } catch (error) {
+      toast.error(`Failed to sort queue: ${error.message || error}`);
+    }
+  };
+
+  const handleWatchlistSortChange = async (sortBy, sortOrder) => {
+    try {
+      await fetchWatchlistBrandsQueue(1, 10, sortBy, sortOrder);
+    } catch (error) {
+      toast.error(`Failed to sort watchlist queue: ${error.message || error}`);
     }
   };
 
@@ -323,9 +339,13 @@ const Dashboard = () => {
         loading={loading}
         error={error}
         onPageChange={handleWatchlistPageChange}
+        onSortChange={handleWatchlistSortChange}
       />
 
-      <BrandProcessingQueue onPageChange={handleQueuePageChange} />
+      <BrandProcessingQueue 
+        onPageChange={handleQueuePageChange}
+        onSortChange={handleQueueSortChange}
+      />
 
       <SeparateScrapedStats />
     </div>

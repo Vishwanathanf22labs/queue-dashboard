@@ -95,7 +95,9 @@ async function getBullMQJobStates(queueType = 'regular') {
 async function getBrandProcessingQueue(
   page = PAGINATION.DEFAULT_PAGE,
   limit = PAGINATION.DEFAULT_LIMIT,
-  queueType = 'regular'
+  queueType = 'regular',
+  sortBy = 'normal',
+  sortOrder = 'desc'
 ) {
   try {
     await initializeBullMQQueues();
@@ -193,9 +195,41 @@ async function getBrandProcessingQueue(
       }
     }
 
-    brandProcessingData.sort(
-      (a, b) => parseInt(b.brand_id) - parseInt(a.brand_id)
-    );
+    // Sort by the specified field and order
+    if (sortBy !== 'normal') {
+      brandProcessingData.sort((a, b) => {
+        let aValue, bValue;
+        
+        switch (sortBy) {
+          case 'total_ads':
+            aValue = parseInt(a.total_ads) || 0;
+            bValue = parseInt(b.total_ads) || 0;
+            break;
+          case 'brand_id':
+            aValue = parseInt(a.brand_id) || 0;
+            bValue = parseInt(b.brand_id) || 0;
+            break;
+          case 'created_at':
+            aValue = new Date(a.created_at).getTime();
+            bValue = new Date(b.created_at).getTime();
+            break;
+          case 'page_name':
+            aValue = (a.page_name || '').toLowerCase();
+            bValue = (b.page_name || '').toLowerCase();
+            break;
+          default:
+            aValue = parseInt(a.total_ads) || 0;
+            bValue = parseInt(b.total_ads) || 0;
+        }
+        
+        if (sortOrder === 'asc') {
+          return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+        } else {
+          return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+        }
+      });
+    }
+    // If sortBy is 'normal', keep original order (no sorting)
 
     const startIndex = (validPage - 1) * validLimit;
     const endIndex = startIndex + validLimit;
@@ -219,11 +253,13 @@ async function getBrandProcessingQueue(
 
 async function getWatchlistBrandsQueue(
   page = PAGINATION.DEFAULT_PAGE,
-  limit = PAGINATION.DEFAULT_LIMIT
+  limit = PAGINATION.DEFAULT_LIMIT,
+  sortBy = 'normal',
+  sortOrder = 'desc'
 ) {
   try {
     // Use the new getBrandProcessingQueue function with watchlist queue type
-    return await getBrandProcessingQueue(page, limit, 'watchlist');
+    return await getBrandProcessingQueue(page, limit, 'watchlist', sortBy, sortOrder);
   } catch (error) {
     logger.error("Error in getWatchlistBrandsQueue:", error);
     throw error;

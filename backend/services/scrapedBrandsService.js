@@ -9,7 +9,7 @@ class ScrapedBrandsService {
    * @param {string} date - Date in YYYY-MM-DD format (optional, defaults to current date)
    * @returns {Object} - Paginated results with brands data
    */
-  static async getScrapedBrands(page = 1, limit = 10, date = null) {
+  static async getScrapedBrands(page = 1, limit = 10, date = null, sortBy = 'normal', sortOrder = 'desc') {
     try {
       // Use provided date if given, otherwise use current date
       let targetDate;
@@ -29,7 +29,7 @@ class ScrapedBrandsService {
       });
       const watchlistBrandIds = watchlistRecords.map(record => record.brand_id);
 
-      // Get all brand IDs first (without pagination) to sort properly
+      // Get all brand records first (without pagination) to sort properly
       const allDailyStatusRecords = await BrandsDailyStatus.findAll({
         where: {
           started_at: {
@@ -37,22 +37,70 @@ class ScrapedBrandsService {
             [Op.lt]: endOfDay
           }
         },
-        attributes: ["brand_id"],
-        group: ["brand_id"],
-        order: [["brand_id", "DESC"]]
+        attributes: ["brand_id", "active_ads", "inactive_ads", "started_at"],
+        order: [["brand_id", "DESC"], ["started_at", "DESC"]]
       });
 
-      // Sort brands: watchlist first, then regular
-      const sortedBrandIds = allDailyStatusRecords
-        .map(record => record.brand_id)
-        .sort((a, b) => {
-          const aIsWatchlist = watchlistBrandIds.includes(a);
-          const bIsWatchlist = watchlistBrandIds.includes(b);
+      // Group by brand_id and get the latest record for each brand
+      const brandMap = new Map();
+      allDailyStatusRecords.forEach(record => {
+        const brandId = record.brand_id;
+        if (!brandMap.has(brandId) || new Date(record.started_at) > new Date(brandMap.get(brandId).started_at)) {
+          brandMap.set(brandId, record);
+        }
+      });
+
+      // Convert map to array for sorting
+      const uniqueBrandRecords = Array.from(brandMap.values());
+
+      // Sort brands based on sorting parameters
+      let sortedBrandIds;
+      
+      if (sortBy === 'normal') {
+        // Default sorting: watchlist first, then regular
+        sortedBrandIds = uniqueBrandRecords
+          .map(record => record.brand_id)
+          .sort((a, b) => {
+            const aIsWatchlist = watchlistBrandIds.includes(a);
+            const bIsWatchlist = watchlistBrandIds.includes(b);
+            
+            if (aIsWatchlist && !bIsWatchlist) return -1; // a (watchlist) comes first
+            if (!aIsWatchlist && bIsWatchlist) return 1;  // b (watchlist) comes first
+            return 0; // maintain original order for same type
+          });
+      } else {
+        // Sort by active_ads or inactive_ads
+        const recordsWithData = uniqueBrandRecords.map(record => ({
+          brand_id: record.brand_id,
+          active_ads: record.active_ads || 0,
+          inactive_ads: record.inactive_ads || 0,
+          isWatchlist: watchlistBrandIds.includes(record.brand_id)
+        }));
+
+        recordsWithData.sort((a, b) => {
+          let aValue, bValue;
           
-          if (aIsWatchlist && !bIsWatchlist) return -1; // a (watchlist) comes first
-          if (!aIsWatchlist && bIsWatchlist) return 1;  // b (watchlist) comes first
-          return 0; // maintain original order for same type
+          if (sortBy === 'active_ads') {
+            aValue = parseInt(a.active_ads) || 0;
+            bValue = parseInt(b.active_ads) || 0;
+          } else if (sortBy === 'inactive_ads') {
+            aValue = parseInt(a.inactive_ads) || 0;
+            bValue = parseInt(b.inactive_ads) || 0;
+          } else {
+            // Fallback to brand_id
+            aValue = parseInt(a.brand_id) || 0;
+            bValue = parseInt(b.brand_id) || 0;
+          }
+          
+          if (sortOrder === 'asc') {
+            return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+          } else {
+            return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+          }
         });
+
+        sortedBrandIds = recordsWithData.map(record => record.brand_id);
+      }
 
       // Update total count after sorting
       const totalCount = sortedBrandIds.length;
@@ -110,22 +158,33 @@ class ScrapedBrandsService {
           'stopped_ads',
           'comparative_status',
           'started_at'
-        ],
-        order: [['started_at', 'DESC']]
+        ]
+        // Removed order clause to preserve our custom sorting
       });
 
-      // Transform the data to include brand_name with COALESCE logic and watchlist flag
-      const transformedBrands = scrapedBrands.map(item => ({
-        brand_id: item.brand_id,
-        active_ads: item.active_ads,
-        inactive_ads: item.inactive_ads,
-        stopped_ads: item.stopped_ads,
-        comparative_status: item.comparative_status,
-        started_at: item.started_at,
-        brand_name: item.brand?.actual_name || item.brand?.name || 'Unknown',
-        page_id: item.brand?.page_id || null, // Add page_id for external link
-        isWatchlist: watchlistBrandIds.includes(item.brand_id) // Add watchlist flag
-      }));
+      // Create a map for quick lookup of brand data
+      const brandDataMap = new Map();
+      scrapedBrands.forEach(item => {
+        brandDataMap.set(item.brand_id, item);
+      });
+
+      // Transform the data in the correct sorted order
+      const transformedBrands = paginatedBrandIds.map(brandId => {
+        const item = brandDataMap.get(brandId);
+        if (!item) return null;
+        
+        return {
+          brand_id: item.brand_id,
+          active_ads: item.active_ads,
+          inactive_ads: item.inactive_ads,
+          stopped_ads: item.stopped_ads,
+          comparative_status: item.comparative_status,
+          started_at: item.started_at,
+          brand_name: item.brand?.actual_name || item.brand?.name || 'Unknown',
+          page_id: item.brand?.page_id || null, // Add page_id for external link
+          isWatchlist: watchlistBrandIds.includes(item.brand_id) // Add watchlist flag
+        };
+      }).filter(Boolean); // Remove any null entries
 
       // Calculate pagination info
       const totalPages = Math.ceil(totalCount / limit);

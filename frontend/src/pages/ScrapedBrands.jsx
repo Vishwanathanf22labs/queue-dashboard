@@ -7,11 +7,14 @@ import Pagination from '../components/ui/Pagination';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import ErrorDisplay from '../components/ui/ErrorDisplay';
 import Badge from '../components/ui/Badge';
+import SortButton from '../components/ui/SortButton';
+import useScrapedBrandsSorting from '../hooks/useScrapedBrandsSorting';
 import { Calendar, Search, TrendingUp, TrendingDown, Minus, BarChart3, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const ScrapedBrands = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { sortBy, sortOrder, updateSorting } = useScrapedBrandsSorting('normal', 'desc');
 
   // Get date from URL params or default to today
   const getInitialDate = () => {
@@ -41,10 +44,12 @@ const ScrapedBrands = () => {
     setDataState(prev => ({ ...prev, ...updates }));
   }, []);
 
-  const loadScrapedBrands = useCallback(async (page = 1, date = null) => {
+  const loadScrapedBrands = useCallback(async (page = 1, date = null, sortByParam = null, sortOrderParam = null) => {
     try {
       setIsLoading(true);
-      const response = await scrapedBrandsAPI.getScrapedBrands(page, 10, date);
+      const currentSortBy = sortByParam || sortBy;
+      const currentSortOrder = sortOrderParam || sortOrder;
+      const response = await scrapedBrandsAPI.getScrapedBrands(page, 10, date, currentSortBy, currentSortOrder);
 
       if (response.data.success) {
         const brands = response.data.data.brands || [];
@@ -65,7 +70,7 @@ const ScrapedBrands = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [updateDataState]);
+  }, [updateDataState, sortBy, sortOrder]);
 
   const loadStats = useCallback(async (date = null) => {
     try {
@@ -128,6 +133,12 @@ const ScrapedBrands = () => {
     updateDataState({ currentPage: page });
   };
 
+  const handleSortChange = (field, order) => {
+    updateSorting(field, order);
+    // Reset to page 1 when sorting changes
+    updateDataState({ currentPage: 1 });
+  };
+
   const getComparativeStatusIcon = (status) => {
     switch (status) {
       case 'increased':
@@ -170,11 +181,11 @@ const ScrapedBrands = () => {
     }
   }, [searchParams, dataState.selectedDate, updateDataState]);
 
-  // Load data on component mount and when date/page changes
+  // Load data on component mount and when date/page/sorting changes
   useEffect(() => {
-    loadScrapedBrands(dataState.currentPage, dataState.selectedDate);
+    loadScrapedBrands(dataState.currentPage, dataState.selectedDate, sortBy, sortOrder);
     loadStats(dataState.selectedDate);
-  }, [dataState.currentPage, dataState.selectedDate, loadScrapedBrands, loadStats]);
+  }, [dataState.currentPage, dataState.selectedDate, sortBy, sortOrder, loadScrapedBrands, loadStats]);
 
   if (isLoading && !dataState.brands.length) {
     return (
@@ -278,6 +289,34 @@ const ScrapedBrands = () => {
             />
           </div>
         </div>
+
+        {/* Sorting Buttons */}
+        {!showSearchResults && (
+          <div className="mb-6 flex flex-wrap gap-2">
+            <span className="text-sm font-medium text-gray-700 self-center">Sort by:</span>
+            <SortButton
+              label="Normal"
+              sortBy="normal"
+              currentSortBy={sortBy}
+              currentSortOrder={sortOrder}
+              onSortChange={handleSortChange}
+            />
+            <SortButton
+              label="Active Ads"
+              sortBy="active_ads"
+              currentSortBy={sortBy}
+              currentSortOrder={sortOrder}
+              onSortChange={handleSortChange}
+            />
+            <SortButton
+              label="Inactive Ads"
+              sortBy="inactive_ads"
+              currentSortBy={sortBy}
+              currentSortOrder={sortOrder}
+              onSortChange={handleSortChange}
+            />
+          </div>
+        )}
 
         {/* Results */}
         {showSearchResults && searchResults.length === 0 && searchTerm ? (

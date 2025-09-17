@@ -10,6 +10,8 @@ class ScrapedBrandsController {
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
       const date = req.query.date || req.query.testDate || null; // Accept date from query parameter
+      const sortBy = req.query.sortBy || 'normal'; // Add sorting parameter
+      const sortOrder = req.query.sortOrder || 'desc'; // Add sort order parameter
 
       // Validate pagination parameters
       if (page < 1) {
@@ -34,7 +36,7 @@ class ScrapedBrandsController {
         });
       }
 
-      const result = await ScrapedBrandsService.getScrapedBrands(page, limit, date);
+      const result = await ScrapedBrandsService.getScrapedBrands(page, limit, date, sortBy, sortOrder);
 
       if (result.success) {
         res.status(200).json(result);

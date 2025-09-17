@@ -4,14 +4,17 @@ import LoadingSpinner from '../ui/LoadingSpinner';
 import ErrorDisplay from '../ui/ErrorDisplay';
 import Table from '../ui/Table';
 import Pagination from '../ui/Pagination';
+import SortButton from '../ui/SortButton';
 import useQueueStore from '../../stores/queueStore';
 import { Users, Eye, ExternalLink, Circle } from 'lucide-react';
 import { openFacebookAdLibrary } from '../../utils/facebookAdLibrary';
 
-const BrandProcessingQueue = ({ onPageChange }) => {
+const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
   const { brandProcessingQueue, loading, error } = useQueueStore();
 
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState('normal');
+  const [sortOrder, setSortOrder] = useState('desc');
 
   // Status indicator component - only show green dot for active
   const StatusIndicator = ({ status }) => {
@@ -35,9 +38,18 @@ const BrandProcessingQueue = ({ onPageChange }) => {
     if (tableSection) {
       tableSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-    // Call the API to fetch the new page
+    // Call the API to fetch the new page with current sorting
     if (onPageChange) {
-      onPageChange(newPage);
+      onPageChange(newPage, sortBy, sortOrder);
+    }
+  };
+
+  const handleSortChange = (field, order) => {
+    setSortBy(field);
+    setSortOrder(order);
+    
+    if (onSortChange) {
+      onSortChange(field, order);
     }
   };
 
@@ -75,12 +87,8 @@ const BrandProcessingQueue = ({ onPageChange }) => {
   const itemsPerPage = pagination?.per_page || 10;
   const apiCurrentPage = pagination?.current_page || 1;
 
-  // Use brands directly from API and sort by date descending
-  const currentPageBrands = (brands || []).sort((a, b) => {
-    const dateA = new Date(a.created_at || 0);
-    const dateB = new Date(b.created_at || 0);
-    return dateB - dateA; // Descending order (newest first)
-  });
+  // Use brands directly from API (server-side sorted)
+  const currentPageBrands = brands || [];
 
   const columns = [
     {
@@ -182,6 +190,32 @@ const BrandProcessingQueue = ({ onPageChange }) => {
               Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} brands
             </div>
           </div>
+        </div>
+
+        {/* Sorting Buttons */}
+        <div className="mb-4 flex flex-wrap gap-2">
+          <span className="text-sm font-medium text-gray-700 self-center">Sort by:</span>
+          <SortButton
+            label="Normal"
+            sortBy="normal"
+            currentSortBy={sortBy}
+            currentSortOrder={sortOrder}
+            onSortChange={handleSortChange}
+          />
+          <SortButton
+            label="Ads Count"
+            sortBy="total_ads"
+            currentSortBy={sortBy}
+            currentSortOrder={sortOrder}
+            onSortChange={handleSortChange}
+          />
+          <SortButton
+            label="Created Date"
+            sortBy="created_at"
+            currentSortBy={sortBy}
+            currentSortOrder={sortOrder}
+            onSortChange={handleSortChange}
+          />
         </div>
 
         {loading ? (
