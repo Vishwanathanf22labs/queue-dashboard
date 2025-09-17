@@ -4,11 +4,14 @@ import LoadingSpinner from '../ui/LoadingSpinner';
 import ErrorDisplay from '../ui/ErrorDisplay';
 import Table from '../ui/Table';
 import Pagination from '../ui/Pagination';
+import SortButton from '../ui/SortButton';
 import { Eye, Users, ExternalLink, Circle } from 'lucide-react';
 import { openFacebookAdLibrary } from '../../utils/facebookAdLibrary';
 
-const WatchlistAdsCountTable = ({ watchlistBrandsQueue, loading, error, onPageChange }) => {
+const WatchlistAdsCountTable = ({ watchlistBrandsQueue, loading, error, onPageChange, onSortChange }) => {
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState('normal');
+  const [sortOrder, setSortOrder] = useState('desc');
 
   // Status indicator component - only show green dot for active
   const StatusIndicator = ({ status }) => {
@@ -50,12 +53,8 @@ const WatchlistAdsCountTable = ({ watchlistBrandsQueue, loading, error, onPageCh
     );
   }
 
-  // Use watchlist brands directly from the API and sort by date descending
-  const watchlistBrands = (watchlistBrandsQueue.brands || []).sort((a, b) => {
-    const dateA = new Date(a.created_at || 0);
-    const dateB = new Date(b.created_at || 0);
-    return dateB - dateA; // Descending order (newest first)
-  });
+  // Use watchlist brands directly from the API (server-side sorted)
+  const watchlistBrands = watchlistBrandsQueue.brands || [];
   const totalPages = watchlistBrandsQueue.pagination?.total_pages || 1;
   const totalItems = watchlistBrandsQueue.pagination?.total_items || 0;
   const itemsPerPage = watchlistBrandsQueue.pagination?.per_page || 10;
@@ -122,7 +121,16 @@ const WatchlistAdsCountTable = ({ watchlistBrandsQueue, loading, error, onPageCh
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage);
     if (onPageChange) {
-      onPageChange(newPage);
+      onPageChange(newPage, sortBy, sortOrder);
+    }
+  };
+
+  const handleSortChange = (field, order) => {
+    setSortBy(field);
+    setSortOrder(order);
+    
+    if (onSortChange) {
+      onSortChange(field, order);
     }
   };
 
@@ -174,6 +182,32 @@ const WatchlistAdsCountTable = ({ watchlistBrandsQueue, loading, error, onPageCh
               Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} watchlist brands
             </div>
           </div>
+        </div>
+
+        {/* Sorting Buttons */}
+        <div className="mb-4 flex flex-wrap gap-2">
+          <span className="text-sm font-medium text-gray-700 self-center">Sort by:</span>
+          <SortButton
+            label="Normal"
+            sortBy="normal"
+            currentSortBy={sortBy}
+            currentSortOrder={sortOrder}
+            onSortChange={handleSortChange}
+          />
+          <SortButton
+            label="Ads Count"
+            sortBy="total_ads"
+            currentSortBy={sortBy}
+            currentSortOrder={sortOrder}
+            onSortChange={handleSortChange}
+          />
+          <SortButton
+            label="Created Date"
+            sortBy="created_at"
+            currentSortBy={sortBy}
+            currentSortOrder={sortOrder}
+            onSortChange={handleSortChange}
+          />
         </div>
 
         {loading ? (

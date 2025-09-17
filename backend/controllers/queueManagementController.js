@@ -309,6 +309,94 @@ async function moveIndividualWatchlistFailedToPending(req, res) {
   }
 }
 
+async function clearWatchlistPendingQueue(req, res) {
+  try {
+    logger.info("Clear watchlist pending queue request received");
+
+    const result = await queueManagementService.clearWatchlistPendingQueue();
+
+    res.status(200).json({
+      success: true,
+      message: "Watchlist pending queue cleared successfully",
+      data: result,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error("Error in clearWatchlistPendingQueue controller:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to clear watchlist pending queue",
+      error: error.message,
+    });
+  }
+}
+
+async function clearWatchlistFailedQueue(req, res) {
+  try {
+    logger.info("Clear watchlist failed queue request received");
+
+    const result = await queueManagementService.clearWatchlistFailedQueue();
+
+    res.status(200).json({
+      success: true,
+      message: "Watchlist failed queue cleared successfully",
+      data: result,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error("Error in clearWatchlistFailedQueue controller:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to clear watchlist failed queue",
+      error: error.message,
+    });
+  }
+}
+
+async function moveAllWatchlistPendingToFailed(req, res) {
+  try {
+    logger.info("Move all watchlist pending to failed request received");
+
+    const result = await queueManagementService.moveAllWatchlistPendingToFailed();
+
+    res.status(200).json({
+      success: true,
+      message: "All watchlist pending brands moved to failed queue successfully",
+      data: result,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error("Error in moveAllWatchlistPendingToFailed controller:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to move all watchlist pending brands to failed queue",
+      error: error.message,
+    });
+  }
+}
+
+async function moveAllWatchlistFailedToPending(req, res) {
+  try {
+    logger.info("Move all watchlist failed to pending request received");
+
+    const result = await queueManagementService.moveAllWatchlistFailedToPending();
+
+    res.status(200).json({
+      success: true,
+      message: "All watchlist failed brands moved to pending queue successfully",
+      data: result,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error("Error in moveAllWatchlistFailedToPending controller:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to move all watchlist failed brands to pending queue",
+      error: error.message,
+    });
+  }
+}
+
 
 
 module.exports = {
@@ -325,4 +413,8 @@ module.exports = {
   moveWatchlistToPending,
   getQueueManagementStats,
   moveIndividualWatchlistFailedToPending,
+  clearWatchlistPendingQueue,
+  clearWatchlistFailedQueue,
+  moveAllWatchlistPendingToFailed,
+  moveAllWatchlistFailedToPending,
 };

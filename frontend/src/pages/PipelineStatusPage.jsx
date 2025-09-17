@@ -13,12 +13,15 @@ import {
   ExternalLink
 } from 'lucide-react';
 import api from '../services/api';
+import { pipelineAPI } from '../services/api';
 import Card from '../components/ui/Card';
 import Pagination from '../components/ui/Pagination';
 import SearchInput from '../components/ui/SearchInput';
 import Button from '../components/ui/Button';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import ErrorDisplay from '../components/ui/ErrorDisplay';
+import SortButton from '../components/ui/SortButton';
+import usePipelineSorting from '../hooks/usePipelineSorting';
 
 const PipelineStatusPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -38,6 +41,7 @@ const PipelineStatusPage = () => {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [pageLoading, setPageLoading] = useState(false);
   const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
@@ -45,49 +49,85 @@ const PipelineStatusPage = () => {
     searchParams.get('date') || new Date().toISOString().split('T')[0]
   );
 
-  // Debounced search term to avoid excessive filtering
+  // Search state management
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+
+  // Sorting state management
+  const { sortBy, sortOrder, updateSorting } = usePipelineSorting('normal', 'desc');
+
+  // Debounced search term to avoid excessive API calls
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
-  // Debounce search term
+  // Search brands function
+  const searchBrands = useCallback(async (query) => {
+    if (!query.trim()) {
+      setShowSearchResults(false);
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      const response = await pipelineAPI.searchBrandsStatus(query, selectedDate);
+
+      if (response.data && response.data.success) {
+        setSearchResults(response.data.data.brands || []);
+        setShowSearchResults(true);
+      } else {
+        setSearchResults([]);
+        setShowSearchResults(false);
+      }
+    } catch (error) {
+      console.error('Error searching brands:', error);
+      setSearchResults([]);
+      setShowSearchResults(false);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [selectedDate]);
+
+  // Clear search function
+  const clearSearch = useCallback(() => {
+    setSearchTerm('');
+    setShowSearchResults(false);
+    setSearchResults([]);
+    setIsSearching(false);
+    setDebouncedSearchTerm('');
+  }, []);
+
+  // Debounce search term and trigger search
   useEffect(() => {
+    // If search term is empty, clear immediately
+    if (!searchTerm.trim()) {
+      setDebouncedSearchTerm('');
+      setShowSearchResults(false);
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    // If search term has content, debounce the search
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
+      searchBrands(searchTerm);
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchTerm]);
+  }, [searchTerm, searchBrands]);
 
-  // Memoize filtered brands (sorting is now done at backend level)
-  const filteredBrands = useMemo(() => {
-    const brands = data.brands || [];
-    
-    // Filter by search term
-    if (debouncedSearchTerm.trim()) {
-      const lowerSearchTerm = debouncedSearchTerm.toLowerCase();
-      return brands.filter(brand =>
-        brand.brandName?.toLowerCase().includes(lowerSearchTerm) ||
-        brand.brandId?.toString().includes(debouncedSearchTerm) ||
-        brand.pageId?.toLowerCase().includes(lowerSearchTerm)
-      );
-    }
-    
-    return brands;
-  }, [data.brands, debouncedSearchTerm]);
+  // Get display brands (search results or paginated data)
+  const displayBrands = showSearchResults ? searchResults : (data.brands || []);
 
   // Memoize API call to prevent unnecessary calls
-  const fetchPipelineStatus = useCallback(async () => {
+  const fetchPipelineStatus = useCallback(async (page = currentPage, sortByParam = null, sortOrderParam = null) => {
     try {
       setError(null);
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: '10'
-      });
-
-      if (selectedDate) {
-        params.append('date', selectedDate);
-      }
-
-      const response = await api.get(`/pipeline-status/all?${params}`);
+      const currentSortBy = sortByParam || sortBy;
+      const currentSortOrder = sortOrderParam || sortOrder;
+      const response = await pipelineAPI.getAllBrandsStatus(page, 10, selectedDate, currentSortBy, currentSortOrder);
 
       if (response.data && response.data.brands) {
         setData(response.data);
@@ -111,22 +151,46 @@ const PipelineStatusPage = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [currentPage, selectedDate]);
+  }, [currentPage, selectedDate, sortBy, sortOrder]);
 
   // Fetch data on component mount and when dependencies change
   useEffect(() => {
-    fetchPipelineStatus();
-  }, [fetchPipelineStatus]);
+    // Only fetch paginated data if not in search mode
+    if (!showSearchResults) {
+      fetchPipelineStatus(currentPage);
+    }
+  }, [fetchPipelineStatus, showSearchResults, currentPage]);
 
   // Memoize handlers to prevent unnecessary re-renders
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchPipelineStatus();
+    fetchPipelineStatus(currentPage);
+  }, [fetchPipelineStatus, currentPage]);
+
+  const handlePageChange = useCallback(async (newPage) => {
+    setPageLoading(true);
+    setCurrentPage(newPage);
+    try {
+      await fetchPipelineStatus(newPage);
+    } catch (error) {
+      console.error('Error changing page:', error);
+    } finally {
+      setPageLoading(false);
+    }
   }, [fetchPipelineStatus]);
 
-  const handlePageChange = useCallback((newPage) => {
-    setCurrentPage(newPage);
-  }, []);
+  const handleSortChange = useCallback(async (field, order) => {
+    updateSorting(field, order);
+    setCurrentPage(1); // Reset to page 1 when sorting changes
+    setPageLoading(true);
+    try {
+      await fetchPipelineStatus(1, field, order);
+    } catch (error) {
+      console.error('Error changing sort:', error);
+    } finally {
+      setPageLoading(false);
+    }
+  }, [updateSorting, fetchPipelineStatus]);
 
   const handleDateChange = useCallback((date) => {
     setSelectedDate(date);
@@ -513,6 +577,10 @@ const PipelineStatusPage = () => {
     return <LoadingSpinner />;
   }
 
+  if (pageLoading) {
+    return <LoadingSpinner />;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -563,53 +631,118 @@ const PipelineStatusPage = () => {
         {/* Error Display */}
         {error && <ErrorDisplay error={error} className="mb-6" />}
 
+        {/* Sorting Controls - Only show when not in search mode */}
+        {!showSearchResults && (
+          <Card className="mb-4">
+            <div className="flex flex-wrap gap-2">
+              <span className="text-sm font-medium text-gray-700 self-center">Sort by:</span>
+              <SortButton
+                label="Normal"
+                sortBy="normal"
+                currentSortBy={sortBy}
+                currentSortOrder={sortOrder}
+                onSortChange={handleSortChange}
+              />
+              <SortButton
+                label="Ads Count"
+                sortBy="active_ads"
+                currentSortBy={sortBy}
+                currentSortOrder={sortOrder}
+                onSortChange={handleSortChange}
+              />
+            </div>
+          </Card>
+        )}
+
         {/* Search and Filters */}
         <Card className="mb-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
-              <SearchInput
-                value={searchTerm}
-                onChange={setSearchTerm}
-                placeholder="Search brands by name, ID, or page ID..."
-                leftIcon={<Search className="h-4 w-4" />}
-                className="w-full"
-              />
+                <SearchInput
+                  value={searchTerm}
+                  onChange={setSearchTerm}
+                  onClear={clearSearch}
+                  placeholder="Search brands by name, ID, or page ID..."
+                  leftIcon={<Search className="h-4 w-4" />}
+                  loading={isSearching}
+                  className="w-full"
+                />
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <Eye className="h-4 w-4" />
-              <span>Showing {filteredBrands.length} of {data.pagination.total} brands</span>
+              <span>
+                {showSearchResults 
+                  ? `Showing ${searchResults.length} search result${searchResults.length !== 1 ? 's' : ''}`
+                  : `Showing ${displayBrands.length} of ${data.pagination.total} brands`
+                }
+              </span>
             </div>
           </div>
         </Card>
 
         {/* Brand Cards Grid */}
-        {filteredBrands.length === 0 ? (
+        {displayBrands.length === 0 ? (
           <Card className="text-center py-12">
             <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No brands found</h3>
             <p className="text-gray-500">
-              {searchTerm ? 'Try adjusting your search terms' : 'No brands available for the selected date'}
+              {showSearchResults ? 'Try adjusting your search terms' : 'No brands available for the selected date'}
             </p>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
-            {filteredBrands.map((brand) => (
-              <BrandCard key={brand.brandId} brand={brand} />
-            ))}
+          <div className="relative">
+            {pageLoading && (
+              <div className="absolute inset-0 bg-gray-50 bg-opacity-75 flex items-center justify-center z-10 rounded-lg">
+                <div className="flex items-center space-x-2 text-blue-600">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <span className="text-sm font-medium">Loading brands...</span>
+                </div>
+              </div>
+            )}
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
+              {displayBrands.map((brand) => (
+                <BrandCard key={brand.brandId} brand={brand} />
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Pagination */}
-        {data.pagination.pages > 1 && (
+        {/* Pagination - Only show when not in search mode */}
+        {!showSearchResults && data.pagination.pages > 1 && (
           <Card>
-            <Pagination
-              currentPage={data.pagination.page}
-              totalPages={data.pagination.pages}
-              onPageChange={handlePageChange}
-              totalItems={data.pagination.total}
-              itemsPerPage={data.pagination.limit}
-              showPageInfo={true}
-            />
+            <div className="relative">
+              {pageLoading && (
+                <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-lg">
+                  <div className="flex items-center space-x-2 text-blue-600">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <span className="text-sm">Loading page...</span>
+                  </div>
+                </div>
+              )}
+              <Pagination
+                currentPage={data.pagination.page}
+                totalPages={data.pagination.pages}
+                onPageChange={handlePageChange}
+                totalItems={data.pagination.total}
+                itemsPerPage={data.pagination.limit}
+                showPageInfo={true}
+              />
+            </div>
+          </Card>
+        )}
+
+        {/* Search Results Info */}
+        {showSearchResults && (
+          <Card className="text-center py-4">
+            <div className="text-sm text-gray-600">
+              Showing {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for "{searchTerm}"
+              <button
+                onClick={clearSearch}
+                className="ml-2 text-blue-600 hover:text-blue-800 underline"
+              >
+                Clear search
+              </button>
+            </div>
           </Card>
         )}
 

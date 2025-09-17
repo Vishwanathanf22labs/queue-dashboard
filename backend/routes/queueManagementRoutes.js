@@ -55,7 +55,27 @@ router.put(
   queueManagementController.moveIndividualWatchlistFailedToPending
 );
 
+// Watchlist specific clear operations
+router.delete(
+  "/watchlist/pending/clear",
+  queueManagementController.clearWatchlistPendingQueue
+);
 
+router.delete(
+  "/watchlist/failed/clear",
+  queueManagementController.clearWatchlistFailedQueue
+);
+
+// Watchlist specific bulk move operations
+router.put(
+  "/watchlist/pending/move-all-to-failed",
+  queueManagementController.moveAllWatchlistPendingToFailed
+);
+
+router.put(
+  "/watchlist/failed/move-all-to-pending",
+  queueManagementController.moveAllWatchlistFailedToPending
+);
 
 // Get queue management statistics
 router.get("/stats", queueManagementController.getQueueManagementStats);

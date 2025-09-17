@@ -96,8 +96,60 @@ async function clearFailedQueue(queueType = 'regular') {
   }
 }
 
+async function clearWatchlistPendingQueue() {
+  try {
+    logger.info("Clearing entire watchlist pending queue");
+
+    const redis = getQueueRedis('watchlist');
+    const queueKey = REDIS_KEYS.WATCHLIST.PENDING_BRANDS;
+    const pendingCount = await redis.zcard(queueKey);
+
+    await redis.del(queueKey);
+
+    logger.info(
+      `Successfully cleared watchlist pending queue. Removed ${pendingCount} brands`
+    );
+
+    return {
+      cleared_count: pendingCount,
+      queue_type: 'watchlist',
+      message: `Cleared ${pendingCount} brands from watchlist pending queue`,
+    };
+  } catch (error) {
+    logger.error("Error clearing watchlist pending queue:", error);
+    throw error;
+  }
+}
+
+async function clearWatchlistFailedQueue() {
+  try {
+    logger.info("Clearing entire watchlist failed queue");
+
+    const redis = getQueueRedis('watchlist');
+    const queueKey = REDIS_KEYS.WATCHLIST.FAILED_BRANDS;
+    const failedCount = await redis.llen(queueKey);
+
+    await redis.del(queueKey);
+
+    logger.info(
+      `Successfully cleared watchlist failed queue. Removed ${failedCount} brands`
+    );
+
+    return {
+      cleared_count: failedCount,
+      queue_type: 'watchlist',
+      message: `Cleared ${failedCount} brands from watchlist failed queue`,
+    };
+  } catch (error) {
+    logger.error("Error clearing watchlist failed queue:", error);
+    throw error;
+  }
+}
+
 module.exports = {
   clearAllQueues,
   clearPendingQueue,
   clearFailedQueue,
+  clearWatchlistPendingQueue,
+  clearWatchlistFailedQueue,
 };

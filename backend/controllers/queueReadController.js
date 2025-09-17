@@ -142,11 +142,13 @@ async function getQueueStats(req, res) {
 
 async function getBrandProcessingQueue(req, res) {
   try {
-    const { page = 1, limit = 10, queueType = 'regular' } = req.query;
+    const { page = 1, limit = 10, queueType = 'regular', sortBy = 'normal', sortOrder = 'desc' } = req.query;
     const processingData = await queueService.getBrandProcessingQueue(
       parseInt(page),
       parseInt(limit),
-      queueType
+      queueType,
+      sortBy,
+      sortOrder
     );
 
     res.status(200).json(processingData);
@@ -162,10 +164,12 @@ async function getBrandProcessingQueue(req, res) {
 
 async function getWatchlistBrandsQueue(req, res) {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc' } = req.query;
     const watchlistData = await queueService.getWatchlistBrandsQueue(
       parseInt(page),
-      parseInt(limit)
+      parseInt(limit),
+      sortBy,
+      sortOrder
     );
 
     res.status(200).json(watchlistData);
