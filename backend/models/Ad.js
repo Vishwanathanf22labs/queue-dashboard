@@ -52,12 +52,7 @@ const Ad = db.define(
       type: Sequelize.JSON,
     },
     ad_life: {
-      type: Sequelize.NUMBER,
-    },
-    // ✅ media_type column with enum
-    media_type: {
-      type: Sequelize.ENUM("image", "video", "both"),
-      allowNull: true,
+      type: Sequelize.STRING,
     },
     created_at: {
       type: Sequelize.DATE,

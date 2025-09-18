@@ -24,16 +24,16 @@ const BrandsDailyStatus = db.define(
       type: Sequelize.DATE,
     },
     active_ads: {
-      type: Sequelize.SMALLINT,
+      type: Sequelize.INTEGER,
     },
     inactive_ads: {
-      type: Sequelize.SMALLINT,
+      type: Sequelize.INTEGER,
     },
     stopped_ads: {
-      type: Sequelize.SMALLINT,
+      type: Sequelize.INTEGER,
     },
     duration: {
-      type: Sequelize.SMALLINT,
+      type: Sequelize.INTEGER,
     },
     status: {
       type: Sequelize.ENUM('Started', 'Completed', 'Blocked'),
