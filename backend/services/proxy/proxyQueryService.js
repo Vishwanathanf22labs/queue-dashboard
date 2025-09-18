@@ -30,6 +30,20 @@ async function getProxies(page = 1, limit = 10, filter = "all", search = "") {
           password: keyParts[4],
           ...proxyData
         };
+        
+        // Check for proxy lock
+        const lockKey = `proxy:lock:${keyParts[1]}:${keyParts[2]}:${keyParts[3]}:${keyParts[4]}`;
+        const lockData = await globalRedis.get(lockKey);
+        if (lockData) {
+          proxy.is_locked = true;
+          proxy.lock_worker = formatWorkerName(lockData);
+          proxy.lock_key = lockKey;
+        } else {
+          proxy.is_locked = false;
+          proxy.lock_worker = null;
+          proxy.lock_key = null;
+        }
+        
         allProxies.push(proxy);
       }
     }
@@ -555,6 +569,24 @@ async function getProxyManagementStats() {
     logger.error("Error getting proxy management stats:", error);
     throw error;
   }
+}
+
+/**
+ * Format worker name for display (e.g., "watchlist-1" -> "WL-1", "non-watchlist-1" -> "NWL-1")
+ */
+function formatWorkerName(workerName) {
+  if (!workerName) return null;
+  
+  if (workerName.startsWith('watchlist-')) {
+    const number = workerName.replace('watchlist-', '');
+    return `WL-${number}`;
+  } else if (workerName.startsWith('non-watchlist-')) {
+    const number = workerName.replace('non-watchlist-', '');
+    return `NWL-${number}`;
+  }
+  
+  // For any other format, return as is
+  return workerName;
 }
 
 module.exports = {

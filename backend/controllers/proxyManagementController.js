@@ -408,6 +408,36 @@ async function getNextWorkingProxy(req, res) {
   }
 }
 
+
+async function unlockProxy(req, res) {
+  try {
+    const { lockKey } = req.body;
+
+    if (!lockKey) {
+      return res.status(400).json({
+        success: false,
+        message: "Lock key is required"
+      });
+    }
+
+    const result = await proxyManagementService.unlockProxy(lockKey);
+    
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      res.status(404).json(result);
+    }
+
+  } catch (error) {
+    logger.error('Error in unlockProxy controller:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+}
+
 module.exports = {
   addProxy,
   removeProxy,
@@ -421,8 +451,9 @@ module.exports = {
   getLastMonthProxies,
   switchToNextWorkingProxy,
   getSystemHealth,
-  markProxyAsFailed,      // ← NEW: Scraper marks proxy as failed
-  markProxyAsWorking,     // ← NEW: Scraper marks proxy as working
-  getNextWorkingProxy     // ← NEW: Scraper gets next working proxy
+  markProxyAsFailed,     
+  markProxyAsWorking,    
+  getNextWorkingProxy,    
+  unlockProxy            
 };
 

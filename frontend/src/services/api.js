@@ -244,6 +244,7 @@ export const proxyAPI = {
         query
       )}&criteria=${criteria}`
     ),
+  unlockProxy: (lockKey) => api.post("/queue/proxy/unlock", { lockKey }),
 };
 
 export default api;

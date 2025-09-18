@@ -126,22 +126,34 @@ async function getBrandProcessingQueue(
       queue.getJobs(["failed"], 0, JOB_FETCH_LIMIT),
     ]);
 
-    // Also get all individual job keys from Redis
-    const jobKeys = await redis.keys("bull:brand-processing:[0-9]*");
+    // Also get all individual job keys from Redis (excluding lock keys)
+    const allJobKeys = await redis.keys("bull:brand-processing:*");
+    const jobKeys = allJobKeys.filter(key => {
+      // Exclude lock keys, meta keys, and other non-job keys
+      return !key.includes(':lock') && 
+             !key.includes(':meta') && 
+             !key.includes(':marker') &&
+             /bull:brand-processing:\d+$/.test(key); // Only numeric job IDs
+    });
+    
     const individualJobs = [];
     
     for (const key of jobKeys) {
       try {
-        const jobData = await redis.hgetall(key);
-        if (jobData && jobData.data) {
-          const job = JSON.parse(jobData.data);
-          const jobId = key.split(':').pop();
-          individualJobs.push({
-            id: jobId,
-            data: job,
-            timestamp: parseInt(jobData.timestamp) || Date.now(),
-            state: jobData.state || 'unknown'
-          });
+        // Check key type before attempting hgetall
+        const keyType = await redis.type(key);
+        if (keyType === 'hash') {
+          const jobData = await redis.hgetall(key);
+          if (jobData && jobData.data) {
+            const job = JSON.parse(jobData.data);
+            const jobId = key.split(':').pop();
+            individualJobs.push({
+              id: jobId,
+              data: job,
+              timestamp: parseInt(jobData.timestamp) || Date.now(),
+              state: jobData.state || 'unknown'
+            });
+          }
         }
       } catch (error) {
         logger.warn(`Error parsing job ${key}:`, error.message);

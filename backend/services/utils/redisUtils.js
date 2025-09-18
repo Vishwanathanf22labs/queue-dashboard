@@ -56,16 +56,31 @@ async function getTypesenseBullQueueData(queueType = 'regular') {
     if (!redis) return new Map();
 
     // Get Ad Update Bull queue data (for Typesense indexing)
-    const queueKeys = await redis.keys("bull:ad-update:*");
+    const allQueueKeys = await redis.keys("bull:ad-update:*");
+    const queueKeys = allQueueKeys.filter(key => {
+      // Exclude lock keys, meta keys, and other non-job keys
+      return !key.includes(':lock') && 
+             !key.includes(':meta') && 
+             !key.includes(':marker') &&
+             /bull:ad-update:\d+$/.test(key); // Only numeric job IDs
+    });
     const jobData = new Map();
 
     for (const key of queueKeys) {
-      const jobDataRaw = await redis.hgetall(key);
-      if (jobDataRaw && jobDataRaw.data) {
-        const adId = JSON.parse(jobDataRaw.data).adid;
-        if (adId) {
-          jobData.set(adId, true);
+      try {
+        // Check key type before attempting hgetall
+        const keyType = await redis.type(key);
+        if (keyType === 'hash') {
+          const jobDataRaw = await redis.hgetall(key);
+          if (jobDataRaw && jobDataRaw.data) {
+            const adId = JSON.parse(jobDataRaw.data).adid;
+            if (adId) {
+              jobData.set(adId, true);
+            }
+          }
         }
+      } catch (error) {
+        console.warn(`Error parsing ad-update job ${key}:`, error.message);
       }
     }
 
@@ -82,16 +97,31 @@ async function getTypesenseFailedQueueData(queueType = 'regular') {
     if (!redis) return new Map();
 
     // Get Ad Update failed queue data
-    const failedKeys = await redis.keys("bull:ad-update:failed:*");
+    const allFailedKeys = await redis.keys("bull:ad-update:failed:*");
+    const failedKeys = allFailedKeys.filter(key => {
+      // Exclude lock keys, meta keys, and other non-job keys
+      return !key.includes(':lock') && 
+             !key.includes(':meta') && 
+             !key.includes(':marker') &&
+             /bull:ad-update:failed:\d+$/.test(key); // Only numeric job IDs
+    });
     const failedData = new Map();
 
     for (const key of failedKeys) {
-      const jobDataRaw = await redis.hgetall(key);
-      if (jobDataRaw && jobDataRaw.data) {
-        const adId = JSON.parse(jobDataRaw.data).adid;
-        if (adId) {
-          failedData.set(adId, true);
+      try {
+        // Check key type before attempting hgetall
+        const keyType = await redis.type(key);
+        if (keyType === 'hash') {
+          const jobDataRaw = await redis.hgetall(key);
+          if (jobDataRaw && jobDataRaw.data) {
+            const adId = JSON.parse(jobDataRaw.data).adid;
+            if (adId) {
+              failedData.set(adId, true);
+            }
+          }
         }
+      } catch (error) {
+        console.warn(`Error parsing ad-update failed job ${key}:`, error.message);
       }
     }
 
@@ -108,16 +138,31 @@ async function getFileUploadBullQueueData(queueType = 'regular') {
     if (!redis) return new Map();
 
     // Get brand processing Bull queue data (for file upload)
-    const queueKeys = await redis.keys("bull:brand-processing:*");
+    const allQueueKeys = await redis.keys("bull:brand-processing:*");
+    const queueKeys = allQueueKeys.filter(key => {
+      // Exclude lock keys, meta keys, and other non-job keys
+      return !key.includes(':lock') && 
+             !key.includes(':meta') && 
+             !key.includes(':marker') &&
+             /bull:brand-processing:\d+$/.test(key); // Only numeric job IDs
+    });
     const jobData = new Map();
 
     for (const key of queueKeys) {
-      const jobDataRaw = await redis.hgetall(key);
-      if (jobDataRaw && jobDataRaw.data) {
-        const brandId = JSON.parse(jobDataRaw.data).brandId;
-        if (brandId) {
-          jobData.set(brandId, true);
+      try {
+        // Check key type before attempting hgetall
+        const keyType = await redis.type(key);
+        if (keyType === 'hash') {
+          const jobDataRaw = await redis.hgetall(key);
+          if (jobDataRaw && jobDataRaw.data) {
+            const brandId = JSON.parse(jobDataRaw.data).brandId;
+            if (brandId) {
+              jobData.set(brandId, true);
+            }
+          }
         }
+      } catch (error) {
+        console.warn(`Error parsing brand-processing job ${key}:`, error.message);
       }
     }
 
