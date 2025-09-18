@@ -53,7 +53,7 @@ const Brand = db.define(
       type: DataTypes.STRING,
     },
     priority: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.STRING,
     },
     website: {
       type: DataTypes.STRING,
@@ -77,7 +77,7 @@ const Brand = db.define(
       type: DataTypes.INTEGER,
     },
     uid: {
-      type: DataTypes.UUID,
+      type: DataTypes.STRING,
     },
   },
   { timestamps: false }

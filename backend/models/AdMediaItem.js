@@ -66,11 +66,6 @@ const AdMediaItem = db.define(
     link_description: {
       type: Sequelize.TEXT,
     },
-    // NEW: media_type column with varchar
-    media_type: {
-      type: Sequelize.STRING, // This will be 'image' or 'video'
-      allowNull: true,
-    },
     uuid: {
       type: Sequelize.UUID,
       allowNull: true,
