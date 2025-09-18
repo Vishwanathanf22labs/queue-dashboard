@@ -487,6 +487,38 @@ async function getPerformanceMetrics() {
   }
 }
 
+async function unlockProxy(lockKey) {
+  try {
+    // Check if lock exists
+    const lockData = await globalRedis.get(lockKey);
+    if (!lockData) {
+      return {
+        success: false,
+        message: "Proxy lock not found",
+        data: null
+      };
+    }
+
+    // Delete the lock key
+    await globalRedis.del(lockKey);
+    
+    logger.info(`Proxy unlocked successfully: ${lockKey} (was locked by: ${lockData})`);
+
+    return {
+      success: true,
+      message: "Proxy unlocked successfully",
+      data: {
+        lock_key: lockKey,
+        previous_worker: lockData
+      }
+    };
+
+  } catch (error) {
+    logger.error("Error unlocking proxy:", error);
+    throw error;
+  }
+}
+
 module.exports = {
   updateProxyStatus,
   markProxyAsFailed,      // ← NEW: Scraper calls this when proxy fails
@@ -495,5 +527,6 @@ module.exports = {
   checkProxyHealth,
   getSystemHealth,
   bulkUpdateStatus,
-  getPerformanceMetrics
+  getPerformanceMetrics,
+  unlockProxy            // ← NEW: Unlock proxy functionality
 };

@@ -5,10 +5,11 @@ import Badge from '../ui/Badge';
 import Table from '../ui/Table';
 import { proxyAPI } from '../../services/api';
 import toast from 'react-hot-toast';
-import { CheckCircle, XCircle, Trash2, RotateCcw } from 'lucide-react';
+import { CheckCircle, XCircle, Trash2, RotateCcw, Lock, Unlock } from 'lucide-react';
 
 const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated }) => {
   const [updatingStatus, setUpdatingStatus] = useState(null);
+  const [unlockingProxy, setUnlockingProxy] = useState(null);
 
   const handleStatusUpdate = useCallback(async (proxyId, isWorking) => {
     setUpdatingStatus(proxyId);
@@ -43,6 +44,33 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated }) => {
     }
   }, [onProxyRemoved]);
 
+  const handleUnlockProxy = useCallback(async (proxyId, lockKey) => {
+    console.log('🔓 Unlocking proxy:', { proxyId, lockKey }); // Debug log
+    setUnlockingProxy(proxyId);
+    try {
+      const response = await proxyAPI.unlockProxy(lockKey);
+      console.log('🔓 Unlock response:', response); // Debug log
+
+      if (response.data.success) {
+        toast.success('Proxy unlocked successfully');
+        onProxyUpdated?.(proxyId, { is_locked: false, lock_worker: null, lock_key: null });
+      } else {
+        toast.error(response.data.message || 'Failed to unlock proxy');
+      }
+    } catch (error) {
+      console.error('🔓 Unlock error:', error); // Debug log
+      if (error.response?.status === 401) {
+        toast.error('Admin authentication required');
+      } else if (error.response?.status === 404) {
+        toast.error('Unlock endpoint not found - check server configuration');
+      } else {
+        toast.error(error.response?.data?.message || 'Error unlocking proxy');
+      }
+    } finally {
+      setUnlockingProxy(null);
+    }
+  }, [onProxyUpdated]);
+
   if (!proxies || proxies.length === 0) {
     return (
       <Card title="Proxy List" subtitle="Manage your proxy configurations">
@@ -59,7 +87,19 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated }) => {
       {/* Mobile view */}
       <div className="block xl:hidden space-y-4">
         {proxies.map((proxy) => (
-          <div key={proxy.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+          <div key={proxy.id} className="relative bg-gray-50 rounded-lg p-4 border border-gray-200">
+            {/* Lock emoji with worker name floating in top left */}
+            {proxy.is_locked && (
+              <div 
+                className="absolute top-2 left-2 cursor-pointer hover:bg-orange-100 px-1 py-1 rounded z-10 flex flex-col items-center"
+                onClick={() => handleUnlockProxy(proxy.id, proxy.lock_key)}
+                title={`Click to unlock proxy locked by ${proxy.lock_worker}`}
+              >
+                <span className="text-sm">🔒</span>
+                <span className="text-xs text-orange-600 font-medium leading-none">{proxy.lock_worker}</span>
+              </div>
+            )}
+
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
@@ -173,7 +213,19 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated }) => {
           {/* Table Body */}
           <div className="divide-y divide-gray-200">
             {proxies.map((proxy, index) => (
-              <div key={proxy.id} className={`grid grid-cols-12 gap-1 px-4 py-3 text-xs hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+              <div key={proxy.id} className={`relative grid grid-cols-12 gap-1 px-4 py-3 text-xs hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                {/* Lock emoji with worker name floating in the left corner */}
+                {proxy.is_locked && (
+                  <div 
+                    className="absolute left-2 top-2 cursor-pointer hover:bg-orange-100 px-1 py-1 rounded z-10 flex flex-col items-center"
+                    onClick={() => handleUnlockProxy(proxy.id, proxy.lock_key)}
+                    title={`Click to unlock proxy locked by ${proxy.lock_worker}`}
+                  >
+                    <span className="text-sm">🔒</span>
+                    <span className="text-xs text-orange-600 font-medium leading-none">{proxy.lock_worker}</span>
+                  </div>
+                )}
+
                 {/* Proxy */}
                 <div className="col-span-3 flex flex-col items-center justify-center min-w-0">
                   <div className="font-medium text-gray-900 truncate w-full text-center">

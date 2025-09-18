@@ -16,7 +16,8 @@ const {
   getSystemHealth,
   markProxyAsFailed,
   markProxyAsWorking,
-  getNextWorkingProxy
+  getNextWorkingProxy,
+  unlockProxy
 } = require("../controllers/proxyManagementController");
 
 // Public routes (no authentication required)
@@ -34,6 +35,7 @@ router.delete("/remove/:proxyId", adminAuth, removeProxy);
 router.put("/status/:proxyId", adminAuth, updateProxyStatus);
 router.post("/switch/:failedProxyId", adminAuth, switchToNextWorkingProxy);
 router.delete("/clear", adminAuth, clearAllProxies);
+router.post("/unlock", adminAuth, unlockProxy);
 
 // NEW: Scraper routes (no auth needed - scraper calls these)
 router.post("/scraper/failed/:proxyId", markProxyAsFailed);        // ← Scraper marks proxy as failed

@@ -33,6 +33,9 @@ module.exports = {
   markProxyAsWorking: proxyHealth.markProxyAsWorking,    // ← Scraper calls this  
   getNextWorkingProxy: proxyHealth.getNextWorkingProxy,  // ← Scraper calls this
   
+  // NEW: Proxy Lock Functions
+  unlockProxy: proxyHealth.unlockProxy,                   // ← Unlock proxy functionality
+  
   // Switch Operations
   switchToNextWorkingProxy: proxySwitch.switchToNextWorkingProxy,
   getNextAvailableProxy: proxySwitch.getNextAvailableProxy,
