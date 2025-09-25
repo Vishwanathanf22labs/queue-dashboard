@@ -1,7 +1,7 @@
 import Card from '../ui/Card';
 import { Users, AlertTriangle, RefreshCw } from 'lucide-react';
 
-const QueueStats = ({ pendingCount, failedCount }) => {
+const QueueStats = ({ pendingCount, failedCount, totalBrands }) => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-3 sm:mb-4 lg:mb-6">
       <Card>
@@ -40,7 +40,7 @@ const QueueStats = ({ pendingCount, failedCount }) => {
           <div className="ml-2 sm:ml-3 lg:ml-4">
             <p className="text-xs sm:text-sm font-medium text-gray-600">Total Brands</p>
             <p className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-600">
-              {pendingCount + failedCount}
+              {totalBrands || (pendingCount + failedCount)}
             </p>
           </div>
         </div>

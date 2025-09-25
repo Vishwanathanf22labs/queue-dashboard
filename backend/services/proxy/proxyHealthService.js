@@ -70,7 +70,8 @@ async function markProxyAsFailed(proxyKey, failureReason = 'Scraping failed') {
     const currentFailCount = parseInt(existingProxy.failCount || 0);
     const updateFields = {
       failCount: (currentFailCount + 1).toString(),
-      active: "false" // Set to inactive when failed
+      active: "false", // Set to inactive when failed
+      failure_reason: failureReason // Store the actual failure reason
     };
 
     // Mark proxy as failed

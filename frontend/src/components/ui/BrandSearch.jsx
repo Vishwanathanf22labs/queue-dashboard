@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, X, Check } from 'lucide-react';
 import useQueueStore from '../../stores/queueStore';
 import Button from './Button';
 
 const BrandSearch = ({ onBrandSelect, selectedBrand = null, disabled = false, onSearchAttempt = null }) => {
   const { searchBrands } = useQueueStore();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [searchState, setSearchState] = useState({
-    query: '',
+    query: searchParams.get('search') || '',
     results: [],
     isSearching: false,
     showDropdown: false,
@@ -33,6 +35,11 @@ const BrandSearch = ({ onBrandSelect, selectedBrand = null, disabled = false, on
       selectedIndex: -1,
       error: null
     });
+    
+    // Update URL parameters
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('search');
+    setSearchParams(newParams);
   };
 
   const performSearch = async (searchQuery) => {
@@ -73,6 +80,15 @@ const BrandSearch = ({ onBrandSelect, selectedBrand = null, disabled = false, on
       query: newQuery,
       error: null
     });
+
+    // Update URL parameters
+    const newParams = new URLSearchParams(searchParams);
+    if (newQuery && newQuery.trim()) {
+      newParams.set('search', newQuery);
+    } else {
+      newParams.delete('search');
+    }
+    setSearchParams(newParams);
 
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -171,6 +187,22 @@ const BrandSearch = ({ onBrandSelect, selectedBrand = null, disabled = false, on
       clearSearch();
     }
   }, [selectedBrand]);
+
+  // Handle URL parameter changes and trigger search on mount
+  useEffect(() => {
+    const urlSearchTerm = searchParams.get('search') || '';
+    if (urlSearchTerm && urlSearchTerm.trim().length >= 3) {
+      updateSearchState({
+        query: urlSearchTerm,
+        error: null
+      });
+      
+      // Trigger search for URL parameter
+      searchTimeoutRef.current = setTimeout(() => {
+        performSearch(urlSearchTerm);
+      }, 300);
+    }
+  }, [searchParams]);
 
   return (
     <div className="relative w-full min-w-0" ref={dropdownRef}>

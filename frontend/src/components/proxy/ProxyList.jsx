@@ -7,6 +7,31 @@ import { proxyAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import { CheckCircle, XCircle, Trash2, RotateCcw, Lock, Unlock } from 'lucide-react';
 
+// Helper function to format failure reasons for display
+const formatFailureReason = (failureReason) => {
+  if (!failureReason) return 'failed';
+  
+  // Map failure reasons to display text as requested
+  const reasonMap = {
+    'Rate limit detected during scrolling': 'RL',
+    'health_check_failed': 'fail hc',
+    'cooldown': 'cooldown'
+  };
+  
+  // Check for exact matches first
+  if (reasonMap[failureReason]) {
+    return reasonMap[failureReason];
+  }
+  
+  // Check for partial matches (e.g., "Rate limit detected..." -> "RL")
+  if (failureReason.toLowerCase().includes('rate limit')) {
+    return 'RL';
+  }
+  
+  // Default to 'fail' for any other failure reasons
+  return 'fail';
+};
+
 const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated }) => {
   const [updatingStatus, setUpdatingStatus] = useState(null);
   const [unlockingProxy, setUnlockingProxy] = useState(null);
@@ -45,11 +70,9 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated }) => {
   }, [onProxyRemoved]);
 
   const handleUnlockProxy = useCallback(async (proxyId, lockKey) => {
-    console.log('🔓 Unlocking proxy:', { proxyId, lockKey }); // Debug log
     setUnlockingProxy(proxyId);
     try {
       const response = await proxyAPI.unlockProxy(lockKey);
-      console.log('🔓 Unlock response:', response); // Debug log
 
       if (response.data.success) {
         toast.success('Proxy unlocked successfully');
@@ -58,7 +81,7 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated }) => {
         toast.error(response.data.message || 'Failed to unlock proxy');
       }
     } catch (error) {
-      console.error('🔓 Unlock error:', error); // Debug log
+      console.error('Unlock error:', error); // Debug log
       if (error.response?.status === 401) {
         toast.error('Admin authentication required');
       } else if (error.response?.status === 404) {
@@ -114,7 +137,7 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated }) => {
                 </div>
                 <div className="ml-3 flex-shrink-0">
                   <Badge variant={proxy.is_working ? 'success' : 'error'} size="sm">
-                    {proxy.is_working ? 'Working' : (proxy.failure_reason === 'cooldown' ? 'cooldown' : (proxy.failure_reason === 'health check' ? 'fail hc' : 'failed'))}
+                    {proxy.is_working ? 'Working' : formatFailureReason(proxy.failure_reason)}
                   </Badge>
                 </div>
               </div>
@@ -259,7 +282,7 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated }) => {
                     size="sm"
                     className="text-xs px-1 py-0.5"
                   >
-                    {proxy.is_working ? 'Good' : (proxy.failure_reason === 'cooldown' ? 'cooldown' : (proxy.failure_reason === 'health check' ? 'fail hc' : 'failed'))}
+                    {proxy.is_working ? 'Good' : formatFailureReason(proxy.failure_reason)}
                   </Badge>
                 </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   CheckCircle,
@@ -43,8 +43,15 @@ const PipelineStatusPage = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(
+    parseInt(searchParams.get('page')) || 1
+  );
   const [searchTerm, setSearchTerm] = useState('');
+
+  // FIXED: Separate state for input value and actual selected date
+  const [dateInputValue, setDateInputValue] = useState(
+    searchParams.get('date') || new Date().toISOString().split('T')[0]
+  );
   const [selectedDate, setSelectedDate] = useState(
     searchParams.get('date') || new Date().toISOString().split('T')[0]
   );
@@ -60,63 +67,130 @@ const PipelineStatusPage = () => {
   // Debounced search term to avoid excessive API calls
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
-  // Search brands function
+  // 🚀 Search with request ID to prevent stale results (ULTIMATE FIX)
+  const searchAbortRef = useRef(null);
+  const currentSearchRef = useRef('');
+  
   const searchBrands = useCallback(async (query) => {
+    // Cancel previous search request if still pending
+    if (searchAbortRef.current) {
+      searchAbortRef.current.abort();
+    }
+
     if (!query.trim()) {
       setShowSearchResults(false);
       setSearchResults([]);
       setIsSearching(false);
+      currentSearchRef.current = '';
       return;
     }
 
     try {
       setIsSearching(true);
-      const response = await pipelineAPI.searchBrandsStatus(query, selectedDate);
+      
+      // Store current search query
+      currentSearchRef.current = query;
+      
+      // Create new AbortController for this request
+      searchAbortRef.current = new AbortController();
+      
+      const response = await pipelineAPI.searchBrandsStatus(query, selectedDate, {
+        signal: searchAbortRef.current.signal
+      });
 
-      if (response.data && response.data.success) {
-        setSearchResults(response.data.data.brands || []);
-        setShowSearchResults(true);
-      } else {
-        setSearchResults([]);
-        setShowSearchResults(false);
+      // 🔥 CRITICAL: Only update UI if this response matches current search term
+      if (!searchAbortRef.current.signal.aborted && currentSearchRef.current === query) {
+        if (response.data && response.data.success) {
+          setSearchResults(response.data.data.brands || []);
+          setShowSearchResults(true);
+        } else {
+          setSearchResults([]);
+          setShowSearchResults(false);
+        }
       }
     } catch (error) {
-      console.error('Error searching brands:', error);
-      setSearchResults([]);
-      setShowSearchResults(false);
+      // Ignore cancelled requests
+      if (error.name !== 'AbortError' && error.name !== 'CanceledError') {
+        console.error('Error searching brands:', error);
+        // Only clear if this was the current search
+        if (currentSearchRef.current === query) {
+          setSearchResults([]);
+          setShowSearchResults(false);
+        }
+      }
     } finally {
-      setIsSearching(false);
+      // Only reset loading if this was the current search
+      if (currentSearchRef.current === query) {
+        setIsSearching(false);
+      }
     }
   }, [selectedDate]);
 
-  // Clear search function
+  // Clear search function with request cancellation
   const clearSearch = useCallback(() => {
     setSearchTerm('');
     setShowSearchResults(false);
     setSearchResults([]);
     setIsSearching(false);
     setDebouncedSearchTerm('');
+    
+    // Cancel any pending search requests
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    if (searchAbortRef.current) {
+      searchAbortRef.current.abort();
+    }
   }, []);
 
-  // Debounce search term and trigger search
-  useEffect(() => {
-    // If search term is empty, clear immediately
-    if (!searchTerm.trim()) {
-      setDebouncedSearchTerm('');
+  // 🚀 Simple search handler with stale result prevention
+  const handleSearch = useCallback((query) => {
+    setSearchTerm(query);
+    
+    // Update current search reference immediately
+    currentSearchRef.current = query;
+    
+    // Clear results immediately if empty or too short
+    if (!query.trim() || query.trim().length < 3) {
       setShowSearchResults(false);
       setSearchResults([]);
       setIsSearching(false);
+      currentSearchRef.current = '';
+      
+      // Cancel any pending search
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      if (searchAbortRef.current) {
+        searchAbortRef.current.abort();
+      }
       return;
     }
-
-    // If search term has content, debounce the search
-    const timer = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm);
-      searchBrands(searchTerm);
+    
+    // Debounce the actual search
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    debounceTimerRef.current = setTimeout(() => {
+      // Double-check current search term before making API call
+      if (currentSearchRef.current === query) {
+        searchBrands(query);
+      }
     }, 300);
+  }, [searchBrands]);
 
-    return () => clearTimeout(timer);
-  }, [searchTerm, searchBrands]);
+  // Refs for cleanup
+  const debounceTimerRef = useRef(null);
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   // Get display brands (search results or paginated data)
   const displayBrands = showSearchResults ? searchResults : (data.brands || []);
@@ -150,6 +224,7 @@ const PipelineStatusPage = () => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setPageLoading(false);
     }
   }, [currentPage, selectedDate, sortBy, sortOrder]);
 
@@ -159,7 +234,27 @@ const PipelineStatusPage = () => {
     if (!showSearchResults) {
       fetchPipelineStatus(currentPage);
     }
-  }, [fetchPipelineStatus, showSearchResults, currentPage]);
+  }, [showSearchResults, currentPage, selectedDate, sortBy, sortOrder, fetchPipelineStatus]); // Keep fetchPipelineStatus but with stable dependencies
+
+  // FIXED: Debounced date change effect to prevent immediate API calls while typing
+  useEffect(() => {
+    // Validate date format (YYYY-MM-DD) before making API call
+    const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(dateInputValue);
+
+    if (!isValidDate) return;
+
+    // Only update if the date actually changed
+    if (dateInputValue === selectedDate) return;
+
+    const timer = setTimeout(() => {
+      setLoading(true); 
+      setSelectedDate(dateInputValue);
+      setCurrentPage(1);
+      setSearchParams({ date: dateInputValue });
+    }, 700); 
+
+    return () => clearTimeout(timer);
+  }, [dateInputValue, selectedDate, setSearchParams]);
 
   // Memoize handlers to prevent unnecessary re-renders
   const handleRefresh = useCallback(() => {
@@ -167,39 +262,70 @@ const PipelineStatusPage = () => {
     fetchPipelineStatus(currentPage);
   }, [fetchPipelineStatus, currentPage]);
 
+  // const handlePageChange = useCallback(async (newPage) => {
+  //   setPageLoading(true);
+  //   setCurrentPage(newPage);
+    
+  //   // Update URL parameters to persist page number
+  //   const newSearchParams = new URLSearchParams(searchParams);
+  //   newSearchParams.set('page', newPage.toString());
+  //   if (selectedDate) {
+  //     newSearchParams.set('date', selectedDate);
+  //   }
+  //   setSearchParams(newSearchParams);
+    
+  //   try {
+  //     await fetchPipelineStatus(newPage);
+  //   } catch (error) {
+  //     console.error('Error changing page:', error);
+  //   } finally {
+  //     setPageLoading(false);
+  //   }
+  // }, [fetchPipelineStatus, searchParams, setSearchParams, selectedDate]);
+
   const handlePageChange = useCallback(async (newPage) => {
-    setPageLoading(true);
+    setPageLoading(true);  // ✅ Keep this for the loading indicator
     setCurrentPage(newPage);
+
+    // Update URL parameters to persist page number
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set('page', newPage.toString());
+    if (selectedDate) {
+      newSearchParams.set('date', selectedDate);
+    }
+    setSearchParams(newSearchParams);
+
     try {
       await fetchPipelineStatus(newPage);
     } catch (error) {
       console.error('Error changing page:', error);
     } finally {
-      setPageLoading(false);
+      setPageLoading(false);  // ✅ Keep this to reset loading
     }
-  }, [fetchPipelineStatus]);
+  }, [fetchPipelineStatus, searchParams, setSearchParams, selectedDate]);
 
-  const handleSortChange = useCallback(async (field, order) => {
+  const handleSortChange = useCallback((field, order) => {
+    setPageLoading(true);
     updateSorting(field, order);
     setCurrentPage(1); // Reset to page 1 when sorting changes
-    setPageLoading(true);
-    try {
-      await fetchPipelineStatus(1, field, order);
-    } catch (error) {
-      console.error('Error changing sort:', error);
-    } finally {
-      setPageLoading(false);
+    
+    // Update URL parameters to reset page to 1
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set('page', '1');
+    if (selectedDate) {
+      newSearchParams.set('date', selectedDate);
     }
-  }, [updateSorting, fetchPipelineStatus]);
+    setSearchParams(newSearchParams);
+    
+    // The useEffect will automatically trigger fetchPipelineStatus when sortBy/sortOrder changes
+  }, [updateSorting, searchParams, setSearchParams, selectedDate]);
 
-  const handleDateChange = useCallback((date) => {
-    setSelectedDate(date);
-    setCurrentPage(1);
-    setLoading(true);
-    setSearchParams({ date });
-  }, [setSearchParams]);
+  // FIXED: New date input change handler that only updates the input value
+  const handleDateInputChange = useCallback((e) => {
+    setDateInputValue(e.target.value);
+  }, []);
 
-  // FIXED: Updated status functions to handle new status types
+  // UPDATED: getStatusIcon function remains the same
   const getStatusIcon = useCallback((status, completed) => {
     const completedStatuses = [
       'Started', 'Completed',
@@ -272,7 +398,6 @@ const PipelineStatusPage = () => {
     }
   }, []);
 
-  // FIXED: Updated status text to handle new PROCESSING status
   const getStatusText = useCallback((status, completed) => {
     if (completed) return 'Completed';
 
@@ -325,7 +450,6 @@ const PipelineStatusPage = () => {
     });
   }, []);
 
-  // FIXED: Enhanced progress indicator for file upload status
   const getProgressIndicator = useCallback((completed, total, status) => {
     if (total === 0) return null;
 
@@ -333,7 +457,7 @@ const PipelineStatusPage = () => {
     let displayCompleted = completed;
     let displayTotal = total;
     let percentage = Math.round((completed / total) * 100);
-    
+
     if (status === 'COMPLETED') {
       displayCompleted = total; // Show all files as completed
       displayTotal = total;
@@ -376,16 +500,17 @@ const PipelineStatusPage = () => {
           </span>
         </div>
       )}
-      
+
       {/* Brand Header */}
       <div className="flex items-start justify-between mb-4">
-        <div className="flex-1" style={{ paddingTop: brand.isWatchlist ? '32px' : '0' }}>
-          <h3 className="text-lg font-semibold text-gray-900 truncate">
+        <div className="flex-1 min-w-0" style={{ paddingTop: brand.isWatchlist ? '32px' : '0' }}>
+          <h3 className="text-lg font-semibold text-gray-900 break-words overflow-hidden"
+            title={brand.brandName || 'Unknown Brand'}>
             {brand.brandName || 'Unknown Brand'}
           </h3>
-          <p className="text-sm text-gray-500">ID: {brand.brandId}</p>
+          <p className="text-sm text-gray-500 truncate">ID: {brand.brandId}</p>
           {brand.pageId && (
-            <p className="text-xs text-gray-400">Page: {brand.pageId}</p>
+            <p className="text-xs text-gray-400 truncate">Page: {brand.pageId}</p>
           )}
         </div>
         <div className="flex items-center gap-1">
@@ -464,7 +589,7 @@ const PipelineStatusPage = () => {
           </div>
         </div>
 
-        {/* FIXED: File Upload Status with enhanced display */}
+        {/* File Upload Status with enhanced display */}
         <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
           <div className="flex items-center gap-3">
             {getStatusIcon(brand.fileUpload?.status, brand.fileUpload?.completed)}
@@ -473,7 +598,7 @@ const PipelineStatusPage = () => {
               <p className={`text-xs ${getStatusColor(brand.fileUpload?.status, brand.fileUpload?.completed)}`}>
                 {getStatusText(brand.fileUpload?.status, brand.fileUpload?.completed)}
               </p>
-              {/* FIXED: Enhanced progress indicator for file upload */}
+              {/* Enhanced progress indicator for file upload */}
               {getProgressIndicator(
                 brand.fileUpload?.mediaWithAllUrls || 0,
                 brand.fileUpload?.totalMedia || 0,
@@ -485,12 +610,12 @@ const PipelineStatusPage = () => {
             {brand.fileUpload?.totalMedia > 0 && (
               <div className="space-y-1">
                 <p className="text-xs text-gray-400">
-                  {brand.fileUpload?.status === 'COMPLETED' 
+                  {brand.fileUpload?.status === 'COMPLETED'
                     ? `${brand.fileUpload.totalMedia}/${brand.fileUpload.totalMedia} files`
                     : `${brand.fileUpload.mediaWithAllUrls}/${brand.fileUpload.totalMedia} files`
                   }
                 </p>
-                {/* FIXED: Show queue and failed counts */}
+                {/* Show queue and failed counts */}
                 {(brand.fileUpload?.mediaInQueue > 0 || brand.fileUpload?.mediaFailed > 0) && (
                   <div className="flex flex-col gap-1">
                     {brand.fileUpload.mediaInQueue > 0 && (
@@ -511,7 +636,7 @@ const PipelineStatusPage = () => {
         </div>
       </div>
 
-      {/* FIXED: Enhanced additional info section */}
+      {/* Enhanced additional info section */}
       {(brand.typesense?.adsInQueue > 0 || brand.typesense?.adsFailed > 0 ||
         brand.fileUpload?.mediaInQueue > 0 || brand.fileUpload?.mediaFailed > 0) && (
           <div className="mt-4 pt-3 border-t border-gray-200">
@@ -557,19 +682,19 @@ const PipelineStatusPage = () => {
           </div>
         )}
 
-        {/* External Link Icon - Bottom Right */}
-        {brand.pageId && (
-          <button
-            onClick={() => {
-              const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=${brand.pageId}`;
-              window.open(url, '_blank', 'noopener,noreferrer');
-            }}
-            className="absolute bottom-4 right-4 p-2 text-gray-400 hover:text-blue-600 transition-colors bg-white rounded-full shadow-sm border border-gray-200"
-            title="View in Facebook Ad Library"
-          >
-            <ExternalLink className="h-4 w-4" />
-          </button>
-        )}
+      {/* External Link Icon - Bottom Right */}
+      {brand.pageId && (
+        <button
+          onClick={() => {
+            const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=${brand.pageId}`;
+            window.open(url, '_blank', 'noopener,noreferrer');
+          }}
+          className="absolute bottom-4 right-4 p-2 text-gray-400 hover:text-blue-600 transition-colors bg-white rounded-full shadow-sm border border-gray-200"
+          title="View in Facebook Ad Library"
+        >
+          <ExternalLink className="h-4 w-4" />
+        </button>
+      )}
     </Card>
   ));
 
@@ -577,9 +702,9 @@ const PipelineStatusPage = () => {
     return <LoadingSpinner />;
   }
 
-  if (pageLoading) {
-    return <LoadingSpinner />;
-  }
+  // if (pageLoading) {
+  //   return <LoadingSpinner />;
+  // }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -595,13 +720,13 @@ const PipelineStatusPage = () => {
             </div>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              {/* Date Picker */}
+              {/* FIXED: Date Picker with separate input value */}
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-gray-400" />
                 <input
                   type="date"
-                  value={selectedDate}
-                  onChange={(e) => handleDateChange(e.target.value)}
+                  value={dateInputValue}
+                  onChange={handleDateInputChange}
                   className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -658,20 +783,20 @@ const PipelineStatusPage = () => {
         <Card className="mb-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
-                <SearchInput
-                  value={searchTerm}
-                  onChange={setSearchTerm}
-                  onClear={clearSearch}
-                  placeholder="Search brands by name, ID, or page ID..."
-                  leftIcon={<Search className="h-4 w-4" />}
-                  loading={isSearching}
-                  className="w-full"
-                />
+              <SearchInput
+                value={searchTerm}
+                onChange={handleSearch}
+                onClear={clearSearch}
+                placeholder="Search brands by name, ID, or page ID..."
+                leftIcon={<Search className="h-4 w-4" />}
+                loading={isSearching}
+                className="w-full"
+              />
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <Eye className="h-4 w-4" />
               <span>
-                {showSearchResults 
+                {showSearchResults
                   ? `Showing ${searchResults.length} search result${searchResults.length !== 1 ? 's' : ''}`
                   : `Showing ${displayBrands.length} of ${data.pagination.total} brands`
                 }
@@ -691,14 +816,13 @@ const PipelineStatusPage = () => {
           </Card>
         ) : (
           <div className="relative">
+            {/* Full-viewport overlay loading that looks like full-page loading */}
             {pageLoading && (
-              <div className="absolute inset-0 bg-gray-50 bg-opacity-75 flex items-center justify-center z-10 rounded-lg">
-                <div className="flex items-center space-x-2 text-blue-600">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                  <span className="text-sm font-medium">Loading brands...</span>
-                </div>
+              <div className="fixed inset-0 bg-gray-50 flex items-center justify-center z-50">
+                <LoadingSpinner />
               </div>
             )}
+
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
               {displayBrands.map((brand) => (
                 <BrandCard key={brand.brandId} brand={brand} />

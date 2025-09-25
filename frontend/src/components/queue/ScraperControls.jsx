@@ -66,6 +66,34 @@ const ScraperControls = () => {
   };
 
   const getStatusInfo = (status) => {
+    // Handle specific stopped reasons
+    if (status && status.startsWith('stopped(')) {
+      const reason = status.replace('stopped(', '').replace(')', '');
+      let description = 'The scraper is stopped';
+      
+      // Map specific reasons to descriptions
+      switch (reason) {
+        case 'cooldown NWL':
+          description = 'Stopped due to cooldown period for Non-Watchlist brands';
+          break;
+        case 'cooldown WL':
+          description = 'Stopped due to cooldown period for Watchlist brands';
+          break;
+        case 'Hold':
+          description = 'Stopped and held by user';
+          break;
+        default:
+          description = `Stopped: ${reason}`;
+      }
+      
+      return {
+        text: status, // Show the full status including reason
+        color: 'text-orange-600',
+        bgColor: 'bg-orange-100',
+        description: description
+      };
+    }
+    
     switch (status) {
       case 'running':
         return {
@@ -84,7 +112,7 @@ const ScraperControls = () => {
         };
       default:
         return {
-          text: 'Unknown',
+          text: status || 'Unknown',
           color: 'text-gray-600',
           bgColor: 'bg-gray-100',
           description: 'Unable to determine scraper status'

@@ -24,7 +24,7 @@ async function cleanupCompletedBrands() {
         const status = processingData.status?.toLowerCase();
         
         // Keep only brands that are actively processing (not completed or failed)
-        if (status && (status === 'complete' || status === 'failed' || status === 'error')) {
+        if (status && (status === 'completed' || status === 'complete' || status === 'failed' || status === 'error')) {
           logger.info(`Cleanup: Removing ${status} brand ${processingData.brandId} from ${REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING} Redis key`);
           removedCount++;
         } else {
@@ -177,7 +177,7 @@ async function getCurrentlyProcessing() {
         // Get brand details from database
         const brand = await Brand.findOne({
           where: { id: parseInt(processingData.brandId) },
-          attributes: ["actual_name", "page_id", "status"],
+          attributes: ["name", "actual_name", "page_id", "status"],
           raw: true,
         });
 
@@ -186,7 +186,7 @@ async function getCurrentlyProcessing() {
           // Return the Redis data even if brand not found in database
           results.push({
             brand_id: parseInt(processingData.brandId),
-            brand_name: "Unknown Brand",
+            brand_name: `Brand ${processingData.brandId}`,
             page_id: processingData.pageId || "Unknown",
             status: processingData.status || "Unknown",
             started_at: processingData.startAt || new Date().toISOString(),
@@ -216,9 +216,18 @@ async function getCurrentlyProcessing() {
             }
           }
 
+          let brandName;
+          if (brand.actual_name && brand.actual_name.trim() !== '') {
+            brandName = brand.actual_name;
+          } else if (brand.name && brand.name.trim() !== '' && brand.name.toLowerCase() !== 'brand') {
+            brandName = brand.name;
+          } else {
+            brandName = `Brand ${processingData.brandId}`;
+          }
+          
           results.push({
             brand_id: parseInt(processingData.brandId),
-            brand_name: brand.actual_name || "Unknown",
+            brand_name: brandName,
             page_id: processingData.pageId || brand.page_id || "Unknown",
             status: processingData.status || brand.status || "Unknown",
             started_at: processingData.startAt || new Date().toISOString(),

@@ -99,8 +99,12 @@ export const queueAPI = {
     return api.post(`/queue/add-all${params}`);
   },
 
-  searchBrands: (query) =>
-    api.get(`/queue/search-brands?query=${encodeURIComponent(query)}`),
+  searchBrands: (query, limit = 8) => {
+    const params = new URLSearchParams();
+    params.append("query", query);
+    params.append("limit", limit);
+    return api.get(`/queue/search-brands?${params.toString()}`);
+  },
 
   getBrandCounts: () => api.get("/queue/brand-counts"),
 
@@ -176,11 +180,14 @@ export const scrapedBrandsAPI = {
     return api.get(`/scraped-brands/stats?${params.toString()}`);
   },
 
-  searchScrapedBrands: (query, date = null) => {
+  searchScrapedBrands: (query, date = null, options = {}) => {
     const params = new URLSearchParams();
     params.append("query", query);
     if (date) params.append("date", date);
-    return api.get(`/scraped-brands/search?${params.toString()}`);
+    return api.get(`/scraped-brands/search?${params.toString()}`, {
+      signal: options.signal, // Support for AbortController
+      ...options
+    });
   }
 };
 

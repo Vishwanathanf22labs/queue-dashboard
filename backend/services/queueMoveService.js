@@ -151,41 +151,30 @@ async function moveFailedToPending(brandId, queueType = "regular") {
 
 async function moveAllPendingToFailed() {
   try {
-    logger.info("Moving ALL pending brands to failed queue");
+    logger.info("Moving ALL regular pending brands to failed queue");
 
-    // Get both regular and watchlist Redis instances
+    // Get only regular Redis instance
     const regularRedis = getQueueRedis("regular");
-    const watchlistRedis = getQueueRedis("watchlist");
 
-    // Get pending brands from both queues
-    const [regularPendingBrands, watchlistPendingBrands] = await Promise.all([
-      regularRedis.zrange(
-        REDIS_KEYS.REGULAR.PENDING_BRANDS,
-        0,
-        -1,
-        "WITHSCORES"
-      ),
-      watchlistRedis.zrange(
-        REDIS_KEYS.WATCHLIST.PENDING_BRANDS,
-        0,
-        -1,
-        "WITHSCORES"
-      ),
-    ]);
+    // Get pending brands from regular queue only
+    const regularPendingBrands = await regularRedis.zrange(
+      REDIS_KEYS.REGULAR.PENDING_BRANDS,
+      0,
+      -1,
+      "WITHSCORES"
+    );
 
-    const totalPendingCount =
-      regularPendingBrands.length / 2 + watchlistPendingBrands.length / 2;
+    const totalPendingCount = regularPendingBrands.length / 2;
 
     if (totalPendingCount === 0) {
       return {
         moved_count: 0,
-        message: "No pending brands to move",
+        message: "No regular pending brands to move",
       };
     }
 
     const movedBrands = [];
     const regularPipeline = regularRedis.pipeline();
-    const watchlistPipeline = watchlistRedis.pipeline();
 
     // Process regular pending brands
     for (let i = 0; i < regularPendingBrands.length; i += 2) {
@@ -212,46 +201,20 @@ async function moveAllPendingToFailed() {
       }
     }
 
-    // Process watchlist pending brands
-    for (let i = 0; i < watchlistPendingBrands.length; i += 2) {
-      try {
-        const member = watchlistPendingBrands[i];
-        const score = watchlistPendingBrands[i + 1];
-
-        if (!member) continue;
-
-        const brandData = JSON.parse(member);
-
-        const failedBrandData = {
-          id: brandData.id || brandData.brand_id || brandData.queue_id,
-          page_id: brandData.page_id,
-        };
-
-        watchlistPipeline.lpush(
-          REDIS_KEYS.WATCHLIST.FAILED_BRANDS,
-          JSON.stringify(failedBrandData)
-        );
-        movedBrands.push({ ...failedBrandData, queueType: "watchlist" });
-      } catch (parseError) {
-        logger.error(`Error parsing watchlist pending brand data:`, parseError);
-      }
-    }
-
-    // Clear both pending queues
+    // Clear regular pending queue
     regularPipeline.del(REDIS_KEYS.REGULAR.PENDING_BRANDS);
-    watchlistPipeline.del(REDIS_KEYS.WATCHLIST.PENDING_BRANDS);
 
-    // Execute both pipelines
-    await Promise.all([regularPipeline.exec(), watchlistPipeline.exec()]);
+    // Execute regular pipeline only
+    await regularPipeline.exec();
 
     logger.info(
-      `Successfully moved ${movedBrands.length} brands from pending to failed queue`
+      `Successfully moved ${movedBrands.length} regular brands from pending to failed queue`
     );
 
     return {
       moved_count: movedBrands.length,
       moved_brands: movedBrands,
-      message: `Moved ${movedBrands.length} brands from pending to failed queue successfully`,
+      message: `Moved ${movedBrands.length} regular brands from pending to failed queue successfully`,
     };
   } catch (error) {
     logger.error("Error moving all pending brands to failed queue:", error);
@@ -261,31 +224,25 @@ async function moveAllPendingToFailed() {
 
 async function moveAllFailedToPending() {
   try {
-    logger.info("Moving ALL failed brands to pending queue");
+    logger.info("Moving ALL regular failed brands to pending queue");
 
-    // Get both regular and watchlist Redis instances
+    // Get only regular Redis instance
     const regularRedis = getQueueRedis("regular");
-    const watchlistRedis = getQueueRedis("watchlist");
 
-    // Get failed brands from both queues
-    const [regularFailedBrands, watchlistFailedBrands] = await Promise.all([
-      regularRedis.lrange(REDIS_KEYS.REGULAR.FAILED_BRANDS, 0, -1),
-      watchlistRedis.lrange(REDIS_KEYS.WATCHLIST.FAILED_BRANDS, 0, -1),
-    ]);
+    // Get failed brands from regular queue only
+    const regularFailedBrands = await regularRedis.lrange(REDIS_KEYS.REGULAR.FAILED_BRANDS, 0, -1);
 
-    const totalFailedCount =
-      regularFailedBrands.length + watchlistFailedBrands.length;
+    const totalFailedCount = regularFailedBrands.length;
 
     if (totalFailedCount === 0) {
       return {
         moved_count: 0,
-        message: "No failed brands to move",
+        message: "No regular failed brands to move",
       };
     }
 
     const movedBrands = [];
     const regularPipeline = regularRedis.pipeline();
-    const watchlistPipeline = watchlistRedis.pipeline();
 
     // Process regular failed brands
     for (const failedBrand of regularFailedBrands) {
@@ -310,44 +267,20 @@ async function moveAllFailedToPending() {
       }
     }
 
-    // Process watchlist failed brands
-    for (const failedBrand of watchlistFailedBrands) {
-      try {
-        const brandData = JSON.parse(failedBrand);
-
-        const pendingBrandData = {
-          id: brandData.id || brandData.brand_id || brandData.queue_id,
-          page_id: brandData.page_id,
-        };
-
-        // Add to pending sorted set with default score 3
-        const defaultScore = 3;
-        watchlistPipeline.zadd(
-          REDIS_KEYS.WATCHLIST.PENDING_BRANDS,
-          defaultScore,
-          JSON.stringify(pendingBrandData)
-        );
-        movedBrands.push({ ...pendingBrandData, queueType: "watchlist" });
-      } catch (parseError) {
-        logger.error(`Error parsing watchlist failed brand data:`, parseError);
-      }
-    }
-
-    // Clear both failed queues
+    // Clear regular failed queue
     regularPipeline.del(REDIS_KEYS.REGULAR.FAILED_BRANDS);
-    watchlistPipeline.del(REDIS_KEYS.WATCHLIST.FAILED_BRANDS);
 
-    // Execute both pipelines
-    await Promise.all([regularPipeline.exec(), watchlistPipeline.exec()]);
+    // Execute regular pipeline only
+    await regularPipeline.exec();
 
     logger.info(
-      `Successfully moved ${movedBrands.length} brands from failed to pending queue`
+      `Successfully moved ${movedBrands.length} regular brands from failed to pending queue`
     );
 
     return {
       moved_count: movedBrands.length,
       moved_brands: movedBrands,
-      message: `Moved ${movedBrands.length} brands from failed to pending queue successfully`,
+      message: `Moved ${movedBrands.length} regular brands from failed to pending queue successfully`,
     };
   } catch (error) {
     logger.error("Error moving all failed brands to pending queue:", error);

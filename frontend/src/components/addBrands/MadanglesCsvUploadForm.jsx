@@ -599,43 +599,48 @@ const MadanglesCsvUploadForm = () => {
           </div>
         )}
 
-        {/* Queue Buttons */}
+        {/* Queue Selection Interface */}
         {showQueueButtons && scrapedBrands.length > 0 && (
-          <div className="mt-6 border border-gray-200 rounded-lg p-4 bg-gray-50">
-            <div className="mb-4">
-              <p className="text-sm text-gray-700 mb-3">
-                Choose which queue to add the brands to:
-              </p>
+          <div className="mt-6 border border-gray-200 rounded-lg p-6 bg-white">
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Choose which queue to add the brands to:</h3>
+              <p className="text-sm text-gray-600">Select where you want to add the {scrapedBrands.length} scraped brands</p>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Button
+                onClick={() => handleAddToQueue('regular')}
+                variant="outline"
+                disabled={queueAdditionStatus?.type === 'adding'}
+                className="h-16 flex items-center justify-center space-x-3 border-2 border-blue-200 hover:border-blue-300 hover:bg-blue-50"
+              >
+                <Users className="h-6 w-6 text-blue-600" />
+                <div className="text-left">
+                  <div className="font-medium text-gray-900">Add to Regular Queue</div>
+                  <div className="text-sm text-gray-500">Standard processing queue</div>
+                </div>
+              </Button>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Button
-                  onClick={() => handleAddToQueue('regular')}
-                  variant="primary"
-                  disabled={queueAdditionStatus?.type === 'adding'}
-                  className="flex items-center justify-center space-x-2"
-                >
-                  <Users className="h-4 w-4" />
-                  <span>Add to Regular Queue</span>
-                </Button>
-                
-                <Button
-                  onClick={() => handleAddToQueue('watchlist')}
-                  variant="secondary"
-                  disabled={queueAdditionStatus?.type === 'adding'}
-                  className="flex items-center justify-center space-x-2"
-                >
-                  <Clock className="h-4 w-4" />
-                  <span>Add to Watchlist Queue</span>
-                </Button>
-              </div>
+              <Button
+                onClick={() => handleAddToQueue('watchlist')}
+                variant="outline"
+                disabled={queueAdditionStatus?.type === 'adding'}
+                className="h-16 flex items-center justify-center space-x-3 border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+              >
+                <Clock className="h-6 w-6 text-gray-600" />
+                <div className="text-left">
+                  <div className="font-medium text-gray-900">Add to Watchlist Queue</div>
+                  <div className="text-sm text-gray-500">Priority watchlist processing</div>
+                </div>
+              </Button>
             </div>
 
             {/* Scraped Brands Preview */}
-            <div className="bg-white rounded border border-gray-200 p-3">
-              <h5 className="text-sm font-medium text-gray-900 mb-2">Brands ({scrapedBrands.length}):</h5>
+            <div className="mt-4 bg-gray-50 rounded-lg border border-gray-200 p-4">
+              <h5 className="text-sm font-medium text-gray-900 mb-3">Scraped Brands ({scrapedBrands.length}):</h5>
               <div className="space-y-2 max-h-32 overflow-y-auto">
                 {scrapedBrands.map((brand, index) => (
-                  <div key={index} className="flex items-center justify-between text-xs">
+                  <div key={index} className="flex items-center justify-between text-xs bg-white rounded border border-gray-100 p-2">
                     <div className="flex items-center space-x-2">
                       {brand.logo_url && (
                         <img 
@@ -645,9 +650,9 @@ const MadanglesCsvUploadForm = () => {
                           onError={(e) => { e.target.style.display = 'none'; }}
                         />
                       )}
-                      <span className="font-medium">{brand.name}</span>
+                      <span className="font-medium text-gray-900">{brand.name}</span>
                     </div>
-                    <span className="text-gray-500 font-mono">{brand.page_id}</span>
+                    <span className="text-gray-500 font-mono text-xs">{brand.page_id}</span>
                   </div>
                 ))}
               </div>
@@ -655,8 +660,8 @@ const MadanglesCsvUploadForm = () => {
           </div>
         )}
 
-        {/* Upload Button */}
-        {csvFile && (
+        {/* Upload Button - Only show if no upload result */}
+        {csvFile && !csvUploadResult && (
           <div className="mt-6 flex space-x-3">
             <Button
               onClick={handleCsvUpload}

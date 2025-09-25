@@ -1,6 +1,6 @@
 const logger = require("../utils/logger");
 
-// Cache for admin status to reduce repeated API calls
+
 let adminStatusCache = {
   isAdmin: false,
   timestamp: 0,
@@ -25,7 +25,7 @@ const login = async (req, res) => {
         path: "/",
       });
 
-      // Update cache on successful login
+     
       adminStatusCache = {
         isAdmin: true,
         timestamp: Date.now(),
@@ -58,18 +58,16 @@ const login = async (req, res) => {
   }
 };
 
-// Admin logout
 const logout = async (req, res) => {
   try {
-    // Clear the admin session cookie
     res.clearCookie("adminSession", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax", // Changed from 'strict' to 'lax' for consistency
+      sameSite: "lax", 
       path: "/",
     });
 
-    // Update cache on logout
+   
     adminStatusCache = {
       isAdmin: false,
       timestamp: Date.now(),
@@ -92,7 +90,7 @@ const logout = async (req, res) => {
   }
 };
 
-// Get admin status with caching
+
 const getStatus = async (req, res) => {
   try {
     const now = Date.now();

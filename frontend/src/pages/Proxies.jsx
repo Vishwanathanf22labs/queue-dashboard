@@ -52,7 +52,10 @@ const Proxies = () => {
         });
 
         if (search && search.trim() && proxies.length === 0) {
-          toast.info(`No proxies found matching "${search}"`);
+          toast(`Not available "${search}"`, {
+            icon: 'ℹ️',
+            duration: 3000,
+          });
         }
       } else {
         toast.error(response.data.message || 'Failed to load proxies');

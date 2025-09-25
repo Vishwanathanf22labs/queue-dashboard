@@ -93,6 +93,21 @@ const FailedQueue = ({
       )
     },
     {
+      key: 'error_message',
+      label: 'Error Message',
+      render: (value, row) => {
+        const errorMsg = value || row.error_message || row.error || row.message || 'Unknown error';
+        // Extract the important part of the error message
+        const importantPart = errorMsg.includes(':') ? errorMsg.split(':').pop().trim() : errorMsg;
+        return (
+          <div className="text-xs text-red-600 max-w-[120px] sm:max-w-[200px] truncate" title={errorMsg}>
+            {importantPart}
+          </div>
+        );
+      },
+      className: 'hidden lg:table-cell'
+    },
+    {
       key: 'actions',
       label: 'Actions',
       render: (value, row) => (
@@ -141,24 +156,12 @@ const FailedQueue = ({
               variant="default"
               showClearButton={true}
               onClear={onClearSearch}
-              disabled={failed.loading || failed.isSearching}
+              loading={false}
             />
           </div>
           <div className="flex items-center space-x-3 sm:space-x-4 text-xs sm:text-sm text-gray-600">
             <span>Total: {failed.totalCount}</span>
             <span>Showing: {filteredFailedBrands.length}</span>
-            {failed.searchTerm && (
-              <span className="text-red-600">
-                {failed.isSearching ? (
-                  <span className="flex items-center">
-                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-600 mr-1"></div>
-                    Searching: "{failed.searchTerm}"
-                  </span>
-                ) : (
-                  `Searching: "${failed.searchTerm}"`
-                )}
-              </span>
-            )}
           </div>
         </div>
       </Card>
@@ -169,21 +172,23 @@ const FailedQueue = ({
           <ErrorDisplay title="Error Loading Failed Queue" message={failed.error}>
             <Button onClick={() => onSearch('')}>Retry</Button>
           </ErrorDisplay>
-        ) : failed.loading ? (
-          <LoadingSpinner />
-        ) : failed.isSearching ? (
+        ) : filteredFailedBrands.length === 0 && (failed.loading || failed.isSearching) ? (
+          // Show loading state only when no data exists yet AND loading
           <div className="text-center py-12 sm:py-16">
             <div className="flex flex-col items-center space-y-4">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
               <div className="text-center">
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Searching...</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  {failed.isSearching ? 'Searching...' : 'Loading...'}
+                </h3>
                 <p className="text-sm text-gray-500">
-                  Searching for "{failed.searchTerm}" across all pages
+                  {failed.isSearching ? `Searching for "${failed.searchTerm}" across all pages` : 'Loading failed brands'}
                 </p>
               </div>
             </div>
           </div>
         ) : filteredFailedBrands.length === 0 ? (
+          // Show empty state when no data and not loading
           <div className="text-center py-8 sm:py-12">
             <AlertTriangle className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-3 sm:mb-4" />
             <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No failed brands found</h3>
@@ -192,42 +197,59 @@ const FailedQueue = ({
             </p>
           </div>
         ) : (
-          <Table
-            data={filteredFailedBrands}
-            columns={failedColumns}
-            emptyMessage="No failed brands found"
-            className="shadow-md rounded-lg"
-          />
+          // Show table when there's data
+          <div className="relative">
+            <Table
+              data={filteredFailedBrands}
+              columns={failedColumns}
+              emptyMessage="No failed brands found"
+              className="shadow-md rounded-lg"
+            />
+            {/* Show loading overlay in table area when searching */}
+            {failed.isSearching && (
+              <div className="absolute inset-0 bg-white bg-opacity-75 flex items-start justify-center z-10 pt-16">
+                <div className="flex flex-col items-center space-y-3">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+                  <div className="text-sm font-medium text-gray-900">
+                    Searching...
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Searching for "{failed.searchTerm}"
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </Card>
 
       {/* Mobile Cards View */}
-      <div className="md:hidden space-y-3">
+      <div className="md:hidden space-y-3 relative">
         {failed.error ? (
           <Card>
             <ErrorDisplay title="Error Loading Failed Queue" message={failed.error}>
               <Button onClick={() => onSearch('')}>Retry</Button>
             </ErrorDisplay>
           </Card>
-        ) : failed.loading ? (
-          <Card>
-            <LoadingSpinner />
-          </Card>
-        ) : failed.isSearching ? (
-          <Card>
-            <div className="text-center py-8">
-              <div className="flex flex-col items-center space-y-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
-                <div className="text-center">
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Searching...</h3>
-                  <p className="text-sm text-gray-500">
-                    Searching for "{failed.searchTerm}" across all pages
-                  </p>
+        ) : filteredFailedBrands.length === 0 ? (
+          // Show loading state only when no data exists yet AND loading
+          (failed.loading || failed.isSearching) ? (
+            <Card>
+              <div className="text-center py-8">
+                <div className="flex flex-col items-center space-y-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+                  <div className="text-center">
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      {failed.isSearching ? 'Searching...' : 'Loading...'}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      {failed.isSearching ? `Searching for "${failed.searchTerm}" across all pages` : 'Loading failed brands'}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          </Card>
-        ) : filteredFailedBrands.length === 0 ? (
+            </Card>
+          ) : (
           <Card>
             <div className="text-center py-8">
               <AlertTriangle className="h-12 w-12 text-gray-300 mx-auto mb-4" />
@@ -237,8 +259,10 @@ const FailedQueue = ({
               </p>
             </div>
           </Card>
+          )
         ) : (
-          filteredFailedBrands.map((brand, index) => {
+          <div className="relative">
+            {filteredFailedBrands.map((brand, index) => {
             const position = (failed.currentPage - 1) * failed.itemsPerPage + index + 1;
             const brandName = brand.brand_name || 'Unknown Brand';
             const brandId = brand.queue_id || brand.brand_id || 'N/A';
@@ -270,6 +294,18 @@ const FailedQueue = ({
                       <span className="text-gray-500">Page ID:</span>
                       <span className="ml-2 font-medium text-gray-900 font-mono">{pageId}</span>
                     </div>
+                  </div>
+
+                  {/* Error Message */}
+                  <div className="pt-2">
+                    <span className="text-gray-500 text-sm">Error:</span>
+                    <p className="text-sm text-red-600 mt-1 break-words" title={brand.error_message || brand.error || brand.message || 'Unknown error'}>
+                      {(() => {
+                        const errorMsg = brand.error_message || brand.error || brand.message || 'Unknown error';
+                        // Extract the important part of the error message
+                        return errorMsg.includes(':') ? errorMsg.split(':').pop().trim() : errorMsg;
+                      })()}
+                    </p>
                   </div>
 
                   {/* Action Buttons */}
@@ -316,18 +352,36 @@ const FailedQueue = ({
                 </div>
               </Card>
             );
-          })
+          })}
+          </div>
+        )}
+        
+        {/* Loading overlay for mobile cards when searching */}
+        {failed.isSearching && (
+          <div className="absolute inset-0 bg-white bg-opacity-75 flex items-start justify-center rounded-lg z-10 pt-16">
+            <div className="flex flex-col items-center space-y-3">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+              <div className="text-sm font-medium text-gray-900">
+                Searching...
+              </div>
+              <div className="text-xs text-gray-500">
+                Searching for "{failed.searchTerm}"
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
-      <Pagination
-        currentPage={failed.currentPage}
-        totalPages={failedTotalPages}
-        onPageChange={onPageChange}
-        totalItems={failed.totalCount}
-        itemsPerPage={failed.itemsPerPage}
-        showPageInfo={true}
-      />
+      <div id="failed-queue-pagination">
+        <Pagination
+          currentPage={failed.currentPage}
+          totalPages={failedTotalPages}
+          onPageChange={onPageChange}
+          totalItems={failed.totalCount}
+          itemsPerPage={failed.itemsPerPage}
+          showPageInfo={true}
+        />
+      </div>
     </div>
   );
 };

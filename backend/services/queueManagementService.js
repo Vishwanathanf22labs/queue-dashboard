@@ -90,12 +90,20 @@ async function changeBrandScore(queueType, brandName, newScore) {
           if (brandData.id && brandData.page_id) {
             const brand = await Brand.findOne({ where: { id: brandData.id } });
 
-            if (brand && brand.name.toLowerCase() === brandName.toLowerCase()) {
-              // Remove the old entry and add with new score
-              await config.redis.zrem(config.queueKey, member);
-              await config.redis.zadd(config.queueKey, newScore, member);
-              brandFound = true;
-              break;
+            if (brand && (brand.name || brand.actual_name)) {
+              // Case-insensitive and space-insensitive brand name matching
+              // Check both 'name' and 'actual_name' fields
+              const normalizedBrandName = brand.name ? brand.name.toLowerCase().replace(/\s+/g, '') : '';
+              const normalizedActualName = brand.actual_name ? brand.actual_name.toLowerCase().replace(/\s+/g, '') : '';
+              const normalizedSearchName = brandName.toLowerCase().replace(/\s+/g, '');
+              
+              if (normalizedBrandName === normalizedSearchName || normalizedActualName === normalizedSearchName) {
+                // Remove the old entry and add with new score
+                await config.redis.zrem(config.queueKey, member);
+                await config.redis.zadd(config.queueKey, newScore, member);
+                brandFound = true;
+                break;
+              }
             }
           }
         } catch (parseError) {
@@ -133,11 +141,19 @@ async function changeBrandScore(queueType, brandName, newScore) {
           if (brandData.id && brandData.page_id) {
             const brand = await Brand.findOne({ where: { id: brandData.id } });
 
-            if (brand && brand.name.toLowerCase() === brandName.toLowerCase()) {
-              brandMember = member;
-              currentIndex = i;
-              brandFound = true;
-              break;
+            if (brand && (brand.name || brand.actual_name)) {
+              // Case-insensitive and space-insensitive brand name matching
+              // Check both 'name' and 'actual_name' fields
+              const normalizedBrandName = brand.name ? brand.name.toLowerCase().replace(/\s+/g, '') : '';
+              const normalizedActualName = brand.actual_name ? brand.actual_name.toLowerCase().replace(/\s+/g, '') : '';
+              const normalizedSearchName = brandName.toLowerCase().replace(/\s+/g, '');
+              
+              if (normalizedBrandName === normalizedSearchName || normalizedActualName === normalizedSearchName) {
+                brandMember = member;
+                currentIndex = i;
+                brandFound = true;
+                break;
+              }
             }
           }
         } catch (parseError) {

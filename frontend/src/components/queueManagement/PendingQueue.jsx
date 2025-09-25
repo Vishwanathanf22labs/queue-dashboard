@@ -141,24 +141,12 @@ const PendingQueue = ({
               variant="default"
               showClearButton={true}
               onClear={onClearSearch}
-              disabled={pending.loading || pending.isSearching}
+              loading={false}
             />
           </div>
           <div className="flex items-center space-x-3 sm:space-x-4 text-xs sm:text-sm text-gray-600">
             <span>Total: {pending.totalCount}</span>
             <span>Showing: {filteredPendingBrands.length}</span>
-            {pending.searchTerm && (
-              <span className="text-blue-600">
-                {pending.isSearching ? (
-                  <span className="flex items-center">
-                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-1"></div>
-                    Searching: "{pending.searchTerm}"
-                  </span>
-                ) : (
-                  `Searching: "${pending.searchTerm}"`
-                )}
-              </span>
-            )}
           </div>
         </div>
       </Card>
@@ -169,21 +157,23 @@ const PendingQueue = ({
           <ErrorDisplay title="Error Loading Pending Queue" message={pending.error}>
             <Button onClick={() => onSearch('')}>Retry</Button>
           </ErrorDisplay>
-        ) : pending.loading ? (
-          <LoadingSpinner />
-        ) : pending.isSearching ? (
+        ) : filteredPendingBrands.length === 0 && (pending.loading || pending.isSearching) ? (
+          // Show loading state only when no data exists yet AND loading
           <div className="text-center py-12 sm:py-16">
             <div className="flex flex-col items-center space-y-4">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
               <div className="text-center">
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Searching...</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  {pending.isSearching ? 'Searching...' : 'Loading...'}
+                </h3>
                 <p className="text-sm text-gray-500">
-                  Searching for "{pending.searchTerm}" across all pages
+                  {pending.isSearching ? `Searching for "${pending.searchTerm}" across all pages` : 'Loading pending brands'}
                 </p>
               </div>
             </div>
           </div>
         ) : filteredPendingBrands.length === 0 ? (
+          // Show empty state when no data and not loading
           <div className="text-center py-8 sm:py-12">
             <Users className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-3 sm:mb-4" />
             <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No pending brands found</h3>
@@ -192,12 +182,29 @@ const PendingQueue = ({
             </p>
           </div>
         ) : (
-          <Table
-            data={filteredPendingBrands}
-            columns={pendingColumns}
-            emptyMessage="No pending brands found"
-            className="shadow-md rounded-lg"
-          />
+          // Show table when there's data
+          <div className="relative">
+            <Table
+              data={filteredPendingBrands}
+              columns={pendingColumns}
+              emptyMessage="No pending brands found"
+              className="shadow-md rounded-lg"
+            />
+            {/* Show loading overlay in table area when searching */}
+            {pending.isSearching && (
+              <div className="absolute inset-0 bg-white bg-opacity-75 flex items-start justify-center z-10 pt-16">
+                <div className="flex flex-col items-center space-y-3">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <div className="text-sm font-medium text-gray-900">
+                    Searching...
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Searching for "{pending.searchTerm}"
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </Card>
 
@@ -209,25 +216,25 @@ const PendingQueue = ({
               <Button onClick={() => onSearch('')}>Retry</Button>
             </ErrorDisplay>
           </Card>
-        ) : pending.loading ? (
-          <Card>
-            <LoadingSpinner />
-          </Card>
-        ) : pending.isSearching ? (
-          <Card>
-            <div className="text-center py-8">
-              <div className="flex flex-col items-center space-y-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <div className="text-center">
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Searching...</h3>
-                  <p className="text-sm text-gray-500">
-                    Searching for "{pending.searchTerm}" across all pages
-                  </p>
+        ) : filteredPendingBrands.length === 0 ? (
+          // Show loading state only when no data exists yet AND loading
+          (pending.loading || pending.isSearching) ? (
+            <Card>
+              <div className="text-center py-8">
+                <div className="flex flex-col items-center space-y-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <div className="text-center">
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      {pending.isSearching ? 'Searching...' : 'Loading...'}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      {pending.isSearching ? `Searching for "${pending.searchTerm}" across all pages` : 'Loading pending brands'}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          </Card>
-        ) : filteredPendingBrands.length === 0 ? (
+            </Card>
+          ) : (
           <Card>
             <div className="text-center py-8">
               <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
@@ -237,8 +244,10 @@ const PendingQueue = ({
               </p>
             </div>
           </Card>
+          )
         ) : (
-          filteredPendingBrands.map((brand, index) => {
+          <div className="relative">
+            {filteredPendingBrands.map((brand, index) => {
             const position = (pending.currentPage - 1) * pending.itemsPerPage + index + 1;
             const brandName = brand.brand_name || 'Unknown Brand';
             const brandId = brand.queue_id || brand.brand_id || 'N/A';
@@ -316,18 +325,36 @@ const PendingQueue = ({
                 </div>
               </Card>
             );
-          })
+          })}
+          
+          {/* Loading overlay for mobile cards when searching */}
+          {pending.isSearching && (
+            <div className="absolute inset-0 bg-white bg-opacity-75 flex items-start justify-center rounded-lg z-10 pt-16">
+              <div className="flex flex-col items-center space-y-3">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="text-sm font-medium text-gray-900">
+                  Searching...
+                </div>
+                <div className="text-xs text-gray-500">
+                  Searching for "{pending.searchTerm}"
+                </div>
+              </div>
+            </div>
+          )}
+          </div>
         )}
       </div>
 
-      <Pagination
-        currentPage={pending.currentPage}
-        totalPages={pendingTotalPages}
-        onPageChange={onPageChange}
-        totalItems={pending.totalCount}
-        itemsPerPage={pending.itemsPerPage}
-        showPageInfo={true}
-      />
+      <div id="pending-queue-pagination">
+        <Pagination
+          currentPage={pending.currentPage}
+          totalPages={pendingTotalPages}
+          onPageChange={onPageChange}
+          totalItems={pending.totalCount}
+          itemsPerPage={pending.itemsPerPage}
+          showPageInfo={true}
+        />
+      </div>
     </div>
   );
 };

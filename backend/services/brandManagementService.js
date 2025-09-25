@@ -276,44 +276,208 @@ async function searchBrands(query, limit = 8) {
     }
 
     const searchQuery = query.trim();
+    
+    // Normalize search query: remove extra spaces, convert to lowercase for flexible matching
+    const normalizedQuery = searchQuery.replace(/\s+/g, ' ').trim();
+    
+    // Create comprehensive search variations
+    const searchVariations = [
+      // Original variations
+      searchQuery,
+      normalizedQuery,
+      searchQuery.toLowerCase(),
+      normalizedQuery.toLowerCase(),
+      
+      // Space variations
+      searchQuery.replace(/\s+/g, ''), // Remove all spaces
+      searchQuery.replace(/\s+/g, '').toLowerCase(),
+    ];
+    
+    // Intelligent compound word detection - works for any brand name
+    if (searchQuery.length > 4 && !searchQuery.includes(' ')) {
+      // First, try to find existing brands that start with the search query
+      // This helps us understand common word patterns in your actual brand names
+      const existingBrands = await Brand.findAll({
+        where: {
+          [Op.or]: [
+            { name: { [Op.iLike]: `${searchQuery}%` } },
+            { actual_name: { [Op.iLike]: `${searchQuery}%` } }
+          ]
+        },
+        attributes: ["name", "actual_name"],
+        limit: 20,
+        raw: true,
+      });
+      
+      // Extract common prefixes and suffixes from existing brands
+      const commonPrefixes = new Set();
+      const commonSuffixes = new Set();
+      
+      existingBrands.forEach(brand => {
+        const name = (brand.actual_name || brand.name || '').toLowerCase();
+        if (name.length > searchQuery.length) {
+          const remaining = name.slice(searchQuery.length);
+          if (remaining.length > 2) {
+            // Check if the remaining part is a common word pattern
+            if (remaining.match(/^[a-z]+$/)) {
+              commonSuffixes.add(remaining);
+            }
+          }
+        }
+      });
+      
+      // Also check for brands that contain the search query as a suffix
+      const suffixBrands = await Brand.findAll({
+        where: {
+          [Op.or]: [
+            { name: { [Op.iLike]: `%${searchQuery}` } },
+            { actual_name: { [Op.iLike]: `%${searchQuery}` } }
+          ]
+        },
+        attributes: ["name", "actual_name"],
+        limit: 20,
+        raw: true,
+      });
+      
+      suffixBrands.forEach(brand => {
+        const name = (brand.actual_name || brand.name || '').toLowerCase();
+        if (name.length > searchQuery.length) {
+          const remaining = name.slice(0, name.length - searchQuery.length);
+          if (remaining.length > 2) {
+            if (remaining.match(/^[a-z]+$/)) {
+              commonPrefixes.add(remaining);
+            }
+          }
+        }
+      });
+      
+      // Generate variations based on discovered patterns
+      [...commonPrefixes, ...commonSuffixes].forEach(word => {
+        // Check if the search query starts with this discovered word
+        if (searchQuery.toLowerCase().startsWith(word.toLowerCase())) {
+          const remaining = searchQuery.slice(word.length);
+          if (remaining.length > 2) {
+            const spacedVersion = word + ' ' + remaining;
+            searchVariations.push(
+              spacedVersion,
+              spacedVersion.toLowerCase(),
+              spacedVersion.toUpperCase(),
+              word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() + ' ' + remaining
+            );
+          }
+        }
+        
+        // Check if the search query ends with this discovered word
+        if (searchQuery.toLowerCase().endsWith(word.toLowerCase())) {
+          const remaining = searchQuery.slice(0, searchQuery.length - word.length);
+          if (remaining.length > 2) {
+            const spacedVersion = remaining + ' ' + word;
+            searchVariations.push(
+              spacedVersion,
+              spacedVersion.toLowerCase(),
+              spacedVersion.toUpperCase(),
+              remaining + ' ' + word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+            );
+          }
+        }
+      });
+      
+      // Fallback: Intelligent space insertion at common positions
+      if (searchQuery.length > 6) {
+        // Try spaces at positions 3, 4, 5, etc. (avoiding very short words)
+        for (let i = 3; i < Math.min(searchQuery.length - 2, 8); i++) {
+          const spacedVersion = searchQuery.slice(0, i) + ' ' + searchQuery.slice(i);
+          searchVariations.push(
+            spacedVersion,
+            spacedVersion.toLowerCase(),
+            spacedVersion.toUpperCase()
+          );
+        }
+      }
+    }
+    
+    // Add space variations for single words (like "commesi" -> "comme si")
+    if (searchQuery.length > 3) {
+      // camelCase to space
+      searchVariations.push(searchQuery.replace(/([a-z])([A-Z])/g, '$1 $2'));
+      searchVariations.push(searchQuery.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase());
+      
+      // Try adding spaces between characters for compound words
+      if (searchQuery.length > 4) {
+        searchVariations.push(searchQuery.replace(/([a-z])([a-z])([A-Z])/g, '$1$2 $3'));
+        searchVariations.push(searchQuery.replace(/([a-z])([a-z])([A-Z])/g, '$1$2 $3').toLowerCase());
+      }
+    }
+    
+    // Remove duplicates and empty strings
+    const uniqueVariations = [...new Set(searchVariations)].filter(v => v && v.trim().length > 0);
+    
 
     // First, check if there are any brands in the database
     await Brand.count();
+    
 
     // Try the complex search first
     let brands;
     try {
+      // Create search conditions for all variations
+      const searchConditions = [];
+      
+      uniqueVariations.forEach(variation => {
+        searchConditions.push(
+          {
+            name: {
+              [Op.or]: [
+                { [Op.iLike]: variation },
+                { [Op.iLike]: `${variation}%` },
+                { [Op.iLike]: `%${variation}%` },
+              ],
+            },
+          },
+          {
+            actual_name: {
+              [Op.or]: [
+                { [Op.iLike]: variation },
+                { [Op.iLike]: `${variation}%` },
+                { [Op.iLike]: `%${variation}%` },
+              ],
+            },
+          }
+        );
+      });
+      
       brands = await Brand.findAll({
         where: {
-          name: {
-            [Op.or]: [
-              { [Op.iLike]: searchQuery },
-              { [Op.like]: searchQuery },
-              { [Op.iLike]: `${searchQuery}%` },
-              { [Op.like]: `${searchQuery}%` },
-              { [Op.iLike]: `%${searchQuery}%` },
-              { [Op.like]: `%${searchQuery}%` },
-            ],
-          },
+          [Op.or]: searchConditions,
         },
-        attributes: ["id", "name", "page_id"],
+        attributes: ["id", "name", "actual_name", "page_id"],
         limit: limit,
         order: [
+          // Prioritize exact matches (case-insensitive)
           [
             Brand.sequelize.literal(
-              `CASE WHEN LOWER(name) = LOWER('${searchQuery}') THEN 0 ELSE 1 END`
+              `CASE WHEN LOWER(name) = LOWER('${searchQuery}') OR LOWER(actual_name) = LOWER('${searchQuery}') THEN 0 ELSE 1 END`
             ),
             "ASC",
           ],
+          // Prioritize starts-with matches (case-insensitive)
           [
             Brand.sequelize.literal(
-              `CASE WHEN LOWER(name) LIKE LOWER('${searchQuery}%') THEN 0 ELSE 1 END`
+              `CASE WHEN LOWER(name) LIKE LOWER('${searchQuery}%') OR LOWER(actual_name) LIKE LOWER('${searchQuery}%') THEN 0 ELSE 1 END`
             ),
             "ASC",
           ],
+          // Prioritize contains matches (case-insensitive)
           [
             Brand.sequelize.literal(
-              `CASE WHEN LOWER(name) LIKE LOWER('%${searchQuery}%') THEN 0 ELSE 1 END`
+              `CASE WHEN LOWER(name) LIKE LOWER('%${searchQuery}%') OR LOWER(actual_name) LIKE LOWER('%${searchQuery}%') THEN 0 ELSE 1 END`
+            ),
+            "ASC",
+          ],
+          // Prioritize space-normalized matches
+          [
+            Brand.sequelize.literal(
+              `CASE WHEN LOWER(REPLACE(name, ' ', '')) = LOWER('${searchQuery.replace(/\s+/g, '')}') OR LOWER(REPLACE(actual_name, ' ', '')) = LOWER('${searchQuery.replace(/\s+/g, '')}') THEN 0 ELSE 1 END`
             ),
             "ASC",
           ],
@@ -322,34 +486,37 @@ async function searchBrands(query, limit = 8) {
         ],
         raw: true,
       });
-    } catch (searchError) {
-      logger.info(
-        "Complex search failed, trying simple search:",
-        searchError.message
-      );
-      // Fallback to simple search
+     } catch (searchError) {
+      // Fallback to simple search with variations
+      const simpleSearchConditions = [];
+      
+      uniqueVariations.forEach(variation => {
+        simpleSearchConditions.push(
+          { name: { [Op.iLike]: `%${variation}%` } },
+          { actual_name: { [Op.iLike]: `%${variation}%` } }
+        );
+      });
+      
       brands = await Brand.findAll({
         where: {
-          name: {
-            [Op.like]: `%${searchQuery}%`,
-          },
+          [Op.or]: simpleSearchConditions,
         },
-        attributes: ["id", "name", "page_id"],
+        attributes: ["id", "name", "actual_name", "page_id"],
         limit: limit,
         order: [["name", "ASC"]],
         raw: true,
       });
     }
 
-    logger.info(
-      `Brand search completed for query "${searchQuery}": ${brands.length} results`
-    );
 
-    return brands.map((brand) => ({
-      brand_id: brand.id,
-      brand_name: brand.name,
-      page_id: brand.page_id,
-    }));
+        // Limit the number of results to avoid overwhelming the user
+        const limitedBrands = brands.slice(0, limit);
+        
+        return limitedBrands.map((brand) => ({
+          brand_id: brand.id,
+          brand_name: brand.actual_name || brand.name, // Use actual_name if available, fallback to name
+          page_id: brand.page_id,
+        }));
   } catch (error) {
     logger.error("Error in searchBrands:", error);
     throw error;

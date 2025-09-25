@@ -52,7 +52,7 @@ const WatchlistProcessingStatus = ({
             {/* List of processing watchlist brands */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-96 overflow-y-auto scrollbar-hide">
               {watchlistProcessingBrands.map((brand, index) => (
-                <div key={brand.brand_id || index} className="flex flex-col space-y-2 p-3 bg-blue-50 rounded-lg border border-blue-200 min-h-[200px]">
+                <div key={`${brand.brand_id}-${brand.page_id}-${index}`} className="flex flex-col space-y-2 p-3 bg-blue-50 rounded-lg border border-blue-200 min-h-[200px]">
                   <div className="flex items-center space-x-3 mb-2">
                     <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                       <Play className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
@@ -109,10 +109,10 @@ const WatchlistProcessingStatus = ({
                   
                   <div className="flex justify-end mt-auto pt-2">
                     <Badge 
-                      variant={brand.status === 'complete' ? 'success' : 'info'} 
+                      variant={brand.status === 'completed' || brand.status === 'complete' ? 'success' : 'info'} 
                       className="text-xs"
                     >
-                      {brand.status === 'complete' ? 'Completed' : 'Active'}
+                      {brand.status === 'completed' || brand.status === 'complete' ? 'Completed' : 'Active'}
                     </Badge>
                   </div>
                 </div>

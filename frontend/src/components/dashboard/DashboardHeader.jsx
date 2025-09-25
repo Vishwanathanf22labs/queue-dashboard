@@ -1,12 +1,15 @@
 import Button from '../ui/Button';
 import CustomDropdown from '../ui/CustomDropdown';
+import CooldownIndicator from './CooldownIndicator';
 import { RefreshCw } from 'lucide-react';
 
 const DashboardHeader = ({ 
   refreshInterval, 
   isRefreshing, 
   onManualRefresh, 
-  onIntervalChange 
+  onIntervalChange,
+  regularCooldown = false,
+  watchlistCooldown = false
 }) => {
   const refreshIntervals = [
     { value: 0, label: 'Off' },
@@ -22,8 +25,18 @@ const DashboardHeader = ({
     <div className="mb-4 sm:mb-6 lg:mb-8">
       <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
         <div className="pr-4 sm:pr-8 lg:pr-16 xl:pr-0">
-          <h1 className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-900">Madangles Queues</h1>
-          <p className="text-xs sm:text-sm lg:text-base text-gray-600">Monitor your brand processing queue</p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-900">Madangles Queues</h1>
+              <p className="text-xs sm:text-sm lg:text-base text-gray-600">Monitor your brand processing queue</p>
+            </div>
+            <div className="mt-2 sm:mt-0 sm:ml-4">
+              <CooldownIndicator
+                regularCooldown={regularCooldown}
+                watchlistCooldown={watchlistCooldown}
+              />
+            </div>
+          </div>
         </div>
 
         <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-3">
