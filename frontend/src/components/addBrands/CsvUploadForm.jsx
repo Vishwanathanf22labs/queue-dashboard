@@ -20,15 +20,14 @@ const CsvUploadForm = ({ loading, isSubmitting, onSubmittingChange }) => {
       const savedResult = localStorage.getItem('addBrands_csvUploadResult');
       if (savedResult) {
         const parsedResult = JSON.parse(savedResult);
-
-        if (parsedResult.timestamp && (Date.now() - new Date(parsedResult.timestamp).getTime()) < 10 * 60 * 1000) {
+        if (parsedResult.timestamp && (Date.now() - new Date(parsedResult.timestamp).getTime()) < 3 * 60 * 1000) {
           setCsvState(prev => ({ ...prev, uploadResult: parsedResult }));
         } else {
           localStorage.removeItem('addBrands_csvUploadResult');
         }
       }
     } catch (error) {
-      console.error('Error loading CSV upload result:', error);
+      console.error('Error loading CSV upload result from localStorage:', error);
       localStorage.removeItem('addBrands_csvUploadResult');
     }
   }, []);
@@ -47,20 +46,24 @@ const CsvUploadForm = ({ loading, isSubmitting, onSubmittingChange }) => {
     }
   };
 
+  const clearCsvUpload = () => {
+    setCsvState({
+      file: null,
+      uploadStatus: null,
+      uploadResult: null
+    });
+    localStorage.removeItem('addBrands_csvUploadResult');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleCsvFileSelect = (file) => {
     if (file) {
+      clearCsvUpload();
       setCsvState(prev => ({
         ...prev,
-        file: file,
-        uploadStatus: null,
-        uploadResult: null
-      }));
-    } else {
-      setCsvState(prev => ({
-        ...prev,
-        file: null,
-        uploadStatus: null,
-        uploadResult: null
+        file: file
       }));
     }
   };
@@ -72,105 +75,101 @@ const CsvUploadForm = ({ loading, isSubmitting, onSubmittingChange }) => {
     }
 
     if (isSubmitting || loading) {
-      toast.error('Please wait, brands are already being processed.');
+      toast.error('Please wait, an upload is already in progress.');
       return;
     }
 
-    try {
-      onSubmittingChange(true);
-      setCsvState(prev => ({ ...prev, uploadStatus: { type: 'uploading', message: 'Uploading CSV file...' } }));
+    onSubmittingChange(true);
+    setCsvState(prev => ({
+      ...prev,
+      uploadStatus: { type: 'uploading', message: 'Uploading CSV file...' },
+      uploadResult: null
+    }));
 
+    try {
       const result = await queueAPI.addBulkBrandsFromCSV(csvFile);
 
-      if (result && result.data) {
-        const summary = result.data.summary || result.data;
-        const results = result.data.results || result.data;
+      if (result && result.data && result.data.data) {
+        const summaryData = result.data.data.summary;
 
-        let successMessage = result.message || 'CSV uploaded successfully!';
-        let totalAdded = summary.totalAdded || 0;
-        let totalErrors = summary.totalErrors || 0;
-        let csvErrors = summary.csvErrors || 0;
-        let duplicates = summary.duplicates || 0;
+        const totalAdded = parseInt(summaryData.totalAdded || 0, 10);
+        const totalErrors = parseInt(summaryData.totalErrors || 0, 10);
+        const csvErrors = parseInt(summaryData.csvErrors || 0, 10);
+        const duplicates = parseInt(summaryData.duplicates || 0, 10);
+        const allErrors = totalErrors + csvErrors;
+
+        let toastMessage = '';
+        let toastType = 'default';
 
         if (totalAdded > 0) {
-          toast.success(successMessage);
-        } else if (duplicates > 0) {
-          toast.error(successMessage);
-        } else if (totalErrors > 0) {
-          toast.error(successMessage);
+          toastType = 'success';
+          toastMessage = `${totalAdded} brand(s) successfully added to the queue.`;
+          if (duplicates > 0) toastMessage += ` ${duplicates} were duplicates.`;
+          if (allErrors > 0) toastMessage += ` ${allErrors} had errors.`;
+        } else if (duplicates > 0 && allErrors === 0) {
+          toastType = 'default';
+          toastMessage = `No new brands added. ${duplicates} brand(s) were already in the queue.`;
+        } else if (allErrors > 0) {
+          toastType = 'error';
+          toastMessage = `Upload failed with ${allErrors} error(s). No brands were added.`;
         } else {
-          toast(successMessage);
+          toastMessage = 'Processing complete, but no new brands were added.';
         }
 
-        const uploadResult = {
-          type: 'success',
-          message: successMessage,
-          summary: {
-            totalAdded: totalAdded,
-            totalErrors: totalErrors,
-            csvErrors: csvErrors,
-            duplicates: duplicates,
-            fileName: csvFile.name,
-            uploadedAt: new Date().toISOString()
-          }
-        };
+        if (toastType === 'success') toast.success(toastMessage);
+        else if (toastType === 'error') toast.error(toastMessage);
+        else toast(toastMessage);
 
-        saveCsvUploadResult(uploadResult);
+        const newUploadResult = {
+          type: toastType,
+          message: toastMessage,
+          summary: { totalAdded, totalErrors, csvErrors, duplicates, fileName: csvFile.name, uploadedAt: new Date().toISOString() },
+          timestamp: new Date().toISOString()
+        };
 
         setCsvState(prev => ({
           ...prev,
-          uploadStatus: { type: 'success', message: successMessage }
+          file: null,
+          uploadStatus: { type: toastType, message: toastMessage },
+          uploadResult: newUploadResult
         }));
 
-        setTimeout(() => {
-          setCsvState(prev => ({ ...prev, uploadStatus: null }));
-          setCsvState(prev => ({ ...prev, file: null }));
-
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-          }
-        }, 3000);
+        localStorage.setItem('addBrands_csvUploadResult', JSON.stringify(newUploadResult));
 
         setTimeout(() => {
-          saveCsvUploadResult(null);
-        }, 5000);
+          setCsvState(prev => ({
+            ...prev,
+            uploadStatus: null,
+            uploadResult: null
+          }));
+          localStorage.removeItem('addBrands_csvUploadResult');
+        }, 4000);
 
       } else {
-        throw new Error('Invalid response structure from server');
+        throw new Error('Invalid or empty response structure from the server.');
       }
 
     } catch (error) {
       console.error('CSV Upload Error:', error);
-
       const errorMessage = error.response?.data?.message || error.message || 'Failed to upload CSV file';
       toast.error(errorMessage);
-
       setCsvState(prev => ({
         ...prev,
-        uploadStatus: { type: 'error', message: errorMessage }
+        uploadStatus: { type: 'error', message: errorMessage },
+        uploadResult: null
       }));
-
-      saveCsvUploadResult(null);
+      localStorage.removeItem('addBrands_csvUploadResult');
     } finally {
       onSubmittingChange(false);
-    }
-  };
-
-  const clearCsvUpload = () => {
-    setCsvState(prev => ({
-      ...prev,
-      file: null,
-      uploadStatus: null
-    }));
-    saveCsvUploadResult(null);
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
   const clearCsvUploadResult = () => {
-    saveCsvUploadResult(null);
+    setCsvState(prev => ({ ...prev, uploadResult: null }));
+    localStorage.removeItem('addBrands_csvUploadResult');
   };
 
   return (
@@ -200,7 +199,6 @@ const CsvUploadForm = ({ loading, isSubmitting, onSubmittingChange }) => {
               <div className="p-2 sm:p-3 bg-gray-100 rounded-full">
                 <Upload className="h-6 w-6 sm:h-8 sm:w-8 text-gray-600" />
               </div>
-
               <div>
                 <p className="text-base sm:text-lg font-medium text-gray-900">Upload CSV File</p>
                 <p className="text-xs sm:text-sm text-gray-500 mt-1">
@@ -216,7 +214,6 @@ const CsvUploadForm = ({ loading, isSubmitting, onSubmittingChange }) => {
                   </Button>
                 </p>
               </div>
-
               <div className="text-xs text-gray-400">
                 <p>Supported formats: .csv</p>
                 <p>Max size: 5MB</p>
@@ -237,11 +234,10 @@ const CsvUploadForm = ({ loading, isSubmitting, onSubmittingChange }) => {
                   </p>
                 </div>
               </div>
-
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => setCsvState(prev => ({ ...prev, file: null }))}
+                onClick={clearCsvUpload}
                 className="text-red-600 hover:text-red-700"
               >
                 <X className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -267,7 +263,7 @@ const CsvUploadForm = ({ loading, isSubmitting, onSubmittingChange }) => {
         />
 
         {csvUploadStatus && (
-          <div className={`p-3 rounded-lg ${csvUploadStatus.type === 'uploading'
+          <div className={`mt-4 p-3 rounded-lg ${csvUploadStatus.type === 'uploading'
             ? 'bg-blue-50 border border-blue-200 text-blue-800'
             : csvUploadStatus.type === 'error'
               ? 'bg-red-50 border border-red-200 text-red-800'
@@ -276,15 +272,9 @@ const CsvUploadForm = ({ loading, isSubmitting, onSubmittingChange }) => {
                 : 'bg-gray-50 border border-gray-200 text-gray-800'
             }`}>
             <div className="flex items-center space-x-2">
-              {csvUploadStatus.type === 'uploading' && (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-              )}
-              {csvUploadStatus.type === 'success' && (
-                <CheckCircle className="h-4 w-4 text-green-600" />
-              )}
-              {csvUploadStatus.type === 'error' && (
-                <AlertCircle className="h-4 w-4 text-red-600" />
-              )}
+              {csvUploadStatus.type === 'uploading' && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>}
+              {csvUploadStatus.type === 'success' && <CheckCircle className="h-4 w-4 text-green-600" />}
+              {csvUploadStatus.type === 'error' && <AlertCircle className="h-4 w-4 text-red-600" />}
               <span className="text-sm font-medium">{csvUploadStatus.message}</span>
             </div>
           </div>
@@ -292,29 +282,18 @@ const CsvUploadForm = ({ loading, isSubmitting, onSubmittingChange }) => {
 
         {csvFile && (
           <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
-            <Button
-              onClick={handleCsvUpload}
-              variant="primary"
-              disabled={loading || isSubmitting}
-              className="flex-1 sm:flex-none"
-            >
+            <Button onClick={handleCsvUpload} variant="primary" disabled={loading || isSubmitting} className="flex-1 sm:flex-none">
               <Upload className="h-4 w-4 mr-2" />
               {isSubmitting ? 'Uploading...' : 'Upload CSV'}
             </Button>
-
-            <Button
-              onClick={clearCsvUpload}
-              variant="outline"
-              disabled={loading || isSubmitting}
-              className="flex-1 sm:flex-none"
-            >
+            <Button onClick={clearCsvUpload} variant="outline" disabled={loading || isSubmitting} className="flex-1 sm:flex-none">
               <X className="h-4 w-4 mr-2" />
               Clear All
             </Button>
           </div>
         )}
 
-        {csvUploadResult && csvUploadResult.type === 'success' && (
+        {csvUploadResult && (
           <div className="mt-3 sm:mt-4 border border-green-200 rounded-lg p-3 sm:p-4 bg-green-50">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
               <div className="flex items-center space-x-2 sm:space-x-3">
@@ -325,41 +304,22 @@ const CsvUploadForm = ({ loading, isSubmitting, onSubmittingChange }) => {
                   <p className="text-sm sm:text-base font-medium text-green-800">Upload Summary</p>
                   <p className="text-xs sm:text-sm text-green-700">
                     {csvUploadResult.summary?.totalAdded || 0} brands added to pending queue
-                    {csvUploadResult.summary?.totalErrors > 0 && (
-                      <span className="ml-2 text-yellow-600">
-                        ({csvUploadResult.summary.totalErrors} processing errors)
-                      </span>
-                    )}
-                    {csvUploadResult.summary?.csvErrors > 0 && (
-                      <span className="ml-2 text-orange-600">
-                        ({csvUploadResult.summary.csvErrors} CSV parsing errors)
-                      </span>
-                    )}
                     {csvUploadResult.summary?.duplicates > 0 && (
-                      <span className="ml-2 text-purple-600">
-                        ({csvUploadResult.summary.duplicates} already in queue)
-                      </span>
+                      <span className="ml-2 text-purple-600">({csvUploadResult.summary.duplicates} already in queue)</span>
+                    )}
+                    {(csvUploadResult.summary?.totalErrors > 0 || csvUploadResult.summary?.csvErrors > 0) && (
+                      <span className="ml-2 text-yellow-600">({(csvUploadResult.summary.totalErrors || 0) + (csvUploadResult.summary.csvErrors || 0)} errors)</span>
                     )}
                   </p>
                   {csvUploadResult.summary?.fileName && (
-                    <p className="text-xs text-green-600 mt-1">
-                      File: {csvUploadResult.summary.fileName}
-                    </p>
+                    <p className="text-xs text-green-600 mt-1">File: {csvUploadResult.summary.fileName}</p>
                   )}
                   {csvUploadResult.summary?.uploadedAt && (
-                    <p className="text-xs text-green-600">
-                      Uploaded: {new Date(csvUploadResult.summary.uploadedAt).toLocaleString()}
-                    </p>
+                    <p className="text-xs text-green-600">Uploaded: {new Date(csvUploadResult.summary.uploadedAt).toLocaleString()}</p>
                   )}
                 </div>
               </div>
-
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={clearCsvUploadResult}
-                className="text-green-600 hover:text-green-700 self-start sm:self-auto"
-              >
+              <Button variant="secondary" size="sm" onClick={clearCsvUploadResult} className="text-green-600 hover:text-green-700 self-start sm:self-auto">
                 <X className="h-3 w-3 sm:h-4 sm:w-4" />
                 Clear
               </Button>

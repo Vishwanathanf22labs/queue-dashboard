@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import AdminAccessRequired from '../components/ui/AdminAccessRequired';
@@ -18,6 +19,11 @@ import {
 
 const QueueManagement = () => {
   const { isAdmin, isLoading: adminLoading } = useAdminStore();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pendingSearchRef = useRef('');
+  const failedSearchRef = useRef('');
+  const isInitialMountRef = useRef(true);
+  
   const {
     loading: storeLoading,
     error: storeError,
@@ -40,9 +46,9 @@ const QueueManagement = () => {
     pending: {
       brands: [],
       loading: false,
-      currentPage: 1,
-      searchTerm: '',
-      itemsPerPage: 10,
+      currentPage: parseInt(searchParams.get('pendingPage')) || 1,
+      searchTerm: searchParams.get('pendingSearch') || '',
+      itemsPerPage: parseInt(searchParams.get('pendingLimit')) || 10,
       totalCount: 0,
       error: null,
       isSearching: false
@@ -50,9 +56,9 @@ const QueueManagement = () => {
     failed: {
       brands: [],
       loading: false,
-      currentPage: 1,
-      searchTerm: '',
-      itemsPerPage: 10,
+      currentPage: parseInt(searchParams.get('failedPage')) || 1,
+      searchTerm: searchParams.get('failedSearch') || '',
+      itemsPerPage: parseInt(searchParams.get('failedLimit')) || 10,
       totalCount: 0,
       error: null,
       isSearching: false
@@ -60,6 +66,13 @@ const QueueManagement = () => {
     admin: {
       isProcessingAction: false
     }
+  });
+
+  // Store original totals that don't change during search
+  const [originalTotals, setOriginalTotals] = useState({
+    pendingCount: 0,
+    failedCount: 0,
+    totalBrands: 0
   });
 
   const { pending, failed, admin } = state;
@@ -74,6 +87,20 @@ const QueueManagement = () => {
       ...prev,
       pending: { ...prev.pending, ...updates }
     }));
+    
+    // Update URL parameters for persistence (except search)
+    if (updates.currentPage !== undefined || updates.itemsPerPage !== undefined) {
+      const newSearchParams = new URLSearchParams(searchParams);
+      
+      if (updates.currentPage !== undefined) {
+        newSearchParams.set('pendingPage', updates.currentPage.toString());
+      }
+      if (updates.itemsPerPage !== undefined) {
+        newSearchParams.set('pendingLimit', updates.itemsPerPage.toString());
+      }
+      
+      setSearchParams(newSearchParams, { replace: true });
+    }
   };
 
   const updateFailedState = (updates) => {
@@ -81,6 +108,20 @@ const QueueManagement = () => {
       ...prev,
       failed: { ...prev.failed, ...updates }
     }));
+    
+    // Update URL parameters for persistence (except search)
+    if (updates.currentPage !== undefined || updates.itemsPerPage !== undefined) {
+      const newSearchParams = new URLSearchParams(searchParams);
+      
+      if (updates.currentPage !== undefined) {
+        newSearchParams.set('failedPage', updates.currentPage.toString());
+      }
+      if (updates.itemsPerPage !== undefined) {
+        newSearchParams.set('failedLimit', updates.itemsPerPage.toString());
+      }
+      
+      setSearchParams(newSearchParams, { replace: true });
+    }
   };
 
   const updateAdminState = (updates) => {
@@ -90,124 +131,293 @@ const QueueManagement = () => {
   };
 
   const loadPendingBrands = useCallback(async (searchTerm = null, page = null) => {
-    updatePendingState({ loading: true, error: null });
+    // Single state update for loading
+    updatePendingState({ 
+      loading: true, 
+      error: null,
+      ...(searchTerm ? { isSearching: true } : {})
+    });
+    
     try {
-      if (searchTerm) {
-        updatePendingState({ isSearching: true });
-      }
-
       const pageToLoad = page || pending.currentPage;
       const response = await queueAPI.getPendingBrands(pageToLoad, pending.itemsPerPage, searchTerm);
+
+      // Only update results if they match the current search term
+      const currentSearch = pendingSearchRef.current;
+      const searchToCheck = searchTerm || '';
+      
+      // If search terms don't match, ignore this response (it's stale)
+      if (searchToCheck !== currentSearch) {
+        updatePendingState({ isSearching: false, loading: false });
+        return; 
+      }
 
       const brands = response.data.data?.brands || [];
       const totalCount = response.data.data?.pagination?.total_items || 0;
 
+      // Single final state update
       updatePendingState({
         brands,
         totalCount,
         currentPage: pageToLoad,
-        isSearching: false
+        isSearching: false,
+        loading: false
       });
+
+      // Update original totals only when not searching
+      if (!searchTerm) {
+        setOriginalTotals(prev => ({
+          ...prev,
+          pendingCount: totalCount,
+          totalBrands: prev.failedCount + totalCount
+        }));
+      }
     } catch (error) {
-      updatePendingState({ error: error.message || 'Failed to load pending brands', isSearching: false });
+      updatePendingState({ 
+        error: error.message || 'Failed to load pending brands', 
+        isSearching: false, 
+        loading: false 
+      });
       toast.error('Failed to load pending brands');
-    } finally {
-      updatePendingState({ loading: false });
     }
   }, [pending.itemsPerPage]);
 
   const loadFailedBrands = useCallback(async (searchTerm = null, page = null) => {
-    updateFailedState({ loading: true, error: null });
+    // Single state update for loading
+    updateFailedState({ 
+      loading: true, 
+      error: null,
+      ...(searchTerm ? { isSearching: true } : {})
+    });
+    
     try {
-      if (searchTerm) {
-        updateFailedState({ isSearching: true });
-      }
-
       const pageToLoad = page || failed.currentPage;
       const response = await queueAPI.getFailedBrands(pageToLoad, failed.itemsPerPage, searchTerm);
+
+      // Only update results if they match the current search term
+      const currentSearch = failedSearchRef.current;
+      const searchToCheck = searchTerm || '';
+      
+      
+      // If search terms don't match, ignore this response (it's stale)
+      if (searchToCheck !== currentSearch) {
+        updateFailedState({ isSearching: false, loading: false });
+        return; 
+      }
 
       const brands = response.data.data?.brands || [];
       const totalCount = response.data.data?.pagination?.total_items || 0;
 
+
+      // Single final state update
       updateFailedState({
         brands,
         totalCount,
         currentPage: pageToLoad,
-        isSearching: false
+        isSearching: false,
+        loading: false
       });
+
+      // Update original totals only when not searching
+      if (!searchTerm) {
+        setOriginalTotals(prev => ({
+          ...prev,
+          failedCount: totalCount,
+          totalBrands: prev.pendingCount + totalCount
+        }));
+      }
     } catch (error) {
-      updateFailedState({ error: error.message || 'Failed to load failed brands', isSearching: false });
+      updateFailedState({ 
+        error: error.message || 'Failed to load failed brands', 
+        isSearching: false, 
+        loading: false 
+      });
       toast.error('Failed to load failed brands');
-    } finally {
-      updateFailedState({ loading: false });
     }
   }, [failed.itemsPerPage]);
 
+
   useEffect(() => {
     // Load both pending and failed brands on component mount
-    loadPendingBrands();
-    loadFailedBrands();
-  }, [loadPendingBrands, loadFailedBrands]);
+    // Check if there are URL search parameters and load accordingly
+    const pendingPage = parseInt(searchParams.get('pendingPage')) || 1;
+    const pendingSearch = localStorage.getItem('queueManagement_pendingSearch') || '';
+    const pendingLimit = parseInt(searchParams.get('pendingLimit')) || 10;
+    const failedPage = parseInt(searchParams.get('failedPage')) || 1;
+    const failedSearch = localStorage.getItem('queueManagement_failedSearch') || '';
+    const failedLimit = parseInt(searchParams.get('failedLimit')) || 10;
 
-  useEffect(() => {
-    // Only reload pending brands when page changes (not on initial load)
-    if (pending.currentPage > 1) {
-      loadPendingBrands(null, pending.currentPage);
-    }
-  }, [pending.currentPage, loadPendingBrands]);
 
-  useEffect(() => {
-    // Only reload failed brands when page changes (not on initial load)
-    if (failed.currentPage > 1) {
-      loadFailedBrands(null, failed.currentPage);
+    // Update state from URL parameters and localStorage fallback
+    setState(prev => ({
+      ...prev,
+      pending: {
+        ...prev.pending,
+        currentPage: pendingPage,
+        searchTerm: pendingSearch,
+        itemsPerPage: pendingLimit
+      },
+      failed: {
+        ...prev.failed,
+        currentPage: failedPage,
+        searchTerm: failedSearch,
+        itemsPerPage: failedLimit
+      }
+    }));
+
+    if (pendingSearch && pendingSearch.trim().length >= 3) {
+      pendingSearchRef.current = pendingSearch;
+      loadPendingBrands(pendingSearch);
+    } else {
+      loadPendingBrands();
     }
-  }, [failed.currentPage, loadFailedBrands]);
+
+    if (failedSearch && failedSearch.trim().length >= 3) {
+      failedSearchRef.current = failedSearch;
+      loadFailedBrands(failedSearch);
+    } else {
+      loadFailedBrands();
+    }
+
+    // Mark initial mount as complete
+    setTimeout(() => {
+      isInitialMountRef.current = false;
+    }, 100);
+  }, []); // Empty dependencies - only run once on mount
+
+  // Load pending brands when pending page changes
+  useEffect(() => {
+    // Skip initial mount - let mount useEffect handle it
+    if (isInitialMountRef.current) {
+      return;
+    }
+    
+    // Only load pending brands when pending page changes
+    loadPendingBrands(null, pending.currentPage);
+  }, [pending.currentPage]);
+
+  // Load failed brands when failed page changes
+  useEffect(() => {
+    // Skip initial mount - let mount useEffect handle it
+    if (isInitialMountRef.current) {
+      return;
+    }
+    
+    // Only load failed brands when failed page changes
+    loadFailedBrands(null, failed.currentPage);
+  }, [failed.currentPage]);
+
+  // Debounced search for pending queue
+  useEffect(() => {
+    // Don't run on initial mount to prevent duplicate calls
+    if (isInitialMountRef.current) {
+      return;
+    }
+    
+    if (pending.searchTerm && pending.searchTerm.trim() !== '') {
+      const timeoutId = setTimeout(() => {
+        if (pending.searchTerm.trim().length >= 3) {
+          pendingSearchRef.current = pending.searchTerm;
+          loadPendingBrands(pending.searchTerm);
+        }
+      }, 300);
+
+      return () => clearTimeout(timeoutId);
+    } else if (pending.searchTerm === '') {
+      // Handle clearing search - load normal data
+      pendingSearchRef.current = '';
+      loadPendingBrands();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending.searchTerm]);
+
+  // Debounced search for failed queue
+  useEffect(() => {
+    // Don't run on initial mount to prevent duplicate calls
+    if (isInitialMountRef.current) {
+      return;
+    }
+    
+    if (failed.searchTerm && failed.searchTerm.trim() !== '') {
+      const timeoutId = setTimeout(() => {
+        if (failed.searchTerm.trim().length >= 3) {
+          failedSearchRef.current = failed.searchTerm;
+          loadFailedBrands(failed.searchTerm);
+        }
+      }, 300);
+
+      return () => clearTimeout(timeoutId);
+    } else if (failed.searchTerm === '') {
+      // Handle clearing search - load normal data
+      failedSearchRef.current = '';
+      loadFailedBrands();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [failed.searchTerm]);
 
   const handlePendingSearch = (searchTerm) => {
     updatePendingState({ searchTerm });
 
+    // Save to localStorage only
+    if (searchTerm && searchTerm.trim()) {
+      localStorage.setItem('queueManagement_pendingSearch', searchTerm);
+    } else {
+      localStorage.removeItem('queueManagement_pendingSearch');
+    }
+
     if (!searchTerm || searchTerm.trim() === '') {
       updatePendingState({ currentPage: 1 });
-      loadPendingBrands();
-      return;
+      // Don't call loadPendingBrands here - let useEffect handle it
     }
-
-    if (searchTerm !== pending.searchTerm) {
-      updatePendingState({ currentPage: 1 });
-    }
-
-    loadPendingBrands(searchTerm);
   };
 
   const handleFailedSearch = (searchTerm) => {
     updateFailedState({ searchTerm });
 
+    // Save to localStorage only
+    if (searchTerm && searchTerm.trim()) {
+      localStorage.setItem('queueManagement_failedSearch', searchTerm);
+    } else {
+      localStorage.removeItem('queueManagement_failedSearch');
+    }
+
     if (!searchTerm || searchTerm.trim() === '') {
       updateFailedState({ currentPage: 1 });
-      loadFailedBrands();
-      return;
+      // Don't call loadFailedBrands here - let useEffect handle it
     }
-
-    if (searchTerm !== failed.searchTerm) {
-      updateFailedState({ currentPage: 1 });
-    }
-
-    loadFailedBrands(searchTerm);
   };
 
   const clearPendingSearch = () => {
+    pendingSearchRef.current = '';
     updatePendingState({ searchTerm: '', currentPage: 1 });
-    loadPendingBrands();
+    
+    // Clear localStorage only
+    localStorage.removeItem('queueManagement_pendingSearch');
+    
+    // Don't call loadPendingBrands here - let useEffect handle it
   };
 
   const clearFailedSearch = () => {
+    failedSearchRef.current = '';
     updateFailedState({ searchTerm: '', currentPage: 1 });
-    loadFailedBrands();
+    
+    // Clear localStorage only
+    localStorage.removeItem('queueManagement_failedSearch');
+    
+    // Don't call loadFailedBrands here - let useEffect handle it
   };
 
   const handleRefresh = async () => {
     await Promise.all([loadPendingBrands(), loadFailedBrands()]);
     toast.success('Queue data refreshed successfully');
+  };
+
+  const handlePendingRefresh = async () => {
+    await loadPendingBrands();
+  };
+
+  const handleFailedRefresh = async () => {
+    await loadFailedBrands();
   };
 
   const handleAdminAction = async (action) => {
@@ -275,13 +485,15 @@ const QueueManagement = () => {
 
       if (targetQueue === 'failed') {
         response = await movePendingToFailed(brandIdentifier);
+        // When moving from pending to failed, refresh both queues
+        await Promise.all([handlePendingRefresh(), handleFailedRefresh()]);
       } else {
         response = await moveFailedToPending(brandIdentifier);
+        // When moving from failed to pending, refresh both queues
+        await Promise.all([handlePendingRefresh(), handleFailedRefresh()]);
       }
 
       toast.success(`Brand ${brand.brand_name} moved to ${targetQueue} queue successfully`);
-
-      await handleRefresh();
 
     } catch (error) {
       toast.error(`Failed to move brand: ${error.response?.data?.message || error.message || error}`);
@@ -305,15 +517,15 @@ const QueueManagement = () => {
 
       if (queueType === 'pending') {
         response = await removePendingBrand(brandIdentifier);
+        await handlePendingRefresh();
       } else if (queueType === 'failed') {
         response = await removeFailedBrand(brandIdentifier);
+        await handleFailedRefresh();
       } else {
         throw new Error('Invalid queue type');
       }
 
       toast.success(`Brand ${brand.brand_name} removed successfully`);
-
-      await handleRefresh();
 
     } catch (error) {
       toast.error(`Failed to remove brand: ${error.response?.data?.message || error.message || error}`);
@@ -322,6 +534,7 @@ const QueueManagement = () => {
     }
   };
 
+  
   if (adminLoading) {
     return <LoadingSpinner />;
   }
@@ -382,15 +595,30 @@ const QueueManagement = () => {
       </Card>
 
       <QueueStats 
-        pendingCount={pending.totalCount}
-        failedCount={failed.totalCount}
+        pendingCount={originalTotals.pendingCount}
+        failedCount={originalTotals.failedCount}
+        totalBrands={originalTotals.totalBrands}
       />
 
       <PendingQueue
         pending={pending}
         onSearch={handlePendingSearch}
         onClearSearch={clearPendingSearch}
-        onPageChange={(page) => updatePendingState({ currentPage: page })}
+          onPageChange={(page) => {
+            updatePendingState({ currentPage: page });
+            
+            // Prevent scroll jump by keeping pagination in view
+          setTimeout(() => {
+            const paginationElement = document.getElementById('pending-queue-pagination');
+            if (paginationElement) {
+              paginationElement.scrollIntoView({ 
+                behavior: 'instant', 
+                block: 'center',
+                inline: 'nearest'
+              });
+            }
+          }, 100); // Increased delay to ensure table re-render is complete
+        }}
         onMoveBrand={handleMoveBrand}
         onRemoveBrand={handleRemoveBrand}
         isProcessingAction={isProcessingAction}
@@ -400,7 +628,26 @@ const QueueManagement = () => {
         failed={failed}
         onSearch={handleFailedSearch}
         onClearSearch={clearFailedSearch}
-        onPageChange={(page) => updateFailedState({ currentPage: page })}
+          onPageChange={(page) => {
+            updateFailedState({ currentPage: page });
+            
+            // Update URL parameters
+            const newParams = new URLSearchParams(searchParams);
+            newParams.set('failedPage', page.toString());
+            setSearchParams(newParams);
+            
+            // Prevent scroll jump by keeping pagination in view
+          setTimeout(() => {
+            const paginationElement = document.getElementById('failed-queue-pagination');
+            if (paginationElement) {
+              paginationElement.scrollIntoView({ 
+                behavior: 'instant', 
+                block: 'center',
+                inline: 'nearest'
+              });
+            }
+          }, 100); // Increased delay to ensure table re-render is complete
+        }}
         onMoveBrand={handleMoveBrand}
         onRemoveBrand={handleRemoveBrand}
         isProcessingAction={isProcessingAction}

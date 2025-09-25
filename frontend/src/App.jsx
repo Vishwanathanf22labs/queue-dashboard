@@ -23,7 +23,7 @@ function App() {
 
   useEffect(() => {
     // Define pages that don't require admin access (public pages)
-    const publicPages = ['/', '/pending-queue', '/failed-queue', '/watchlist-queues'];
+    const publicPages = ['/', '/pending-queue', '/failed-queue', '/watchlist-queues', '/pipeline-status', '/scraped-brands'];
     
     // Only check admin status for admin-only pages, not for public pages
     if (!publicPages.includes(location.pathname)) {

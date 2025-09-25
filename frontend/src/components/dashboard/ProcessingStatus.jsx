@@ -12,6 +12,29 @@ const ProcessingStatus = ({
   pendingCount = 0
 }) => {
   const getScraperStatusInfo = (status) => {
+    // Handle specific stopped reasons
+    if (status && status.startsWith('stopped(')) {
+      const reason = status.replace('stopped(', '').replace(')', '');
+      let label = status; // Show the full status including reason
+      
+      // Map specific reasons to shorter labels for display
+      switch (reason) {
+        case 'cooldown NWL':
+          label = 'Stopped (Cooldown NWL)';
+          break;
+        case 'cooldown WL':
+          label = 'Stopped (Cooldown WL)';
+          break;
+        case 'Hold':
+          label = 'Stopped (Hold)';
+          break;
+        default:
+          label = status;
+      }
+      
+      return { variant: 'warning', icon: Square, label: label };
+    }
+    
     switch (status) {
       case 'running':
         return { variant: 'success', icon: Play, label: 'Running' };
@@ -22,7 +45,7 @@ const ProcessingStatus = ({
       case 'not_running':
         return { variant: 'secondary', icon: Square, label: 'Not Running' };
       default:
-        return { variant: 'secondary', icon: Clock, label: 'Unknown' };
+        return { variant: 'secondary', icon: Clock, label: status || 'Unknown' };
     }
   };
 
@@ -74,7 +97,7 @@ const ProcessingStatus = ({
             {/* List of processing brands */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-96 overflow-y-auto scrollbar-hide">
               {nonWatchlistProcessingBrands.map((brand, index) => (
-                <div key={brand.brand_id || index} className="flex flex-col space-y-2 p-3 bg-gray-50 rounded-lg border min-h-[200px]">
+                <div key={`${brand.brand_id}-${brand.page_id}-${index}`} className="flex flex-col space-y-2 p-3 bg-gray-50 rounded-lg border min-h-[200px]">
                   <div className="flex items-center space-x-3 mb-2">
                     <div className="w-6 h-6 sm:w-8 sm:h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
                       <Play className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
@@ -131,10 +154,10 @@ const ProcessingStatus = ({
                   
                   <div className="flex justify-end mt-auto pt-2">
                     <Badge 
-                      variant={brand.status === 'complete' ? 'success' : 'info'} 
+                      variant={brand.status === 'completed' || brand.status === 'complete' ? 'success' : 'info'} 
                       className="text-xs"
                     >
-                      {brand.status === 'complete' ? 'Completed' : 'Active'}
+                      {brand.status === 'completed' || brand.status === 'complete' ? 'Completed' : 'Active'}
                     </Badge>
                   </div>
                 </div>

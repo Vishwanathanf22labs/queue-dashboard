@@ -245,6 +245,9 @@ class ScrapedBrandsService {
       // Check if query is numeric for brand_id search
       const isNumericQuery = !isNaN(query) && !isNaN(parseInt(query));
       
+      // 🔍 Normalize search query - remove spaces and make lowercase for flexible matching
+      const normalizedQuery = query.toLowerCase().replace(/\s+/g, '');
+      
       // Build where clause based on query type
       let whereClause = {
         started_at: {
@@ -258,7 +261,7 @@ class ScrapedBrandsService {
         whereClause.brand_id = parseInt(query);
       }
 
-      // Search across all pages using Sequelize ORM
+      // Search across all pages using Sequelize ORM with flexible matching
       const searchResults = await BrandsDailyStatus.findAll({
         where: whereClause,
         include: [
@@ -274,6 +277,7 @@ class ScrapedBrandsService {
             required: true,
             where: isNumericQuery ? {} : {
               [Op.or]: [
+                // 🔍 Exact match with spaces
                 {
                   actual_name: {
                     [Op.iLike]: `%${query}%`
@@ -283,6 +287,33 @@ class ScrapedBrandsService {
                   name: {
                     [Op.iLike]: `%${query}%`
                   }
+                },
+                // 🔍 Flexible match without spaces (for "redbull" to find "Red Bull")
+                {
+                  [Op.and]: [
+                    BrandsDailyStatus.sequelize.where(
+                      BrandsDailyStatus.sequelize.fn('LOWER', 
+                        BrandsDailyStatus.sequelize.fn('REPLACE', 
+                          BrandsDailyStatus.sequelize.col('brand.actual_name'), ' ', ''
+                        )
+                      ),
+                      'LIKE',
+                      `%${normalizedQuery}%`
+                    )
+                  ]
+                },
+                {
+                  [Op.and]: [
+                    BrandsDailyStatus.sequelize.where(
+                      BrandsDailyStatus.sequelize.fn('LOWER', 
+                        BrandsDailyStatus.sequelize.fn('REPLACE', 
+                          BrandsDailyStatus.sequelize.col('brand.name'), ' ', ''
+                        )
+                      ),
+                      'LIKE',
+                      `%${normalizedQuery}%`
+                    )
+                  ]
                 }
               ]
             }

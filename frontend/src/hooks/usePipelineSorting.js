@@ -2,23 +2,27 @@ import { useState, useEffect, useCallback } from 'react';
 
 const usePipelineSorting = (defaultSortBy, defaultSortOrder) => {
   const storageKey = 'pipeline-sorting';
-  const [sortBy, setSortBy] = useState(defaultSortBy);
-  const [sortOrder, setSortOrder] = useState(defaultSortOrder);
-
-  useEffect(() => {
+  
+  // Initialize state directly from localStorage to prevent double API calls
+  const getInitialSortState = () => {
     try {
       const savedState = localStorage.getItem(storageKey);
       if (savedState) {
         const { sortBy: savedSortBy, sortOrder: savedSortOrder } = JSON.parse(savedState);
-        setSortBy(savedSortBy || defaultSortBy);
-        setSortOrder(savedSortOrder || defaultSortOrder);
+        return {
+          sortBy: savedSortBy || defaultSortBy,
+          sortOrder: savedSortOrder || defaultSortOrder
+        };
       }
     } catch (error) {
       console.error(`Error loading sorting state from localStorage for ${storageKey}:`, error);
-      setSortBy(defaultSortBy);
-      setSortOrder(defaultSortOrder);
     }
-  }, [defaultSortBy, defaultSortOrder]);
+    return { sortBy: defaultSortBy, sortOrder: defaultSortOrder };
+  };
+
+  const initialState = getInitialSortState();
+  const [sortBy, setSortBy] = useState(initialState.sortBy);
+  const [sortOrder, setSortOrder] = useState(initialState.sortOrder);
 
   const updateSorting = useCallback((newSortBy, newSortOrder) => {
     setSortBy(newSortBy);

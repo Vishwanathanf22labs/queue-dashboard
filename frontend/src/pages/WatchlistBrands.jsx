@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -14,6 +15,8 @@ import { watchlistBrandsColumns } from '../constants/data';
 import toast from 'react-hot-toast';
 
 const WatchlistBrands = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  
   const { 
     watchlistBrands, 
     watchlistPendingBrands,
@@ -29,14 +32,16 @@ const WatchlistBrands = () => {
   } = useQueueStore();
   const { isAdmin } = useAdminStore();
 
+  // Get pagination and search state from URL params
+  const searchTerm = searchParams.get('search') || '';
+  const currentPage = parseInt(searchParams.get('page')) || 1;
+  const itemsPerPage = parseInt(searchParams.get('limit')) || 20;
+
   const [state, setState] = useState({
-    filteredBrands: [],
-    searchTerm: '',
-    currentPage: 1,
-    itemsPerPage: 20
+    filteredBrands: []
   });
 
-  const { filteredBrands, searchTerm, currentPage, itemsPerPage } = state;
+  const { filteredBrands } = state;
 
   const updateState = (updates) => {
     setState(prev => ({ ...prev, ...updates }));
@@ -66,54 +71,70 @@ const WatchlistBrands = () => {
 
 
 
+  // Stable sorting function with deterministic secondary sort
+  const sortBrandsStably = (brands) => {
+    // Don't sort until all data is loaded to prevent inconsistent results
+    if (!watchlistPendingBrands || !watchlistFailedBrands || !watchlistBrands?.brands) {
+      return brands;
+    }
+
+    return brands.sort((a, b) => {
+      const getPriority = (status) => {
+        switch (status) {
+          case 'failed': return 1;       // Show failed first (as requested)
+          case 'waiting': return 2;      // Show waiting second
+          case 'completed': return 3;    // Show completed third
+          case 'queues_empty': return 4; // Show queues_empty fourth
+          default: return 5;             // Show unknown last
+        }
+      };
+
+      const statusA = determineScraperStatus(a);
+      const statusB = determineScraperStatus(b);
+      
+      const priorityA = getPriority(statusA);
+      const priorityB = getPriority(statusB);
+
+      // Primary sort: by status priority
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+
+      // Secondary sort: by page_id for stable ordering (prevents shuffle on refresh)
+      const pageIdA = parseInt(a.page_id) || 0;
+      const pageIdB = parseInt(b.page_id) || 0;
+      return pageIdA - pageIdB;
+    });
+  };
+
   useEffect(() => {
     if (searchTerm.trim() === '') {
-      const sortedBrands = (watchlistBrands?.brands || []).sort((a, b) => {
-        const getPriority = (status) => {
-          switch (status) {
-            case 'completed': return 1;
-            case 'waiting': return 2;
-            case 'failed': return 3;
-            case 'queues_empty': return 4;
-            default: return 5;
-          }
-        };
-
-        const statusA = determineScraperStatus(a);
-        const statusB = determineScraperStatus(b);
-
-        return getPriority(statusA) - getPriority(statusB);
-      });
+      const sortedBrands = sortBrandsStably(watchlistBrands?.brands || []);
       updateState({ filteredBrands: sortedBrands });
     } else {
-      const filtered = (watchlistBrands?.brands || []).filter(brand =>
-        brand.brand_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        brand.page_id?.toString().includes(searchTerm) ||
-        brand.brand_id?.toString().includes(searchTerm)
-      );
-
-      // Sort filtered results by the same priority
-      const sortedFiltered = filtered.sort((a, b) => {
-        const getPriority = (status) => {
-          switch (status) {
-            case 'completed': return 1;
-            case 'waiting': return 2;
-            case 'failed': return 3;
-            case 'queues_empty': return 4;
-            default: return 5;
-          }
-        };
-
-        const statusA = determineScraperStatus(a);
-        const statusB = determineScraperStatus(b);
-
-        return getPriority(statusA) - getPriority(statusB);
+      const normalizedSearchTerm = searchTerm.toLowerCase().replace(/\s+/g, '');
+      
+      const filtered = (watchlistBrands?.brands || []).filter(brand => {
+        const brandName = brand.brand_name?.toLowerCase() || '';
+        const normalizedBrandName = brandName.replace(/\s+/g, '');
+        
+        return (
+          // Original search (with spaces)
+          brandName.includes(searchTerm.toLowerCase()) ||
+          // Space-insensitive search
+          normalizedBrandName.includes(normalizedSearchTerm) ||
+          // Page ID and Brand ID search
+          brand.page_id?.toString().includes(searchTerm) ||
+          brand.brand_id?.toString().includes(searchTerm)
+        );
       });
 
+      const sortedFiltered = sortBrandsStably(filtered);
       updateState({ filteredBrands: sortedFiltered });
     }
-    updateState({ currentPage: 1 }); 
-  }, [searchTerm, watchlistBrands]);
+  }, [searchTerm, watchlistBrands, watchlistPendingBrands, watchlistFailedBrands]);
+
+
 
   const getScraperStatusInfo = (status) => {
     switch (status) {
@@ -162,8 +183,23 @@ const WatchlistBrands = () => {
   const currentBrands = filteredBrands.slice(startIndex, endIndex);
 
   const handlePageChange = (page) => {
-    updateState({ currentPage: page });
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('page', page.toString());
+    setSearchParams(newParams);
   };
+
+  const handleSearchChange = (value) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (value.trim() === '') {
+      newParams.delete('search');
+    } else {
+      newParams.set('search', value);
+    }
+    newParams.set('page', '1'); // Reset to page 1 when searching
+    setSearchParams(newParams);
+  };
+
+
 
   // Handle individual brand movement from failed to pending
   const handleMoveIndividualBrand = async (brand) => {
@@ -329,31 +365,31 @@ const WatchlistBrands = () => {
         </Button>
       </div>
 
-                         {/* Summary Stats Cards - Above Search */}
+                      
        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
          <Card>
-           <div className="text-center">
-             <div className="text-2xl font-bold text-green-600">
-               {filteredBrands ? filteredBrands.filter(b => determineScraperStatus(b) === 'completed').length : 0}
+             <div className="text-center">
+               <div className="text-2xl font-bold text-green-600">
+                 {watchlistBrands?.brands ? watchlistBrands.brands.filter(b => determineScraperStatus(b) === 'completed').length : 0}
+               </div>
+               <div className="text-sm text-gray-600">Completed</div>
              </div>
-             <div className="text-sm text-gray-600">Completed</div>
-           </div>
-         </Card>
-         <Card>
-           <div className="text-center">
-             <div className="text-2xl font-bold text-yellow-600">
-               {filteredBrands ? filteredBrands.filter(b => determineScraperStatus(b) === 'waiting').length : 0}
+           </Card>
+           <Card>
+             <div className="text-center">
+               <div className="text-2xl font-bold text-yellow-600">
+                 {watchlistBrands?.brands ? watchlistBrands.brands.filter(b => determineScraperStatus(b) === 'waiting').length : 0}
+               </div>
+               <div className="text-sm text-gray-600">Waiting</div>
              </div>
-             <div className="text-sm text-gray-600">Waiting</div>
-           </div>
-         </Card>
-         <Card>
-           <div className="text-center">
-             <div className="text-2xl font-bold text-red-600">
-               {filteredBrands ? filteredBrands.filter(b => determineScraperStatus(b) === 'failed').length : 0}
+           </Card>
+           <Card>
+             <div className="text-center">
+               <div className="text-2xl font-bold text-red-600">
+                 {watchlistBrands?.brands ? watchlistBrands.brands.filter(b => determineScraperStatus(b) === 'failed').length : 0}
+               </div>
+               <div className="text-sm text-gray-600">Failed</div>
              </div>
-             <div className="text-sm text-gray-600">Failed</div>
-           </div>
          </Card>
        </div>
 
@@ -453,7 +489,7 @@ const WatchlistBrands = () => {
       <Card>
         <SearchInput
           value={searchTerm}
-          onChange={(value) => updateState({ searchTerm: value })}
+          onChange={handleSearchChange}
           placeholder="Search by brand name, page ID, or brand ID..."
           leftIcon={<Search className="h-4 w-4 text-gray-400" />}
           size="md"

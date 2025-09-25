@@ -31,7 +31,7 @@ const regularRedis = new Redis({
   enableReadyCheck: false,
 });
 
-// Event handlers for Global Redis
+
 globalRedis.on("connect", () => {
   console.log("Global Redis connected successfully");
 });
@@ -52,7 +52,7 @@ globalRedis.on("reconnecting", () => {
   console.log("Global Redis reconnecting...");
 });
 
-// Event handlers for Watchlist Redis
+
 watchlistRedis.on("connect", () => {
   console.log("Watchlist Redis connected successfully");
 });
@@ -73,7 +73,7 @@ watchlistRedis.on("reconnecting", () => {
   console.log("Watchlist Redis reconnecting...");
 });
 
-// Event handlers for Regular Redis
+
 regularRedis.on("connect", () => {
   console.log("Regular Redis connected successfully");
 });
@@ -98,6 +98,5 @@ module.exports = {
   globalRedis,
   watchlistRedis,
   regularRedis,
-  // Keep backward compatibility
   redis: globalRedis
 };

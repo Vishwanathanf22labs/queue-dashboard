@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import ErrorDisplay from '../components/ui/ErrorDisplay';
 import Button from '../components/ui/Button';
@@ -15,6 +16,8 @@ import WatchlistProcessingStatus from '../components/dashboard/WatchlistProcessi
 import WatchlistAdsCountTable from '../components/queue/WatchlistAdsCountTable';
 
 const Dashboard = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  
   const {
     overview,
     nextBrand,
@@ -154,9 +157,19 @@ const Dashboard = () => {
       // Always fetch overview first to get queue counts
       const overviewData = await fetchOverview();
       
+      // Get sorting and pagination state from URL params
+      const regularBrandsPage = parseInt(searchParams.get('regularPage')) || 1;
+      const regularBrandsSortBy = searchParams.get('regularSortBy') || 'normal';
+      const regularBrandsSortOrder = searchParams.get('regularSortOrder') || 'desc';
+      
+      const watchlistPage = parseInt(searchParams.get('watchlistPage')) || 1;
+      const watchlistSortBy = searchParams.get('watchlistSortBy') || 'normal';
+      const watchlistSortOrder = searchParams.get('watchlistSortOrder') || 'desc';
+      
+      
       const promises = [
-        fetchBrandProcessingQueue(1, 10),
-        fetchWatchlistBrandsQueue(1, 10),
+        fetchBrandProcessingQueue(regularBrandsPage, 10, regularBrandsSortBy, regularBrandsSortOrder),
+        fetchWatchlistBrandsQueue(watchlistPage, 10, watchlistSortBy, watchlistSortOrder),
         fetchSeparateScrapedStats(null, 7),
         fetchScraperStatus()
       ];
@@ -184,6 +197,13 @@ const Dashboard = () => {
 
   const handleQueuePageChange = async (newPage, sortBy = 'normal', sortOrder = 'desc') => {
     try {
+      // Update URL params
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('regularPage', newPage.toString());
+      newParams.set('regularSortBy', sortBy);
+      newParams.set('regularSortOrder', sortOrder);
+      setSearchParams(newParams);
+      
       await fetchBrandProcessingQueue(newPage, 10, sortBy, sortOrder);
     } catch (error) {
       toast.error(`Failed to load page ${newPage}: ${error.message || error}`);
@@ -192,6 +212,13 @@ const Dashboard = () => {
 
   const handleWatchlistPageChange = async (newPage, sortBy = 'normal', sortOrder = 'desc') => {
     try {
+      // Update URL params
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('watchlistPage', newPage.toString());
+      newParams.set('watchlistSortBy', sortBy);
+      newParams.set('watchlistSortOrder', sortOrder);
+      setSearchParams(newParams);
+      
       await fetchWatchlistBrandsQueue(newPage, 10, sortBy, sortOrder);
     } catch (error) {
       toast.error(`Failed to load watchlist page ${newPage}: ${error.message || error}`);
@@ -200,6 +227,13 @@ const Dashboard = () => {
 
   const handleQueueSortChange = async (sortBy, sortOrder) => {
     try {
+      // Update URL params
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('regularPage', '1'); // Reset to page 1 when sorting
+      newParams.set('regularSortBy', sortBy);
+      newParams.set('regularSortOrder', sortOrder);
+      setSearchParams(newParams);
+      
       await fetchBrandProcessingQueue(1, 10, sortBy, sortOrder);
     } catch (error) {
       toast.error(`Failed to sort queue: ${error.message || error}`);
@@ -208,6 +242,13 @@ const Dashboard = () => {
 
   const handleWatchlistSortChange = async (sortBy, sortOrder) => {
     try {
+      // Update URL params
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('watchlistPage', '1'); // Reset to page 1 when sorting
+      newParams.set('watchlistSortBy', sortBy);
+      newParams.set('watchlistSortOrder', sortOrder);
+      setSearchParams(newParams);
+      
       await fetchWatchlistBrandsQueue(1, 10, sortBy, sortOrder);
     } catch (error) {
       toast.error(`Failed to sort watchlist queue: ${error.message || error}`);
@@ -264,7 +305,12 @@ const Dashboard = () => {
   }, [refreshInterval]);
 
   useEffect(() => {
-    loadData();
+    // Small delay to ensure localStorage is available and components are mounted
+    const timer = setTimeout(() => {
+      loadData();
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -299,6 +345,8 @@ const Dashboard = () => {
         isRefreshing={isRefreshing}
         onManualRefresh={handleManualRefresh}
         onIntervalChange={changeRefreshInterval}
+        regularCooldown={pendingCount === 0 && failedCount === 0}
+        watchlistCooldown={watchlistPendingCount === 0 && watchlistFailedCount === 0}
       />
 
       <DashboardStats
@@ -343,6 +391,9 @@ const Dashboard = () => {
       />
 
       <BrandProcessingQueue 
+        brandProcessingQueue={brandProcessingQueue}
+        loading={loading}
+        error={error}
         onPageChange={handleQueuePageChange}
         onSortChange={handleQueueSortChange}
       />

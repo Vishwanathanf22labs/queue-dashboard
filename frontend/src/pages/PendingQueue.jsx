@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -13,10 +14,19 @@ import SearchInput from '../components/ui/SearchInput';
 
 const PendingQueue = () => {
   const { fetchPendingBrands, loading } = useQueueStore();
+  const currentSearchRef = useRef('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Separate state for original totals (for static display)
+  const [originalTotals, setOriginalTotals] = useState({
+    total_items: 0,
+    total_pages: 0
+  });
+  
   const [queueState, setQueueState] = useState({
-    searchTerm: '',
-    currentPage: 1,
-    itemsPerPage: 10,
+    searchTerm: searchParams.get('search') || '',
+    currentPage: parseInt(searchParams.get('page')) || 1,
+    itemsPerPage: parseInt(searchParams.get('limit')) || 10,
     isRefreshing: false,
     brands: [],
     pagination: {},
@@ -112,14 +122,24 @@ const PendingQueue = () => {
     }
   ];
 
-  const loadPendingBrands = async (searchTerm = null) => {
+  const loadPendingBrands = useCallback(async (searchTerm = null, pageOverride = null) => {
     try {
       if (searchTerm) {
         updateQueueState({ isSearching: true });
       }
 
-      const pageToLoad = searchTerm ? 1 : currentPage;
+      const pageToLoad = searchTerm ? 1 : (pageOverride || currentPage);
       const response = await fetchPendingBrands(pageToLoad, itemsPerPage, searchTerm);
+
+      // Only update results if they match the current search term
+      const currentSearch = currentSearchRef.current;
+      const searchToCheck = searchTerm || '';
+      
+      // If search terms don't match, ignore this response (it's stale)
+      if (searchToCheck !== currentSearch) {
+        updateQueueState({ isSearching: false });
+        return; 
+      }
 
       let brands = [];
       let pagination = {};
@@ -135,34 +155,45 @@ const PendingQueue = () => {
         pagination = {};
       }
 
-
       updateQueueState({
         brands,
         pagination,
         currentPage: pageToLoad,
         isSearching: false
       });
+
+      // Store original totals only when not searching (for static display)
+      if (!searchTerm) {
+        setOriginalTotals({
+          total_items: pagination.total_items || 0,
+          total_pages: pagination.total_pages || 0
+        });
+      }
     } catch (error) {
       updateQueueState({ isSearching: false });
       toast.error(`Failed to load pending brands: ${error.message || error}`);
     }
-  };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Single useEffect to handle all loading scenarios
   useEffect(() => {
-    if (!searchTerm) {
-      loadPendingBrands();
+    if (searchTerm && searchTerm.trim() !== '') {
+      // Handle search with debouncing
+      const timeoutId = setTimeout(() => {
+        if (searchTerm.trim().length >= 3) {
+          currentSearchRef.current = searchTerm;
+          loadPendingBrands(searchTerm);
+        }
+      }, 300);
+
+      return () => clearTimeout(timeoutId);
+    } else {
+      // Load normal data when no search term, pass current page
+      currentSearchRef.current = '';
+      loadPendingBrands(null, currentPage);
     }
-  }, [currentPage, itemsPerPage]);
-
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (searchTerm && searchTerm.trim() !== '') {
-        loadPendingBrands(searchTerm);
-      }
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, itemsPerPage, searchTerm]);
 
   const handleRefresh = async () => {
     if (isRefreshing) return;
@@ -181,15 +212,34 @@ const PendingQueue = () => {
   const handleSearch = (searchTerm) => {
     updateQueueState({ searchTerm });
 
+    // Update URL parameters
+    const newParams = new URLSearchParams(searchParams);
+    if (searchTerm && searchTerm.trim()) {
+      newParams.set('search', searchTerm);
+      newParams.set('page', '1'); // Reset to page 1 on search
+    } else {
+      newParams.delete('search');
+      newParams.set('page', '1'); // Reset to page 1 when clearing search
+    }
+    setSearchParams(newParams);
+
     if (!searchTerm || searchTerm.trim() === '') {
       updateQueueState({ currentPage: 1 });
-      loadPendingBrands();
+      // Don't call loadPendingBrands() here - let useEffect handle it
     }
   };
 
   const clearSearch = () => {
+    currentSearchRef.current = '';
     updateQueueState({ searchTerm: '', currentPage: 1 });
-    loadPendingBrands();
+    
+    // Update URL parameters
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('search');
+    newParams.set('page', '1');
+    setSearchParams(newParams);
+    
+    // Don't call loadPendingBrands() here - let useEffect handle it
   };
 
   const filteredBrands = brands;
@@ -208,7 +258,7 @@ const PendingQueue = () => {
             <div>
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Pending Queue</h1>
               <p className="text-xs sm:text-sm lg:text-base text-gray-600">
-                {pagination.total_items || 0} brands waiting to be processed
+                {originalTotals.total_items || pagination.total_items || 0} brands waiting to be processed
               </p>
             </div>
           </div>
@@ -233,7 +283,7 @@ const PendingQueue = () => {
             <div className="ml-2 sm:ml-3 lg:ml-4">
               <p className="text-xs sm:text-sm font-medium text-gray-600">Total Pending</p>
               <p className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-blue-600">
-                {pagination.total_items || 0}
+                {originalTotals.total_items || pagination.total_items || 0}
               </p>
             </div>
           </div>
@@ -247,7 +297,7 @@ const PendingQueue = () => {
             <div className="ml-2 sm:ml-3 lg:ml-4">
               <p className="text-xs sm:text-sm font-medium text-gray-600">Current Page</p>
               <p className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-green-600">
-                {currentPage} / {totalPages || 1}
+                {currentPage} / {Math.ceil((originalTotals.total_items || pagination.total_items || 0) / itemsPerPage) || 1}
               </p>
             </div>
           </div>
@@ -280,24 +330,11 @@ const PendingQueue = () => {
               variant="default"
               showClearButton={true}
               onClear={clearSearch}
-              disabled={isSearching}
             />
           </div>
           <div className="flex items-center space-x-3 sm:space-x-4 text-xs sm:text-sm text-gray-600">
-            <span>Total: {pagination.total_items || 0}</span>
+            <span>Total: {originalTotals.total_items || pagination.total_items || 0}</span>
             <span>Showing: {filteredBrands.length}</span>
-            {searchTerm && (
-              <span className="text-blue-600">
-                {isSearching ? (
-                  <span className="flex items-center">
-                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-1"></div>
-                    Searching: "{searchTerm}"
-                  </span>
-                ) : (
-                  `Searching: "${searchTerm}"`
-                )}
-              </span>
-            )}
           </div>
         </div>
       </Card>
@@ -419,7 +456,14 @@ const PendingQueue = () => {
       <Pagination
         currentPage={currentPage}
         totalPages={totalPages}
-        onPageChange={(page) => updateQueueState({ currentPage: page })}
+        onPageChange={(page) => {
+          updateQueueState({ currentPage: page });
+          
+          // Update URL parameters
+          const newParams = new URLSearchParams(searchParams);
+          newParams.set('page', page.toString());
+          setSearchParams(newParams);
+        }}
         totalItems={pagination.total_items || 0}
         itemsPerPage={itemsPerPage}
         showPageInfo={true}

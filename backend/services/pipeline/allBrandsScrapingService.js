@@ -396,6 +396,9 @@ async function searchBrandsPipelineStatus(query, date = null) {
     // Check if query is numeric for brand_id search
     const isNumericQuery = !isNaN(query) && !isNaN(parseInt(query));
     
+    // 🔍 Normalize search query - remove spaces and make lowercase for flexible matching
+    const normalizedQuery = query.toLowerCase().replace(/\s+/g, '');
+    
     // Build where clause based on query type
     let whereClause = {
       created_at: {
@@ -408,7 +411,7 @@ async function searchBrandsPipelineStatus(query, date = null) {
       whereClause.brand_id = parseInt(query);
     }
 
-    // Search across all brands using Sequelize ORM
+    // Search across all brands using Sequelize ORM with flexible matching
     const searchResults = await BrandsDailyStatus.findAll({
       where: whereClause,
       include: [
@@ -424,6 +427,7 @@ async function searchBrandsPipelineStatus(query, date = null) {
           required: true,
           where: isNumericQuery ? {} : {
             [Op.or]: [
+              // 🔍 Exact match with spaces
               {
                 actual_name: {
                   [Op.iLike]: `%${query}%`
@@ -434,6 +438,34 @@ async function searchBrandsPipelineStatus(query, date = null) {
                   [Op.iLike]: `%${query}%`
                 }
               },
+              // 🔍 Flexible match without spaces (for "redbull" to find "Red Bull")
+              {
+                [Op.and]: [
+                  BrandsDailyStatus.sequelize.where(
+                    BrandsDailyStatus.sequelize.fn('LOWER', 
+                      BrandsDailyStatus.sequelize.fn('REPLACE', 
+                        BrandsDailyStatus.sequelize.col('brand.actual_name'), ' ', ''
+                      )
+                    ),
+                    'LIKE',
+                    `%${normalizedQuery}%`
+                  )
+                ]
+              },
+              {
+                [Op.and]: [
+                  BrandsDailyStatus.sequelize.where(
+                    BrandsDailyStatus.sequelize.fn('LOWER', 
+                      BrandsDailyStatus.sequelize.fn('REPLACE', 
+                        BrandsDailyStatus.sequelize.col('brand.name'), ' ', ''
+                      )
+                    ),
+                    'LIKE',
+                    `%${normalizedQuery}%`
+                  )
+                ]
+              },
+              // Page ID search (exact)
               {
                 page_id: {
                   [Op.iLike]: `%${query}%`

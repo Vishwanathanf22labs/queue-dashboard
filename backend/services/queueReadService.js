@@ -7,9 +7,61 @@ const { QUEUES, PAGINATION, REDIS_KEYS } = require("../config/constants");
 
 async function enrichBrandsWithDBInfo(brandItems, isSortedSet = false) {
   const results = [];
+  const pageIds = [];
 
+  // First pass: collect all page IDs and parse Redis data
   if (isSortedSet) {
     // For sorted sets with WITHSCORES, items come as [member1, score1, member2, score2, ...]
+    for (let i = 0; i < brandItems.length; i += 2) {
+      try {
+        const member = brandItems[i];
+        if (!member) continue;
+        
+        const brandData = JSON.parse(member);
+        const pageId = brandData.page_id;
+        if (pageId) {
+          pageIds.push(pageId);
+        }
+      } catch (parseError) {
+        logger.error("Error parsing brand item from Redis:", parseError);
+      }
+    }
+  } else {
+    // For lists, items are just the members
+    for (const item of brandItems) {
+      try {
+        const brandData = JSON.parse(item);
+        const pageId = brandData.page_id;
+        if (pageId) {
+          pageIds.push(pageId);
+        }
+      } catch (parseError) {
+        logger.error("Error parsing brand item from Redis:", parseError);
+      }
+    }
+  }
+
+  // Batch fetch all brand data from database in one query
+  let brandMap = new Map();
+  if (pageIds.length > 0) {
+    try {
+      const brands = await Brand.findAll({
+        where: { page_id: pageIds },
+        attributes: ["name", "actual_name", "status", "category", "page_id"],
+        raw: true,
+      });
+      
+      // Create a map for fast lookup
+      brands.forEach(brand => {
+        brandMap.set(brand.page_id, brand);
+      });
+    } catch (dbError) {
+      logger.error("Error batch fetching brand info:", dbError);
+    }
+  }
+
+  // Second pass: build results with batched data
+  if (isSortedSet) {
     for (let i = 0; i < brandItems.length; i += 2) {
       try {
         const member = brandItems[i];
@@ -20,33 +72,35 @@ async function enrichBrandsWithDBInfo(brandItems, isSortedSet = false) {
         const brandData = JSON.parse(member);
         const pageId = brandData.page_id;
 
+        // Handle page category from Redis data
+        let pageCategory = brandData.page_category;
+        if (!pageCategory && brandData.page_categories) {
+          pageCategory = Array.isArray(brandData.page_categories) 
+            ? brandData.page_categories.join(', ')
+            : brandData.page_categories;
+        }
+
         let brandInfo = {
           queue_id: brandData.id,
           page_id: pageId,
           brand_name: "Unknown",
           status: "Unknown",
-          queue_position: results.length + 1
+          queue_position: results.length + 1,
+          page_category: pageCategory || "Unknown",
+          error_message: brandData.reason || "Unknown error"
         };
 
-        try {
-          const brand = await Brand.findOne({
-            where: { page_id: pageId },
-            attributes: ["actual_name", "status"],
-            raw: true,
-          });
-
-          if (brand) {
-            brandInfo.brand_name = brand.actual_name || "Unknown";
-            brandInfo.status = brand.status || "Unknown";
-            logger.info(`Found brand for page_id ${pageId}: ${brand.actual_name}`);
-          } else {
-            logger.warn(`No brand found in database for page_id ${pageId}`);
+        // Use batched data
+        const brand = brandMap.get(pageId);
+        if (brand) {
+          brandInfo.brand_name = brand.actual_name || brand.name || "Unknown";
+          brandInfo.status = brand.status || "Unknown";
+          
+          // If no page category from Redis data, use database category as fallback
+          if (!pageCategory && brand.category) {
+            pageCategory = brand.category;
+            brandInfo.page_category = pageCategory;
           }
-        } catch (dbError) {
-          logger.error(
-            `Error fetching brand info for page_id ${pageId}:`,
-            dbError
-          );
         }
 
         results.push(brandInfo);
@@ -61,33 +115,35 @@ async function enrichBrandsWithDBInfo(brandItems, isSortedSet = false) {
         const brandData = JSON.parse(item);
         const pageId = brandData.page_id;
 
+        // Handle page category from Redis data
+        let pageCategory = brandData.page_category;
+        if (!pageCategory && brandData.page_categories) {
+          pageCategory = Array.isArray(brandData.page_categories) 
+            ? brandData.page_categories.join(', ')
+            : brandData.page_categories;
+        }
+
         let brandInfo = {
           queue_id: brandData.id,
           page_id: pageId,
           brand_name: "Unknown",
           status: "Unknown",
-          queue_position: results.length + 1
+          queue_position: results.length + 1,
+          page_category: pageCategory || "Unknown",
+          error_message: brandData.reason || "Unknown error"
         };
 
-        try {
-          const brand = await Brand.findOne({
-            where: { page_id: pageId },
-            attributes: ["actual_name", "status"],
-            raw: true,
-          });
-
-          if (brand) {
-            brandInfo.brand_name = brand.actual_name || "Unknown";
-            brandInfo.status = brand.status || "Unknown";
-            logger.info(`Found brand for page_id ${pageId}: ${brand.actual_name}`);
-          } else {
-            logger.warn(`No brand found in database for page_id ${pageId}`);
+        // Use batched data
+        const brand = brandMap.get(pageId);
+        if (brand) {
+          brandInfo.brand_name = brand.actual_name || brand.name || "Unknown";
+          brandInfo.status = brand.status || "Unknown";
+          
+          // If no page category from Redis data, use database category as fallback
+          if (!pageCategory && brand.category) {
+            pageCategory = brand.category;
+            brandInfo.page_category = pageCategory;
           }
-        } catch (dbError) {
-          logger.error(
-            `Error fetching brand info for page_id ${pageId}:`,
-            dbError
-          );
         }
 
         results.push(brandInfo);
@@ -127,12 +183,23 @@ async function getPendingBrands(
       logger.info(`Raw Redis data for ${queueType} pending brands: ${JSON.stringify(allBrandItems)}`);
       const allEnrichedBrands = await enrichBrandsWithDBInfo(allBrandItems, true);
       
-      // Filter brands based on search term
-      const matchingBrands = allEnrichedBrands.filter(brand => 
-        brand.brand_name?.toLowerCase().includes(searchTerm) ||
-        brand.queue_id?.toString().includes(searchTerm) ||
-        brand.page_id?.toString().includes(searchTerm)
-      );
+      // Filter brands based on search term (flexible search)
+      const normalizedSearchTerm = searchTerm.replace(/\s+/g, '');
+      
+      const matchingBrands = allEnrichedBrands.filter(brand => {
+        const brandName = brand.brand_name?.toLowerCase() || '';
+        const normalizedBrandName = brandName.replace(/\s+/g, '');
+        
+        return (
+          // Original search (with spaces)
+          brandName.includes(searchTerm) ||
+          // Space-insensitive search
+          normalizedBrandName.includes(normalizedSearchTerm) ||
+          // ID searches
+          brand.queue_id?.toString().includes(searchTerm) ||
+          brand.page_id?.toString().includes(searchTerm)
+        );
+      });
       
       // Apply pagination to search results
       const totalCount = matchingBrands.length;
@@ -224,12 +291,23 @@ async function getFailedBrands(
       const allBrandItems = await queueRedis.lrange(queueKey, 0, -1);
       const allEnrichedBrands = await enrichBrandsWithDBInfo(allBrandItems);
       
-      // Filter brands based on search term
-      const matchingBrands = allEnrichedBrands.filter(brand => 
-        brand.brand_name?.toLowerCase().includes(searchTerm) ||
-        brand.queue_id?.toString().includes(searchTerm) ||
-        brand.page_id?.toString().includes(searchTerm)
-      );
+      // Filter brands based on search term (flexible search)
+      const normalizedSearchTerm = searchTerm.replace(/\s+/g, '');
+      
+      const matchingBrands = allEnrichedBrands.filter(brand => {
+        const brandName = brand.brand_name?.toLowerCase() || '';
+        const normalizedBrandName = brandName.replace(/\s+/g, '');
+        
+        return (
+          // Original search (with spaces)
+          brandName.includes(searchTerm) ||
+          // Space-insensitive search
+          normalizedBrandName.includes(normalizedSearchTerm) ||
+          // ID searches
+          brand.queue_id?.toString().includes(searchTerm) ||
+          brand.page_id?.toString().includes(searchTerm)
+        );
+      });
       
       // Apply pagination to search results
       const totalCount = matchingBrands.length;
@@ -331,7 +409,7 @@ async function getWatchlistBrands(
     const brandIds = uniqueWatchlistBrandIds.map(item => item.brand_id);
     const watchlistBrands = await Brand.findAll({
       where: { id: brandIds },
-      attributes: ['id', 'page_id', 'actual_name', 'status'],
+      attributes: ['id', 'page_id', 'name', 'actual_name', 'status'],
       raw: true
     });
 
@@ -401,13 +479,11 @@ async function getWatchlistBrands(
         scraperStatus = 'completed';
       }
 
-      logger.info(`Brand ${pageId} (${brand.actual_name}) status: ${scraperStatus}`);
-
       const brandInfo = {
         queue_id: pendingBrandsMap.get(pageId)?.queue_id || null,
         page_id: pageId,
         brand_id: brand.id,
-        brand_name: brand.actual_name || "Unknown",
+        brand_name: brand.actual_name || brand.name || "Unknown",
         status: brand.status || "Unknown",
         is_watchlist: true,
         scraper_status: scraperStatus,

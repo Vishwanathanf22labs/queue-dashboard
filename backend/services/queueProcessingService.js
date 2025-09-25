@@ -181,16 +181,36 @@ async function getBrandProcessingQueue(
     for (const job of uniqueJobs) {
       try {
         const brandId = job.data.brandId;
-        const pageCategory = job.data.brandDetails?.page_category;
+        // Handle both page_category (string) and page_categories (array)
+        let pageCategory = job.data.brandDetails?.page_category;
+        
+        // Debug logging
+        logger.info(`Job ${job.id} - brandDetails:`, JSON.stringify(job.data.brandDetails, null, 2));
+        logger.info(`Job ${job.id} - page_category:`, pageCategory);
+        logger.info(`Job ${job.id} - page_categories:`, job.data.brandDetails?.page_categories);
+        
+        if (!pageCategory && job.data.brandDetails?.page_categories) {
+          // If page_categories is an array, join them with comma
+          pageCategory = Array.isArray(job.data.brandDetails.page_categories) 
+            ? job.data.brandDetails.page_categories.join(', ')
+            : job.data.brandDetails.page_categories;
+          logger.info(`Job ${job.id} - converted pageCategory:`, pageCategory);
+        }
         const totalAds = job.data.totalAds?.length || 0;
 
         const brand = await Brand.findOne({
           where: { id: brandId },
-          attributes: ["actual_name", "page_id"],
+          attributes: ["actual_name", "page_id", "category"],
           raw: true,
         });
 
-        brandProcessingData.push({
+        // If no page category from job data, try to use database category as fallback
+        if (!pageCategory && brand?.category) {
+          pageCategory = brand.category;
+          logger.info(`Job ${job.id} - using database category as fallback:`, pageCategory);
+        }
+
+        const finalBrandData = {
           brand_id: brandId,
           page_id: brand?.page_id || "Unknown",
           page_name: brand?.actual_name || "Unknown",
@@ -201,7 +221,10 @@ async function getBrandProcessingQueue(
           queue_type: queueType,
           job_status: job.state || 'unknown',
           job_id: job.id
-        });
+        };
+        
+        logger.info(`Final brand data for frontend:`, JSON.stringify(finalBrandData, null, 2));
+        brandProcessingData.push(finalBrandData);
       } catch (jobError) {
         logger.error(`Error processing job ${job.id}:`, jobError);
       }

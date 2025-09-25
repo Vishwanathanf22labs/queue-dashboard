@@ -1,20 +1,28 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Card from '../ui/Card';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import ErrorDisplay from '../ui/ErrorDisplay';
 import Table from '../ui/Table';
 import Pagination from '../ui/Pagination';
-import SortButton from '../ui/SortButton';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 import useQueueStore from '../../stores/queueStore';
 import { Users, Eye, ExternalLink, Circle } from 'lucide-react';
 import { openFacebookAdLibrary } from '../../utils/facebookAdLibrary';
 
 const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { brandProcessingQueue, loading, error } = useQueueStore();
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState('normal');
-  const [sortOrder, setSortOrder] = useState('desc');
+  // Get pagination and sorting state from URL params
+  const currentPage = parseInt(searchParams.get('regularPage')) || 1;
+  const sortBy = searchParams.get('regularSortBy') || 'normal';
+  const sortOrder = searchParams.get('regularSortOrder') || 'desc';
+  
+
+  // Don't make API calls on mount - let the parent Dashboard handle initial loading
+  // The parent will load data with the correct saved state from localStorage
+  // No useEffect needed here as Dashboard already handles the initial API calls
 
   // Status indicator component - only show green dot for active
   const StatusIndicator = ({ status }) => {
@@ -32,21 +40,23 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
 
 
   const handlePageChange = (newPage) => {
-    setCurrentPage(newPage);
+    if (onPageChange) {
+      onPageChange(newPage, sortBy, sortOrder);
+    }
     // Scroll to the table section when changing pages
     const tableSection = document.getElementById('brands-table-section');
     if (tableSection) {
       tableSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-    // Call the API to fetch the new page with current sorting
-    if (onPageChange) {
-      onPageChange(newPage, sortBy, sortOrder);
-    }
   };
 
   const handleSortChange = (field, order) => {
-    setSortBy(field);
-    setSortOrder(order);
+    // Update URL params
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('regularPage', '1'); // Reset to page 1 when sorting
+    newParams.set('regularSortBy', field);
+    newParams.set('regularSortOrder', order);
+    setSearchParams(newParams);
     
     if (onSortChange) {
       onSortChange(field, order);
@@ -86,14 +96,61 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
   const totalPages = pagination?.total_pages || 1;
   const itemsPerPage = pagination?.per_page || 10;
   const apiCurrentPage = pagination?.current_page || 1;
+  
 
   // Use brands directly from API (server-side sorted)
   const currentPageBrands = brands || [];
+
+  // Sortable header component
+  const SortableHeader = ({ field, label, currentSortBy, currentSortOrder, onSortChange }) => {
+    const isActive = currentSortBy === field;
+    const isAsc = isActive && currentSortOrder === 'asc';
+    const isDesc = isActive && currentSortOrder === 'desc';
+
+    const handleClick = () => {
+      if (field === 'normal') {
+        onSortChange('normal', 'desc');
+      } else if (isActive) {
+        // Toggle between asc and desc
+        onSortChange(field, isAsc ? 'desc' : 'asc');
+      } else {
+        // Set to desc by default
+        onSortChange(field, 'desc');
+      }
+    };
+
+    return (
+      <th 
+        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-50 select-none relative group"
+        onClick={handleClick}
+        title={field === 'normal' ? 'Normal' : undefined}
+      >
+        <div className="flex items-center space-x-1">
+          <span>{label}</span>
+          <div className="flex flex-col">
+            <ChevronUp 
+              className={`h-3 w-3 ${isAsc ? 'text-blue-600' : 'text-gray-300'}`} 
+            />
+            <ChevronDown 
+              className={`h-3 w-3 -mt-1 ${isDesc ? 'text-blue-600' : 'text-gray-300'}`} 
+            />
+          </div>
+        </div>
+        {field === 'normal' && (
+          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+            Normal
+            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+          </div>
+        )}
+      </th>
+    );
+  };
 
   const columns = [
     {
       key: 'brand',
       label: 'Brand',
+      sortable: false, // Brand name is not sortable
       render: (value, brand) => (
         <div>
           <div className="flex items-center space-x-2">
@@ -125,6 +182,7 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
     {
       key: 'total_ads',
       label: 'Ads Count',
+      sortable: true,
       render: (value) => (
         <div className="text-sm text-gray-900">{value || 0}</div>
       )
@@ -132,6 +190,7 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
     {
       key: 'created_at',
       label: 'Created',
+      sortable: true,
       render: (value) => (
         <div className="text-sm text-gray-500 max-w-[80px] sm:max-w-none truncate">
           {value ? new Date(value).toLocaleDateString() : 'N/A'}
@@ -180,56 +239,110 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
             <h3 className="text-base sm:text-lg font-semibold text-gray-900">Regular Brands in Queue</h3>
           </div>
           <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-2">
-            {loading && (
-              <div className="flex items-center space-x-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                <span className="text-xs sm:text-sm text-gray-500">Loading...</span>
-              </div>
-            )}
             <div className="text-xs sm:text-sm text-gray-600">
               Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} brands
             </div>
           </div>
         </div>
 
-        {/* Sorting Buttons */}
-        <div className="mb-4 flex flex-wrap gap-2">
-          <span className="text-sm font-medium text-gray-700 self-center">Sort by:</span>
-          <SortButton
-            label="Normal"
-            sortBy="normal"
-            currentSortBy={sortBy}
-            currentSortOrder={sortOrder}
-            onSortChange={handleSortChange}
-          />
-          <SortButton
-            label="Ads Count"
-            sortBy="total_ads"
-            currentSortBy={sortBy}
-            currentSortOrder={sortOrder}
-            onSortChange={handleSortChange}
-          />
-          <SortButton
-            label="Created Date"
-            sortBy="created_at"
-            currentSortBy={sortBy}
-            currentSortOrder={sortOrder}
-            onSortChange={handleSortChange}
-          />
-        </div>
 
         {loading ? (
           <LoadingSpinner />
         ) : !loading && currentPageBrands && currentPageBrands.length > 0 ? (
           <>
+            {/* Mobile Sorting Controls */}
+            <div className="md:hidden mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium text-gray-700">Sort by:</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleSortChange('normal', sortBy === 'normal' && sortOrder === 'desc' ? 'asc' : 'desc')}
+                  className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    sortBy === 'normal' 
+                      ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <ChevronUp className={`h-3 w-3 ${sortBy === 'normal' && sortOrder === 'asc' ? 'text-blue-600' : 'text-gray-400'}`} />
+                  <ChevronDown className={`h-3 w-3 -mt-1 ${sortBy === 'normal' && sortOrder === 'desc' ? 'text-blue-600' : 'text-gray-400'}`} />
+                  <span>Normal</span>
+                </button>
+                
+                <button
+                  onClick={() => handleSortChange('total_ads', sortBy === 'total_ads' && sortOrder === 'desc' ? 'asc' : 'desc')}
+                  className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    sortBy === 'total_ads' 
+                      ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <ChevronUp className={`h-3 w-3 ${sortBy === 'total_ads' && sortOrder === 'asc' ? 'text-blue-600' : 'text-gray-400'}`} />
+                  <ChevronDown className={`h-3 w-3 -mt-1 ${sortBy === 'total_ads' && sortOrder === 'desc' ? 'text-blue-600' : 'text-gray-400'}`} />
+                  <span>Ads Count</span>
+                </button>
+                
+                <button
+                  onClick={() => handleSortChange('created_at', sortBy === 'created_at' && sortOrder === 'desc' ? 'asc' : 'desc')}
+                  className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    sortBy === 'created_at' 
+                      ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <ChevronUp className={`h-3 w-3 ${sortBy === 'created_at' && sortOrder === 'asc' ? 'text-blue-600' : 'text-gray-400'}`} />
+                  <ChevronDown className={`h-3 w-3 -mt-1 ${sortBy === 'created_at' && sortOrder === 'desc' ? 'text-blue-600' : 'text-gray-400'}`} />
+                  <span>Created Date</span>
+                </button>
+              </div>
+            </div>
+
             {/* Desktop Table View */}
             <div className="hidden md:block">
-              <Table
-                data={currentPageBrands}
-                columns={columns}
-                emptyMessage="No brands in queue"
-                className="shadow-md rounded-lg"
-              />
+              <div className="overflow-hidden shadow-md rounded-lg">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <SortableHeader
+                        field="normal"
+                        label="Brand"
+                        currentSortBy={sortBy}
+                        currentSortOrder={sortOrder}
+                        onSortChange={handleSortChange}
+                      />
+                      <SortableHeader
+                        field="total_ads"
+                        label="Ads Count"
+                        currentSortBy={sortBy}
+                        currentSortOrder={sortOrder}
+                        onSortChange={handleSortChange}
+                      />
+                      <SortableHeader
+                        field="created_at"
+                        label="Created"
+                        currentSortBy={sortBy}
+                        currentSortOrder={sortOrder}
+                        onSortChange={handleSortChange}
+                      />
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {currentPageBrands.map((brand, index) => (
+                      <tr key={`${brand.brand_id}-${index}`} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {columns[0].render(null, brand)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {columns[1].render(brand.total_ads, brand)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {columns[2].render(brand.created_at, brand)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Mobile Cards View */}

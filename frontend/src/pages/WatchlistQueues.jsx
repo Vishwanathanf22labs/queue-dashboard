@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -14,18 +15,37 @@ import CustomDropdown from '../components/ui/CustomDropdown';
 
 const WatchlistQueues = () => {
   const { fetchWatchlistPendingBrands, fetchWatchlistFailedBrands } = useQueueStore();
-  const [activeTab, setActiveTab] = useState('pending'); // 'pending' or 'failed'
+  const currentSearchRef = useRef('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Separate state for original totals (for static display)
+  const [originalTotals, setOriginalTotals] = useState({
+    total_items: 0,
+    total_pages: 0
+  });
+  
+  // Get active tab from localStorage first, then URL, then default to 'pending'
+  const getInitialTab = () => {
+    try {
+      const storedTab = localStorage.getItem('watchlistQueues_activeTab');
+      const urlTab = searchParams.get('tab');
+      return urlTab || storedTab || 'pending';
+    } catch {
+      return searchParams.get('tab') || 'pending';
+    }
+  };
+
+  const [activeTab, setActiveTab] = useState(getInitialTab()); // 'pending' or 'failed'
   const [queueState, setQueueState] = useState({
-    searchTerm: '',
-    currentPage: 1,
-    itemsPerPage: 10,
-    isRefreshing: false,
+    searchTerm: searchParams.get('search') || '',
+    currentPage: parseInt(searchParams.get('page')) || 1,
+    itemsPerPage: parseInt(searchParams.get('limit')) || 10,
     brands: [],
     pagination: {},
     isSearching: false
   });
 
-  const { searchTerm, currentPage, itemsPerPage, isRefreshing, brands, pagination, isSearching } = queueState;
+  const { searchTerm, currentPage, itemsPerPage, brands, pagination, isSearching } = queueState;
 
   const updateQueueState = (updates) => {
     setQueueState(prev => ({ ...prev, ...updates }));
@@ -205,68 +225,119 @@ const WatchlistQueues = () => {
     }
   ];
 
-  const loadBrands = async (searchTerm = null) => {
+  const loadBrands = useCallback(async (searchTerm = null, pageOverride = null) => {
     try {
       if (searchTerm) {
         updateQueueState({ isSearching: true });
-      } else {
-        updateQueueState({ isRefreshing: true });
       }
 
+      const pageToLoad = searchTerm ? 1 : (pageOverride || currentPage);
+      
+      // Only update results if they match the current search term
+      const currentSearch = currentSearchRef.current;
+      const searchToCheck = searchTerm || '';
+      
       let response;
       if (activeTab === 'pending') {
-        response = await fetchWatchlistPendingBrands(currentPage, itemsPerPage, searchTerm);
+        response = await fetchWatchlistPendingBrands(pageToLoad, itemsPerPage, searchTerm);
       } else {
-        response = await fetchWatchlistFailedBrands(currentPage, itemsPerPage, searchTerm);
+        response = await fetchWatchlistFailedBrands(pageToLoad, itemsPerPage, searchTerm);
+      }
+
+      // If search terms don't match, ignore this response (it's stale)
+      if (searchToCheck !== currentSearch) {
+        updateQueueState({ isSearching: false });
+        return; 
       }
       
       if (response && response.brands) {
          updateQueueState({
            brands: response.brands,
            pagination: response.pagination || {},
-           isSearching: false,
-           isRefreshing: false
+           currentPage: pageToLoad,
+           isSearching: false
          });
        } else {
         updateQueueState({
           brands: [],
           pagination: {},
-          isSearching: false,
-          isRefreshing: false
+          currentPage: pageToLoad,
+          isSearching: false
+        });
+      }
+
+      // Store original totals only when not searching (for static display)
+      if (!searchTerm) {
+        const paginationData = response?.pagination || {};
+        setOriginalTotals({
+          total_items: paginationData.total_items || 0,
+          total_pages: paginationData.total_pages || 0
         });
       }
     } catch (error) {
       console.error(`Error loading watchlist ${activeTab} brands:`, error);
       toast.error(`Failed to load watchlist ${activeTab} brands`);
       updateQueueState({
-        isSearching: false,
-        isRefreshing: false
+        isSearching: false
       });
     }
-  };
+  }, [activeTab, itemsPerPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearch = (searchTerm) => {
-    updateQueueState({ searchTerm, currentPage: 1 });
-    
-    if (!searchTerm || searchTerm.trim() === '') {
-      loadBrands();
+    updateQueueState({ searchTerm });
+
+    // Update URL parameters
+    const newParams = new URLSearchParams(searchParams);
+    if (searchTerm && searchTerm.trim()) {
+      newParams.set('search', searchTerm);
+      newParams.set('page', '1'); // Reset to page 1 on search
     } else {
-      loadBrands(searchTerm);
+      newParams.delete('search');
+      newParams.set('page', '1'); // Reset to page 1 when clearing search
+    }
+    newParams.set('tab', activeTab); // Preserve active tab
+    setSearchParams(newParams);
+
+    if (!searchTerm || searchTerm.trim() === '') {
+      updateQueueState({ currentPage: 1 });
+      // Don't call loadBrands() here - let useEffect handle it
     }
   };
 
   const clearSearch = () => {
+    currentSearchRef.current = '';
     updateQueueState({ searchTerm: '', currentPage: 1 });
-    loadBrands();
+    
+    // Update URL parameters
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('search');
+    newParams.set('page', '1');
+    newParams.set('tab', activeTab); // Preserve active tab
+    setSearchParams(newParams);
+    
+    // Don't call loadBrands() here - let useEffect handle it
   };
 
-  const handlePageChange = async (newPage) => {
+  const handlePageChange = (newPage) => {
     updateQueueState({ currentPage: newPage });
-    await loadBrands(searchTerm);
+    
+    // Update URL parameters
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('page', newPage.toString());
+    newParams.set('tab', activeTab); // Preserve active tab
+    setSearchParams(newParams);
   };
 
   const handleRefresh = async () => {
     updateQueueState({ currentPage: 1, searchTerm: '' });
+    
+    // Update URL parameters
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('search');
+    newParams.set('page', '1');
+    newParams.set('tab', activeTab); // Preserve active tab
+    setSearchParams(newParams);
+    
     await loadBrands();
   };
 
@@ -275,33 +346,49 @@ const WatchlistQueues = () => {
       itemsPerPage: newItemsPerPage, 
       currentPage: 1 
     });
-    await loadBrands(searchTerm);
+    
+    // Update URL parameters
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('limit', newItemsPerPage.toString());
+    newParams.set('page', '1');
+    newParams.set('tab', activeTab); // Preserve active tab
+    setSearchParams(newParams);
   };
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     updateQueueState({ currentPage: 1, searchTerm: '' });
+    
+    // Save tab to localStorage for cross-navigation persistence
+    localStorage.setItem('watchlistQueues_activeTab', tab);
+    
+    // Update URL parameters with new tab
+    const newParams = new URLSearchParams();
+    newParams.set('tab', tab);
+    newParams.set('page', '1');
+    setSearchParams(newParams);
   };
 
+  // Single useEffect to handle all loading scenarios
   useEffect(() => {
-    if (!searchTerm) {
-      loadBrands();
+    if (searchTerm && searchTerm.trim() !== '') {
+      // Handle search with debouncing
+      const timeoutId = setTimeout(() => {
+        if (searchTerm.trim().length >= 3) {
+          currentSearchRef.current = searchTerm;
+          loadBrands(searchTerm);
+        }
+      }, 300); // Reduced from 500ms to 300ms for smoother experience
+
+      return () => clearTimeout(timeoutId);
+    } else {
+      // Load normal data when no search term, pass current page
+      currentSearchRef.current = '';
+      loadBrands(null, currentPage);
     }
-  }, [currentPage, itemsPerPage, activeTab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, itemsPerPage, activeTab, searchTerm]);
 
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (searchTerm && searchTerm.trim() !== '') {
-        loadBrands(searchTerm);
-      }
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm]);
-
-  if (isSearching) {
-    return <LoadingSpinner />;
-  }
 
   const currentColumns = activeTab === 'pending' ? pendingColumns : failedColumns;
   const tabIcon = activeTab === 'pending' ? Clock : XCircle;
@@ -374,7 +461,7 @@ const WatchlistQueues = () => {
                  Total {activeTab === 'pending' ? 'Pending' : 'Failed'} Brands:
                </span>
                <span className={`text-lg font-bold text-${tabColor}-600`}>
-                 {pagination?.total_items || brands?.length || 0}
+                 {originalTotals.total_items || pagination?.total_items || brands?.length || 0}
                </span>
              </div>
              <div className="flex items-center gap-2">
@@ -384,7 +471,7 @@ const WatchlistQueues = () => {
              <div className="flex items-center gap-2">
                <span className="text-sm font-medium text-gray-600">Total Pages:</span>
                <span className="text-lg font-bold text-gray-900">
-                 {pagination?.total_pages || Math.ceil((pagination?.total_items || brands.length) / itemsPerPage)}
+                 {Math.ceil((originalTotals.total_items || pagination?.total_items || brands.length) / itemsPerPage)}
                </span>
              </div>
              <div className="flex items-center gap-2">
@@ -426,7 +513,7 @@ const WatchlistQueues = () => {
                </span>
              </div>
              <span className={`text-lg font-bold text-${tabColor}-600`}>
-               {pagination?.total_items || brands?.length || 0}
+               {originalTotals.total_items || pagination?.total_items || brands?.length || 0}
              </span>
            </div>
 
@@ -440,7 +527,7 @@ const WatchlistQueues = () => {
            <div className="flex items-center justify-between">
              <span className="text-sm font-medium text-gray-600">Total Pages:</span>
              <span className="text-lg font-bold text-gray-900">
-               {pagination?.total_pages || Math.ceil((pagination?.total_items || brands.length) / itemsPerPage)}
+               {Math.ceil((originalTotals.total_items || pagination?.total_items || brands.length) / itemsPerPage)}
              </span>
            </div>
 
@@ -484,26 +571,13 @@ const WatchlistQueues = () => {
               variant="default"
               showClearButton={true}
               onClear={clearSearch}
-              disabled={isSearching}
               showStats={true}
               stats={{
-                total: pagination?.total_items || 0,
+                total: originalTotals.total_items || pagination?.total_items || 0,
                 showing: brands?.length || 0
               }}
             />
           </div>
-          {searchTerm && (
-            <div className="flex items-center text-xs sm:text-sm text-blue-600">
-              {isSearching ? (
-                <span className="flex items-center">
-                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-1"></div>
-                  Searching: "{searchTerm}"
-                </span>
-              ) : (
-                `Searching: "${searchTerm}"`
-              )}
-            </div>
-          )}
         </div>
       </Card>
 
@@ -641,7 +715,7 @@ const WatchlistQueues = () => {
         {brands && brands.length > 0 && (
           <Pagination
             currentPage={currentPage}
-            totalPages={pagination?.total_pages || Math.ceil((pagination?.total_items || brands.length) / itemsPerPage)}
+            totalPages={Math.ceil((originalTotals.total_items || pagination?.total_items || brands.length) / itemsPerPage)}
             onPageChange={handlePageChange}
             totalItems={pagination?.total_items || brands.length}
             itemsPerPage={itemsPerPage}

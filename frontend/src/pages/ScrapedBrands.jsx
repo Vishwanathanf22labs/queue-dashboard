@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { scrapedBrandsAPI } from '../services/api';
 import Card from '../components/ui/Card';
@@ -28,7 +28,7 @@ const ScrapedBrands = () => {
   const [dataState, setDataState] = useState({
     brands: [],
     stats: null,
-    currentPage: 1,
+    currentPage: parseInt(searchParams.get('page')) || 1,
     totalPages: 1,
     totalItems: 0,
     selectedDate: getInitialDate()
@@ -39,14 +39,48 @@ const ScrapedBrands = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [dateInputValue, setDateInputValue] = useState(getInitialDate());
+  const [pageLoading, setPageLoading] = useState(false);
 
   const updateDataState = useCallback((updates) => {
     setDataState(prev => ({ ...prev, ...updates }));
   }, []);
 
+  // const loadScrapedBrands = useCallback(async (page = 1, date = null, sortByParam = null, sortOrderParam = null) => {
+  //   try {
+  //     setIsLoading(true);
+  //     const currentSortBy = sortByParam || sortBy;
+  //     const currentSortOrder = sortOrderParam || sortOrder;
+  //     const response = await scrapedBrandsAPI.getScrapedBrands(page, 10, date, currentSortBy, currentSortOrder);
+
+  //     if (response.data.success) {
+  //       const brands = response.data.data.brands || [];
+  //       const pagination = response.data.data.pagination || {};
+
+  //       updateDataState({
+  //         brands,
+  //         currentPage: pagination.currentPage || 1,
+  //         totalPages: pagination.totalPages || 1,
+  //         totalItems: pagination.totalItems || 0
+  //       });
+  //     } else {
+  //       toast.error(response.data.error || 'Failed to load scraped brands');
+  //     }
+  //   } catch (error) {
+  //     console.error('Error loading scraped brands:', error);
+  //     toast.error('Failed to load scraped brands');
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // }, [updateDataState, sortBy, sortOrder]);
+
   const loadScrapedBrands = useCallback(async (page = 1, date = null, sortByParam = null, sortOrderParam = null) => {
     try {
-      setIsLoading(true);
+      // Only set main loading if no data exists, otherwise use pageLoading
+      if (!dataState.brands.length) {
+        setIsLoading(true);
+      }
+
       const currentSortBy = sortByParam || sortBy;
       const currentSortOrder = sortOrderParam || sortOrder;
       const response = await scrapedBrandsAPI.getScrapedBrands(page, 10, date, currentSortBy, currentSortOrder);
@@ -69,8 +103,9 @@ const ScrapedBrands = () => {
       toast.error('Failed to load scraped brands');
     } finally {
       setIsLoading(false);
+      setPageLoading(false);  // Reset page loading
     }
-  }, [updateDataState, sortBy, sortOrder]);
+  }, [updateDataState, sortBy, sortOrder, dataState.brands.length]);
 
   const loadStats = useCallback(async (date = null) => {
     try {
@@ -84,59 +119,198 @@ const ScrapedBrands = () => {
     }
   }, [updateDataState]);
 
+  // 🚀 Fixed search with request ID to prevent stale results
+  const searchAbortRef = useRef(null);
+  const currentSearchRef = useRef('');
+  
   const searchBrands = useCallback(async (query) => {
+    // Cancel previous search request if still pending
+    if (searchAbortRef.current) {
+      searchAbortRef.current.abort();
+    }
+
     if (!query.trim()) {
       setShowSearchResults(false);
       setSearchResults([]);
+      setIsSearching(false);
+      currentSearchRef.current = '';
       return;
     }
 
     try {
       setIsSearching(true);
-      const response = await scrapedBrandsAPI.searchScrapedBrands(query, dataState.selectedDate);
+      
+      // Store current search query
+      currentSearchRef.current = query;
+      
+      // Create new AbortController for this request
+      searchAbortRef.current = new AbortController();
+      
+      const response = await scrapedBrandsAPI.searchScrapedBrands(query, dataState.selectedDate, {
+        signal: searchAbortRef.current.signal
+      });
 
-      if (response.data.success) {
-        setSearchResults(response.data.data.brands || []);
-        setShowSearchResults(true);
-      } else {
-        toast.error(response.data.error || 'Search failed');
-        setSearchResults([]);
-        setShowSearchResults(false);
+      // 🔥 CRITICAL: Only update UI if this response matches current search term
+      if (!searchAbortRef.current.signal.aborted && currentSearchRef.current === query) {
+        if (response.data.success) {
+          setSearchResults(response.data.data.brands || []);
+          setShowSearchResults(true);
+        } else {
+          toast.error(response.data.error || 'Search failed');
+          setSearchResults([]);
+          setShowSearchResults(false);
+        }
       }
     } catch (error) {
-      console.error('Error searching brands:', error);
-      toast.error('Search failed');
-      setSearchResults([]);
-      setShowSearchResults(false);
+      // Ignore cancelled requests
+      if (error.name !== 'AbortError' && error.name !== 'CanceledError') {
+        console.error('Error searching brands:', error);
+        toast.error('Search failed');
+        // Only clear if this was the current search
+        if (currentSearchRef.current === query) {
+          setSearchResults([]);
+          setShowSearchResults(false);
+        }
+      }
     } finally {
-      setIsSearching(false);
+      // Only reset loading if this was the current search
+      if (currentSearchRef.current === query) {
+        setIsSearching(false);
+      }
     }
   }, [dataState.selectedDate]);
 
-  const handleDateChange = (event) => {
-    const newDate = event.target.value;
+  // const handleDateChange = (event) => {
+  //   const newDate = event.target.value;
 
-    // Update URL params to persist the selected date
-    const newSearchParams = new URLSearchParams(searchParams);
-    newSearchParams.set('date', newDate);
-    setSearchParams(newSearchParams);
+  //   // Update URL params to persist the selected date and reset page to 1
+  //   const newSearchParams = new URLSearchParams(searchParams);
+  //   newSearchParams.set('date', newDate);
+  //   newSearchParams.set('page', '1');
+  //   setSearchParams(newSearchParams);
 
-    updateDataState({ selectedDate: newDate, currentPage: 1 });
-  };
+  //   updateDataState({ selectedDate: newDate, currentPage: 1 });
+  // };
 
-  const handleSearch = (query) => {
+  const handleDateInputChange = useCallback((e) => {
+    setDateInputValue(e.target.value);
+  }, []);
+
+  // Add this useEffect for debounced date changes
+  useEffect(() => {
+    // Validate date format (YYYY-MM-DD) before making API call
+    const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(dateInputValue);
+
+    if (!isValidDate) return;
+
+    // Only update if the date actually changed
+    if (dateInputValue === dataState.selectedDate) return;
+
+    const timer = setTimeout(() => {
+      setIsLoading(true);
+
+      // Update URL params to persist the selected date and reset page to 1
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.set('date', dateInputValue);
+      newSearchParams.set('page', '1');
+      setSearchParams(newSearchParams);
+
+      updateDataState({ selectedDate: dateInputValue, currentPage: 1 });
+    }, 700); // 700ms debounce
+
+    return () => clearTimeout(timer);
+  }, [dateInputValue, dataState.selectedDate, setSearchParams, searchParams, updateDataState]);
+
+  // 🚀 Fixed search handler with debouncing and minimum chars
+  const debounceTimerRef = useRef(null);
+  
+  const handleSearch = useCallback((query) => {
     setSearchTerm(query);
-    searchBrands(query);
-  };
+    
+    // Update current search reference immediately
+    currentSearchRef.current = query;
+    
+    // Clear results immediately if empty or too short
+    if (!query.trim() || query.trim().length < 3) {
+      setShowSearchResults(false);
+      setSearchResults([]);
+      setIsSearching(false);
+      currentSearchRef.current = '';
+      
+      // Cancel any pending search
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      if (searchAbortRef.current) {
+        searchAbortRef.current.abort();
+      }
+      return;
+    }
+    
+    // Debounce the actual search
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    debounceTimerRef.current = setTimeout(() => {
+      // Double-check current search term before making API call
+      if (currentSearchRef.current === query) {
+        searchBrands(query);
+      }
+    }, 300);
+  }, [searchBrands]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      if (searchAbortRef.current) {
+        searchAbortRef.current.abort();
+      }
+    };
+  }, []);
+
+  // const handlePageChange = (page) => {
+  //   updateDataState({ currentPage: page });
+    
+  //   // Update URL parameters to persist page number
+  //   const newSearchParams = new URLSearchParams(searchParams);
+  //   newSearchParams.set('page', page.toString());
+  //   if (dataState.selectedDate) {
+  //     newSearchParams.set('date', dataState.selectedDate);
+  //   }
+  //   setSearchParams(newSearchParams);
+  // };
 
   const handlePageChange = (page) => {
+    setPageLoading(true);  // Add loading for pagination
     updateDataState({ currentPage: page });
+
+    // Update URL parameters to persist page number
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set('page', page.toString());
+    if (dataState.selectedDate) {
+      newSearchParams.set('date', dataState.selectedDate);
+    }
+    setSearchParams(newSearchParams);
   };
 
   const handleSortChange = (field, order) => {
     updateSorting(field, order);
     // Reset to page 1 when sorting changes
     updateDataState({ currentPage: 1 });
+    
+    // Update URL parameters to reset page to 1
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set('page', '1');
+    if (dataState.selectedDate) {
+      newSearchParams.set('date', dataState.selectedDate);
+    }
+    setSearchParams(newSearchParams);
+    
+    // Don't call loadScrapedBrands here - let useEffect handle it
   };
 
   const getComparativeStatusIcon = (status) => {
@@ -181,11 +355,17 @@ const ScrapedBrands = () => {
     }
   }, [searchParams, dataState.selectedDate, updateDataState]);
 
-  // Load data on component mount and when date/page/sorting changes
+  // Load scraped brands data when page/date/sorting changes
   useEffect(() => {
     loadScrapedBrands(dataState.currentPage, dataState.selectedDate, sortBy, sortOrder);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataState.currentPage, dataState.selectedDate, sortBy, sortOrder]);
+
+  // Load stats only when date changes
+  useEffect(() => {
     loadStats(dataState.selectedDate);
-  }, [dataState.currentPage, dataState.selectedDate, sortBy, sortOrder, loadScrapedBrands, loadStats]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataState.selectedDate]);
 
   if (isLoading && !dataState.brands.length) {
     return (
@@ -270,10 +450,16 @@ const ScrapedBrands = () => {
           {/* Date Picker */}
           <div className="flex items-center space-x-2">
             <Calendar className="h-5 w-5 text-gray-500" />
-            <input
+            {/* <input
               type="date"
               value={dataState.selectedDate}
               onChange={handleDateChange}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            /> */}
+            <input
+              type="date"
+              value={dateInputValue}  // Change from dataState.selectedDate to dateInputValue
+              onChange={handleDateInputChange}  // Change from handleDateChange to handleDateInputChange
               className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -333,8 +519,15 @@ const ScrapedBrands = () => {
           </Card>
         ) : (
           <>
-            {/* Brands Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+                {/* Brands Grid */}
+                <div className="relative">
+                  {/* Loading overlay for pagination and date changes */}
+                  {(pageLoading || isLoading) && (
+                    <div className="fixed inset-0 bg-gray-50 flex items-center justify-center z-50">
+                      <LoadingSpinner />
+                    </div>
+                  )}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
               {displayBrands.map((brand) => (
                 <Card key={`${brand.brand_id}-${brand.started_at}`} className="p-4 hover:shadow-md transition-shadow relative">
                   {/* Watchlist Badge - Top Left Corner */}
@@ -414,6 +607,7 @@ const ScrapedBrands = () => {
                   )}
                 </Card>
               ))}
+              </div>
             </div>
 
             {/* Pagination */}

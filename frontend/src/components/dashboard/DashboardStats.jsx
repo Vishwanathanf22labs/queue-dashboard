@@ -24,9 +24,6 @@ const DashboardStats = ({
               <p className="text-xs sm:text-sm font-medium text-gray-600 whitespace-nowrap">Pending Queue</p>
               <div className="space-y-1">
                 <p className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-yellow-600">{pendingCount}</p>
-                {pendingCount === 0 && failedCount === 0 && (
-                  <p className="text-xs text-gray-700">cooldown applied</p>
-                )}
               </div>
             </div>
           </div>
@@ -78,7 +75,7 @@ const DashboardStats = ({
             </div>
              <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
                <p className="text-xs sm:text-sm font-medium text-gray-600 break-words">Watchlist Pending</p>
-               <p className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-600">{watchlistPendingCount}</p>
+               <p className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-purple-600">{watchlistPendingCount}</p>
              </div>
           </div>
         </Card>
@@ -90,7 +87,7 @@ const DashboardStats = ({
             </div>
              <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
                <p className="text-xs sm:text-sm font-medium text-gray-600 break-words">Watchlist Failed</p>
-               <p className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-600">{watchlistFailedCount}</p>
+               <p className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-orange-600">{watchlistFailedCount}</p>
              </div>
           </div>
         </Card>
@@ -103,10 +100,7 @@ const DashboardStats = ({
             <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
               <p className="text-xs sm:text-sm font-medium text-gray-600 break-words">Watchlist Completed</p>
               <div className="space-y-1">
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-green-600">{watchlistCompletedCount}</p>
-                {watchlistPendingCount === 0 && (
-                  <p className="text-xs text-gray-700">cooldown applied</p>
-                )}
+                <p className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-green-600">{watchlistCompletedCount}</p>
               </div>
             </div>
           </div>
@@ -119,7 +113,7 @@ const DashboardStats = ({
             </div>
              <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
                <p className="text-xs sm:text-sm font-medium text-gray-600 break-words">Ads Processed</p>
-               <p className="text-lg sm:text-xl lg:text-2xl font-bold text-indigo-600">{adsProcessed}</p>
+               <p className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-indigo-600">{adsProcessed}</p>
              </div>
           </div>
         </Card>
