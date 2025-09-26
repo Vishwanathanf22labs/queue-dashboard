@@ -15,6 +15,7 @@ import SearchInput from '../components/ui/SearchInput';
 const PendingQueue = () => {
   const { fetchPendingBrands, loading } = useQueueStore();
   const currentSearchRef = useRef('');
+  const isInitialMountRef = useRef(true);
   const [searchParams, setSearchParams] = useSearchParams();
   
   // Separate state for original totals (for static display)
@@ -30,10 +31,11 @@ const PendingQueue = () => {
     isRefreshing: false,
     brands: [],
     pagination: {},
-    isSearching: false
+    isSearching: false,
+    error: null
   });
 
-  const { searchTerm, currentPage, itemsPerPage, isRefreshing, brands, pagination, isSearching } = queueState;
+  const { searchTerm, currentPage, itemsPerPage, isRefreshing, brands, pagination, isSearching, error } = queueState;
 
   const updateQueueState = (updates) => {
     setQueueState(prev => ({ ...prev, ...updates }));
@@ -124,8 +126,11 @@ const PendingQueue = () => {
 
   const loadPendingBrands = useCallback(async (searchTerm = null, pageOverride = null) => {
     try {
+      // Set loading states appropriately
       if (searchTerm) {
-        updateQueueState({ isSearching: true });
+        updateQueueState({ isSearching: true, error: null });
+      } else {
+        updateQueueState({ error: null });
       }
 
       const pageToLoad = searchTerm ? 1 : (pageOverride || currentPage);
@@ -170,15 +175,52 @@ const PendingQueue = () => {
         });
       }
     } catch (error) {
-      updateQueueState({ isSearching: false });
+      updateQueueState({
+        isSearching: false,
+        error: error.message || 'Failed to load pending brands'
+      });
       toast.error(`Failed to load pending brands: ${error.message || error}`);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fetchPendingBrands, itemsPerPage]);
 
-  // Single useEffect to handle all loading scenarios
+  // Initial load effect - runs only once on mount
   useEffect(() => {
+    // Load initial data based on URL parameters
+    const initialSearch = searchParams.get('search') || '';
+    const initialPage = parseInt(searchParams.get('page')) || 1;
+
+    if (initialSearch && initialSearch.trim().length >= 3) {
+      currentSearchRef.current = initialSearch;
+      loadPendingBrands(initialSearch, initialPage);
+    } else {
+      currentSearchRef.current = '';
+      loadPendingBrands(null, initialPage);
+    }
+
+    // Mark initial mount as complete
+    setTimeout(() => {
+      isInitialMountRef.current = false;
+    }, 100);
+  }, []); // Empty dependency array - only run once
+
+  // Handle page changes (when not searching)
+  useEffect(() => {
+    // Skip initial mount and when searching
+    if (isInitialMountRef.current || (searchTerm && searchTerm.trim().length >= 3)) {
+      return;
+    }
+
+    loadPendingBrands(null, currentPage);
+  }, [currentPage, loadPendingBrands]);
+
+  // Handle search with debouncing
+  useEffect(() => {
+    // Skip initial mount to prevent duplicate calls
+    if (isInitialMountRef.current) {
+      return;
+    }
+
     if (searchTerm && searchTerm.trim() !== '') {
-      // Handle search with debouncing
       const timeoutId = setTimeout(() => {
         if (searchTerm.trim().length >= 3) {
           currentSearchRef.current = searchTerm;
@@ -187,20 +229,23 @@ const PendingQueue = () => {
       }, 300);
 
       return () => clearTimeout(timeoutId);
-    } else {
-      // Load normal data when no search term, pass current page
+    } else if (searchTerm === '') {
+      // Handle clearing search - load normal data
       currentSearchRef.current = '';
-      loadPendingBrands(null, currentPage);
+      loadPendingBrands(null, 1);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, itemsPerPage, searchTerm]);
+  }, [searchTerm, loadPendingBrands]);
 
   const handleRefresh = async () => {
     if (isRefreshing) return;
 
     updateQueueState({ isRefreshing: true });
     try {
-      await loadPendingBrands();
+      if (searchTerm && searchTerm.trim().length >= 3) {
+        await loadPendingBrands(searchTerm);
+      } else {
+        await loadPendingBrands();
+      }
       toast.success('Pending queue refreshed successfully');
     } catch (error) {
       toast.error(`Failed to refresh pending queue: ${error.message || error}`);
@@ -209,45 +254,60 @@ const PendingQueue = () => {
     }
   };
 
-  const handleSearch = (searchTerm) => {
-    updateQueueState({ searchTerm });
+  const handleSearch = (searchValue) => {
+    // Update search term in state immediately (for input display)
+    updateQueueState({ searchTerm: searchValue });
 
     // Update URL parameters
     const newParams = new URLSearchParams(searchParams);
-    if (searchTerm && searchTerm.trim()) {
-      newParams.set('search', searchTerm);
+    if (searchValue && searchValue.trim()) {
+      newParams.set('search', searchValue);
       newParams.set('page', '1'); // Reset to page 1 on search
     } else {
       newParams.delete('search');
       newParams.set('page', '1'); // Reset to page 1 when clearing search
     }
-    setSearchParams(newParams);
+    setSearchParams(newParams, { replace: true });
 
-    if (!searchTerm || searchTerm.trim() === '') {
+    if (!searchValue || searchValue.trim() === '') {
       updateQueueState({ currentPage: 1 });
-      // Don't call loadPendingBrands() here - let useEffect handle it
+      // The useEffect will handle loading the data
     }
   };
 
   const clearSearch = () => {
     currentSearchRef.current = '';
     updateQueueState({ searchTerm: '', currentPage: 1 });
-    
+
     // Update URL parameters
     const newParams = new URLSearchParams(searchParams);
     newParams.delete('search');
     newParams.set('page', '1');
-    setSearchParams(newParams);
-    
-    // Don't call loadPendingBrands() here - let useEffect handle it
+    setSearchParams(newParams, { replace: true });
+
+    // The useEffect will handle loading the data
+  };
+
+  const handlePageChange = (page) => {
+    updateQueueState({ currentPage: page });
+
+    // Update URL parameters
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('page', page.toString());
+    setSearchParams(newParams, { replace: true });
   };
 
   const filteredBrands = brands;
   const totalPages = pagination.total_pages || 1;
 
   // Show loading state while initial data is loading
-  if (loading && brands.length === 0) {
+  if (loading && brands.length === 0 && !isSearching) {
     return <LoadingSpinner />;
+  }
+
+  // Show error state if there's an error
+  if (error && !isSearching && brands.length === 0) {
+    return <ErrorDisplay message={error} onRetry={() => loadPendingBrands()} />;
   }
 
   return (
@@ -323,7 +383,7 @@ const PendingQueue = () => {
           <div className="flex-1 max-w-md">
             <SearchInput
               value={searchTerm}
-              onChange={(value) => handleSearch(value)}
+              onChange={handleSearch}
               placeholder="Search brands by name, ID, or page ID..."
               leftIcon={<Search className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />}
               size="md"
@@ -456,14 +516,7 @@ const PendingQueue = () => {
       <Pagination
         currentPage={currentPage}
         totalPages={totalPages}
-        onPageChange={(page) => {
-          updateQueueState({ currentPage: page });
-          
-          // Update URL parameters
-          const newParams = new URLSearchParams(searchParams);
-          newParams.set('page', page.toString());
-          setSearchParams(newParams);
-        }}
+        onPageChange={handlePageChange}
         totalItems={pagination.total_items || 0}
         itemsPerPage={itemsPerPage}
         showPageInfo={true}

@@ -9,7 +9,7 @@ import { ChevronUp, ChevronDown } from 'lucide-react';
 import { Eye, Users, ExternalLink, Circle } from 'lucide-react';
 import { openFacebookAdLibrary } from '../../utils/facebookAdLibrary';
 
-const WatchlistAdsCountTable = ({ watchlistBrandsQueue, loading, error, onPageChange, onSortChange }) => {
+const WatchlistAdsCountTable = ({ watchlistBrandsQueue, loading, error, onPageChange, onSortChange, totalAdsCount = 0 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   
   // Get pagination and sorting state from URL params
@@ -201,7 +201,7 @@ const WatchlistAdsCountTable = ({ watchlistBrandsQueue, loading, error, onPageCh
         <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-blue-900">Watchlist Ads Count</h2>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
         <Card>
           <div className="flex items-center">
             <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
@@ -222,7 +222,21 @@ const WatchlistAdsCountTable = ({ watchlistBrandsQueue, loading, error, onPageCh
             <div className="ml-2 sm:ml-3">
               <p className="text-xs sm:text-sm font-medium text-gray-600">Watchlist Ads Found</p>
               <p className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-900">
-                {watchlistBrands.reduce((sum, brand) => sum + (brand.total_ads || 0), 0) || 0}
+                {totalAdsCount || 0}
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <div className="flex items-center">
+            <div className="p-2 sm:p-3 bg-green-100 rounded-lg">
+              <Eye className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
+            </div>
+            <div className="ml-2 sm:ml-3">
+              <p className="text-xs sm:text-sm font-medium text-gray-600">Current Page Ads</p>
+              <p className="text-lg sm:text-xl lg:text-2xl font-bold text-green-900">
+                {watchlistBrandsQueue?.analytics?.current_page_total_ads || 0}
               </p>
             </div>
           </div>

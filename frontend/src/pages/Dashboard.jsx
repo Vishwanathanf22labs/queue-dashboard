@@ -17,6 +17,7 @@ import WatchlistAdsCountTable from '../components/queue/WatchlistAdsCountTable';
 
 const Dashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [initialLoading, setInitialLoading] = useState(true); // New: Covers full initial load
   
   const {
     overview,
@@ -62,6 +63,10 @@ const Dashboard = () => {
   const watchlistFailedCount = overview?.watchlist_stats?.failed_count || 0;
   const watchlistCompletedCount = overview?.watchlist_stats?.completed_count || 0;
   const watchlistBrands = overview?.watchlist_stats?.brands || [];
+
+  // Extract total ads counts from overview API
+  const regularTotalAds = overview?.total_ads_regular || 0;
+  const watchlistTotalAds = overview?.total_ads_watchlist || 0;
 
   const [state, setState] = useState({
     scraperStatus: 'unknown',
@@ -304,13 +309,25 @@ const Dashboard = () => {
     };
   }, [refreshInterval]);
 
+  // Updated: Manage full initial load with initialLoading
   useEffect(() => {
-    // Small delay to ensure localStorage is available and components are mounted
-    const timer = setTimeout(() => {
-      loadData();
+    let mounted = true;
+    const timer = setTimeout(async () => {
+      if (!mounted) return;
+      // initialLoading is already true from useState; no need to set again
+      try {
+        await loadData();
+      } finally {
+        if (mounted) {
+          setInitialLoading(false);
+        }
+      }
     }, 100);
     
-    return () => clearTimeout(timer);
+    return () => {
+      mounted = false;
+      clearTimeout(timer);
+    };
   }, []);
 
   useEffect(() => {
@@ -319,8 +336,8 @@ const Dashboard = () => {
     };
   }, []);
 
-  // Show loading spinner while initial data is loading
-  if (loading && !overview) {
+  // Updated: Use initialLoading for the full initial gate
+  if (initialLoading) {
     return <LoadingSpinner />;
   }
 
@@ -388,6 +405,7 @@ const Dashboard = () => {
         error={error}
         onPageChange={handleWatchlistPageChange}
         onSortChange={handleWatchlistSortChange}
+        totalAdsCount={watchlistTotalAds}
       />
 
       <BrandProcessingQueue 
@@ -396,6 +414,7 @@ const Dashboard = () => {
         error={error}
         onPageChange={handleQueuePageChange}
         onSortChange={handleQueueSortChange}
+        totalAdsCount={regularTotalAds}
       />
 
       <SeparateScrapedStats />

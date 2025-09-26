@@ -108,12 +108,27 @@ const WatchlistProcessingStatus = ({
                   </div>
                   
                   <div className="flex justify-end mt-auto pt-2">
-                    <Badge 
-                      variant={brand.status === 'completed' || brand.status === 'complete' ? 'success' : 'info'} 
-                      className="text-xs"
-                    >
-                      {brand.status === 'completed' || brand.status === 'complete' ? 'Completed' : 'Active'}
-                    </Badge>
+                    {(() => {
+                      const badgeVariant = brand.status === 'completed' || brand.status === 'complete' 
+                        ? 'success' 
+                        : brand.status === 'failed' 
+                          ? 'error' 
+                          : 'info';
+                      console.log(`Watchlist Brand ${brand.brand_id}: status="${brand.status}", variant="${badgeVariant}"`);
+                      return (
+                        <Badge 
+                          variant={badgeVariant} 
+                          className="text-xs"
+                        >
+                          {brand.status === 'completed' || brand.status === 'complete' 
+                            ? 'Completed' 
+                            : brand.status === 'failed' 
+                              ? 'Failed' 
+                              : 'Active'
+                          }
+                        </Badge>
+                      );
+                    })()}
                   </div>
                 </div>
               ))}

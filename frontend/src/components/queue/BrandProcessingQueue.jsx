@@ -10,7 +10,7 @@ import useQueueStore from '../../stores/queueStore';
 import { Users, Eye, ExternalLink, Circle } from 'lucide-react';
 import { openFacebookAdLibrary } from '../../utils/facebookAdLibrary';
 
-const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
+const BrandProcessingQueue = ({ onPageChange, onSortChange, totalAdsCount = 0 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { brandProcessingQueue, loading, error } = useQueueStore();
 
@@ -205,7 +205,7 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
         <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">All Brands Scrapped Queue</h2>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
         <Card>
           <div className="flex items-center">
             <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
@@ -226,7 +226,21 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
             <div className="ml-2 sm:ml-3">
               <p className="text-xs sm:text-sm font-medium text-gray-600">Total Ads Found</p>
               <p className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-900">
-                {brands?.reduce((sum, brand) => sum + (brand.total_ads || 0), 0) || 0}
+                {totalAdsCount || 0}
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <div className="flex items-center">
+            <div className="p-2 sm:p-3 bg-green-100 rounded-lg">
+              <Eye className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
+            </div>
+            <div className="ml-2 sm:ml-3">
+              <p className="text-xs sm:text-sm font-medium text-gray-600">Current Page Ads</p>
+              <p className="text-lg sm:text-xl lg:text-2xl font-bold text-green-900">
+                {brandProcessingQueue?.analytics?.current_page_total_ads || 0}
               </p>
             </div>
           </div>

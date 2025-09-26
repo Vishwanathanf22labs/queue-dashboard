@@ -92,21 +92,47 @@ const FailedQueue = ({
         </div>
       )
     },
-    {
-      key: 'error_message',
-      label: 'Error Message',
-      render: (value, row) => {
-        const errorMsg = value || row.error_message || row.error || row.message || 'Unknown error';
-        // Extract the important part of the error message
-        const importantPart = errorMsg.includes(':') ? errorMsg.split(':').pop().trim() : errorMsg;
-        return (
-          <div className="text-xs text-red-600 max-w-[120px] sm:max-w-[200px] truncate" title={errorMsg}>
-            {importantPart}
-          </div>
-        );
-      },
-      className: 'hidden lg:table-cell'
-    },
+        {
+          key: 'error_message',
+          label: 'Error Message',
+          render: (value, row) => {
+            const errorMsg = value || row.error_message || row.error || row.message || 'Unknown error';
+            // Extract the important part of the error message - get the last meaningful part
+            let importantPart = errorMsg;
+            
+            // If it contains ':', get the part after the last colon
+            if (errorMsg.includes(':')) {
+              const parts = errorMsg.split(':');
+              importantPart = parts[parts.length - 1].trim();
+            }
+            
+            // Further shorten common error patterns
+            if (importantPart.toLowerCase().includes('no matching script tag found')) {
+              importantPart = 'No script tag';
+            } else if (importantPart.toLowerCase().includes('session closed')) {
+              importantPart = 'Session closed';
+            } else if (importantPart.toLowerCase().includes('target closed')) {
+              importantPart = 'Target closed';
+            } else if (importantPart.toLowerCase().includes('protocol error')) {
+              importantPart = 'Protocol error';
+            } else if (importantPart.toLowerCase().includes('timeout')) {
+              importantPart = 'Timeout';
+            } else if (importantPart.toLowerCase().includes('network')) {
+              importantPart = 'Network error';
+            } else if (importantPart.toLowerCase().includes('connection')) {
+              importantPart = 'Connection error';
+            } else if (importantPart.toLowerCase().includes('failed to extract')) {
+              importantPart = 'Extraction failed';
+            }
+            
+            return (
+              <div className="text-xs text-red-600 max-w-[100px] sm:max-w-[150px] truncate font-medium" title={errorMsg}>
+                {importantPart}
+              </div>
+            );
+          },
+          className: 'hidden lg:table-cell'
+        },
     {
       key: 'actions',
       label: 'Actions',
@@ -297,16 +323,43 @@ const FailedQueue = ({
                   </div>
 
                   {/* Error Message */}
-                  <div className="pt-2">
-                    <span className="text-gray-500 text-sm">Error:</span>
-                    <p className="text-sm text-red-600 mt-1 break-words" title={brand.error_message || brand.error || brand.message || 'Unknown error'}>
-                      {(() => {
-                        const errorMsg = brand.error_message || brand.error || brand.message || 'Unknown error';
-                        // Extract the important part of the error message
-                        return errorMsg.includes(':') ? errorMsg.split(':').pop().trim() : errorMsg;
-                      })()}
-                    </p>
-                  </div>
+         <div className="pt-2">
+           <span className="text-gray-500 text-sm">Error:</span>
+           <p className="text-sm text-red-600 mt-1 break-words font-medium" title={brand.error_message || brand.error || brand.message || 'Unknown error'}>
+             {(() => {
+               const errorMsg = brand.error_message || brand.error || brand.message || 'Unknown error';
+               // Extract the important part of the error message - get the last meaningful part
+               let importantPart = errorMsg;
+               
+               // If it contains ':', get the part after the last colon
+               if (errorMsg.includes(':')) {
+                 const parts = errorMsg.split(':');
+                 importantPart = parts[parts.length - 1].trim();
+               }
+               
+               // Further shorten common error patterns
+               if (importantPart.toLowerCase().includes('no matching script tag found')) {
+                 importantPart = 'No script tag';
+               } else if (importantPart.toLowerCase().includes('session closed')) {
+                 importantPart = 'Session closed';
+               } else if (importantPart.toLowerCase().includes('target closed')) {
+                 importantPart = 'Target closed';
+               } else if (importantPart.toLowerCase().includes('protocol error')) {
+                 importantPart = 'Protocol error';
+               } else if (importantPart.toLowerCase().includes('timeout')) {
+                 importantPart = 'Timeout';
+               } else if (importantPart.toLowerCase().includes('network')) {
+                 importantPart = 'Network error';
+               } else if (importantPart.toLowerCase().includes('connection')) {
+                 importantPart = 'Connection error';
+               } else if (importantPart.toLowerCase().includes('failed to extract')) {
+                 importantPart = 'Extraction failed';
+               }
+               
+               return importantPart;
+             })()}
+           </p>
+         </div>
 
                   {/* Action Buttons */}
                   <div className="flex flex-col space-y-2 pt-2">

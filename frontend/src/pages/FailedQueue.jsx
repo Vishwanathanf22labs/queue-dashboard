@@ -15,6 +15,7 @@ import SearchInput from '../components/ui/SearchInput';
 const FailedQueue = () => {
   const { fetchFailedBrands, loading } = useQueueStore();
   const currentSearchRef = useRef('');
+  const isInitialMountRef = useRef(true);
   const [searchParams, setSearchParams] = useSearchParams();
   
   // Separate state for original totals (for static display)
@@ -30,10 +31,11 @@ const FailedQueue = () => {
     isRefreshing: false,
     brands: [],
     pagination: {},
-    isSearching: false
+    isSearching: false,
+    error: null
   });
 
-  const { searchTerm, currentPage, itemsPerPage, isRefreshing, brands, pagination, isSearching } = queueState;
+  const { searchTerm, currentPage, itemsPerPage, isRefreshing, brands, pagination, isSearching, error } = queueState;
 
   const updateQueueState = (updates) => {
     setQueueState(prev => ({ ...prev, ...updates }));
@@ -132,10 +134,36 @@ const FailedQueue = () => {
       label: 'Error Message',
       render: (value, row) => {
         const errorMsg = value || row.error_message || row.error || row.message || 'Unknown error';
-        // Extract the important part of the error message
-        const importantPart = errorMsg.includes(':') ? errorMsg.split(':').pop().trim() : errorMsg;
+        // Extract the important part of the error message - get the last meaningful part
+        let importantPart = errorMsg;
+        
+        // If it contains ':', get the part after the last colon
+        if (errorMsg.includes(':')) {
+          const parts = errorMsg.split(':');
+          importantPart = parts[parts.length - 1].trim();
+        }
+        
+        // Further shorten common error patterns
+        if (importantPart.toLowerCase().includes('no matching script tag found')) {
+          importantPart = 'No script tag';
+        } else if (importantPart.toLowerCase().includes('session closed')) {
+          importantPart = 'Session closed';
+        } else if (importantPart.toLowerCase().includes('target closed')) {
+          importantPart = 'Target closed';
+        } else if (importantPart.toLowerCase().includes('protocol error')) {
+          importantPart = 'Protocol error';
+        } else if (importantPart.toLowerCase().includes('timeout')) {
+          importantPart = 'Timeout';
+        } else if (importantPart.toLowerCase().includes('network')) {
+          importantPart = 'Network error';
+        } else if (importantPart.toLowerCase().includes('connection')) {
+          importantPart = 'Connection error';
+        } else if (importantPart.toLowerCase().includes('failed to extract')) {
+          importantPart = 'Extraction failed';
+        }
+        
         return (
-          <div className="text-xs text-red-600 max-w-[120px] sm:max-w-[200px] truncate" title={errorMsg}>
+          <div className="text-xs text-red-600 max-w-[100px] sm:max-w-[150px] truncate font-medium" title={errorMsg}>
             {importantPart}
           </div>
         );
@@ -146,8 +174,11 @@ const FailedQueue = () => {
 
   const loadFailedBrands = useCallback(async (searchTerm = null, pageOverride = null) => {
     try {
+      // Set loading states appropriately
       if (searchTerm) {
-        updateQueueState({ isSearching: true });
+        updateQueueState({ isSearching: true, error: null });
+      } else {
+        updateQueueState({ error: null });
       }
 
       const pageToLoad = searchTerm ? 1 : (pageOverride || currentPage);
@@ -192,37 +223,77 @@ const FailedQueue = () => {
         });
       }
     } catch (error) {
-      updateQueueState({ isSearching: false });
+      updateQueueState({
+        isSearching: false,
+        error: error.message || 'Failed to load failed brands'
+      });
       toast.error(`Failed to load failed brands: ${error.message || error}`);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fetchFailedBrands, itemsPerPage]);
 
-  // Single useEffect to handle all loading scenarios
+  // Initial load effect - runs only once on mount
   useEffect(() => {
+    // Load initial data based on URL parameters
+    const initialSearch = searchParams.get('search') || '';
+    const initialPage = parseInt(searchParams.get('page')) || 1;
+
+    if (initialSearch && initialSearch.trim().length >= 3) {
+      currentSearchRef.current = initialSearch;
+      loadFailedBrands(initialSearch, initialPage);
+    } else {
+      currentSearchRef.current = '';
+      loadFailedBrands(null, initialPage);
+    }
+
+    // Mark initial mount as complete
+    setTimeout(() => {
+      isInitialMountRef.current = false;
+    }, 100);
+  }, []); // Empty dependency array - only run once
+
+  // Handle page changes (when not searching)
+  useEffect(() => {
+    // Skip initial mount and when searching
+    if (isInitialMountRef.current || (searchTerm && searchTerm.trim().length >= 3)) {
+      return;
+    }
+
+    loadFailedBrands(null, currentPage);
+  }, [currentPage, loadFailedBrands]);
+
+  // Handle search with debouncing
+  useEffect(() => {
+    // Skip initial mount to prevent duplicate calls
+    if (isInitialMountRef.current) {
+      return;
+    }
+
     if (searchTerm && searchTerm.trim() !== '') {
-      // Handle search with debouncing
       const timeoutId = setTimeout(() => {
         if (searchTerm.trim().length >= 3) {
           currentSearchRef.current = searchTerm;
           loadFailedBrands(searchTerm);
         }
-      }, 300); // Reduced from 500ms to 300ms for smoother experience
+      }, 300);
 
       return () => clearTimeout(timeoutId);
-    } else {
-      // Load normal data when no search term, pass current page
+    } else if (searchTerm === '') {
+      // Handle clearing search - load normal data
       currentSearchRef.current = '';
-      loadFailedBrands(null, currentPage);
+      loadFailedBrands(null, 1);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, itemsPerPage, searchTerm]);
+  }, [searchTerm, loadFailedBrands]);
 
   const handleRefresh = async () => {
     if (isRefreshing) return;
 
     updateQueueState({ isRefreshing: true });
     try {
-      await loadFailedBrands();
+      if (searchTerm && searchTerm.trim().length >= 3) {
+        await loadFailedBrands(searchTerm);
+      } else {
+        await loadFailedBrands();
+      }
       toast.success('Failed queue refreshed successfully');
     } catch (error) {
       toast.error(`Failed to refresh failed queue: ${error.message || error}`);
@@ -231,37 +302,47 @@ const FailedQueue = () => {
     }
   };
 
-  const handleSearch = (searchTerm) => {
-    updateQueueState({ searchTerm });
+  const handleSearch = (searchValue) => {
+    // Update search term in state immediately (for input display)
+    updateQueueState({ searchTerm: searchValue });
 
     // Update URL parameters
     const newParams = new URLSearchParams(searchParams);
-    if (searchTerm && searchTerm.trim()) {
-      newParams.set('search', searchTerm);
+    if (searchValue && searchValue.trim()) {
+      newParams.set('search', searchValue);
       newParams.set('page', '1'); // Reset to page 1 on search
     } else {
       newParams.delete('search');
       newParams.set('page', '1'); // Reset to page 1 when clearing search
     }
-    setSearchParams(newParams);
+    setSearchParams(newParams, { replace: true });
 
-    if (!searchTerm || searchTerm.trim() === '') {
+    if (!searchValue || searchValue.trim() === '') {
       updateQueueState({ currentPage: 1 });
-      // Don't call loadFailedBrands() here - let useEffect handle it
+      // The useEffect will handle loading the data
     }
   };
 
   const clearSearch = () => {
     currentSearchRef.current = '';
     updateQueueState({ searchTerm: '', currentPage: 1 });
-    
+
     // Update URL parameters
     const newParams = new URLSearchParams(searchParams);
     newParams.delete('search');
     newParams.set('page', '1');
-    setSearchParams(newParams);
-    
-    // Don't call loadFailedBrands() here - let useEffect handle it
+    setSearchParams(newParams, { replace: true });
+
+    // The useEffect will handle loading the data
+  };
+
+  const handlePageChange = (page) => {
+    updateQueueState({ currentPage: page });
+
+    // Update URL parameters
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('page', page.toString());
+    setSearchParams(newParams, { replace: true });
   };
 
   const filteredBrands = brands;
@@ -269,8 +350,13 @@ const FailedQueue = () => {
   const totalPages = pagination.total_pages || 1;
 
   // Show loading state while initial data is loading
-  if (loading && brands.length === 0) {
+  if (loading && brands.length === 0 && !isSearching) {
     return <LoadingSpinner />;
+  }
+
+  // Show error state if there's an error
+  if (error && !isSearching && brands.length === 0) {
+    return <ErrorDisplay message={error} onRetry={() => loadFailedBrands()} />;
   }
 
   return (
@@ -348,7 +434,7 @@ const FailedQueue = () => {
           <div className="flex-1 max-w-md">
             <SearchInput
               value={searchTerm}
-              onChange={(value) => handleSearch(value)}
+              onChange={handleSearch}
               placeholder="Search brands by name, ID, or page ID..."
               leftIcon={<Search className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />}
               size="md"
@@ -459,16 +545,43 @@ const FailedQueue = () => {
                     </div>
                   </div>
 
-                  {/* Error Message */}
-                  <div className="pt-2">
-                    <span className="text-gray-500 text-sm">Error:</span>
-                    <p className="text-sm text-red-600 mt-1 break-words" title={errorMessage}>
-                      {(() => {
-                        // Extract the important part of the error message
-                        return errorMessage.includes(':') ? errorMessage.split(':').pop().trim() : errorMessage;
-                      })()}
-                    </p>
-                  </div>
+                   {/* Error Message */}
+                   <div className="pt-2">
+                     <span className="text-gray-500 text-sm">Error:</span>
+                     <p className="text-sm text-red-600 mt-1 break-words font-medium" title={errorMessage}>
+                       {(() => {
+                         // Extract the important part of the error message - get the last meaningful part
+                         let importantPart = errorMessage;
+                         
+                         // If it contains ':', get the part after the last colon
+                         if (errorMessage.includes(':')) {
+                           const parts = errorMessage.split(':');
+                           importantPart = parts[parts.length - 1].trim();
+                         }
+                         
+                         // Further shorten common error patterns
+                         if (importantPart.toLowerCase().includes('no matching script tag found')) {
+                           importantPart = 'No script tag';
+                         } else if (importantPart.toLowerCase().includes('session closed')) {
+                           importantPart = 'Session closed';
+                         } else if (importantPart.toLowerCase().includes('target closed')) {
+                           importantPart = 'Target closed';
+                         } else if (importantPart.toLowerCase().includes('protocol error')) {
+                           importantPart = 'Protocol error';
+                         } else if (importantPart.toLowerCase().includes('timeout')) {
+                           importantPart = 'Timeout';
+                         } else if (importantPart.toLowerCase().includes('network')) {
+                           importantPart = 'Network error';
+                         } else if (importantPart.toLowerCase().includes('connection')) {
+                           importantPart = 'Connection error';
+                         } else if (importantPart.toLowerCase().includes('failed to extract')) {
+                           importantPart = 'Extraction failed';
+                         }
+                         
+                         return importantPart;
+                       })()}
+                     </p>
+                   </div>
 
                   {/* External Link Icon - Bottom Right */}
                   {pageId && pageId !== 'N/A' && (
@@ -494,14 +607,7 @@ const FailedQueue = () => {
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
-          onPageChange={(page) => {
-            updateQueueState({ currentPage: page });
-            
-            // Update URL parameters
-            const newParams = new URLSearchParams(searchParams);
-            newParams.set('page', page.toString());
-            setSearchParams(newParams);
-          }}
+          onPageChange={handlePageChange}
           totalItems={pagination.total_items || 0}
           itemsPerPage={itemsPerPage}
           showPageInfo={true}
