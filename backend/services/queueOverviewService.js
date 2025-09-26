@@ -86,6 +86,43 @@ function startCleanupInterval() {
 // Start the interval
 startCleanupInterval();
 
+// Get total ads count for regular or watchlist brands
+async function getTotalAdsCount(queueType) {
+  try {
+    const redis = getQueueRedis(queueType);
+    
+    // Get all brand processing jobs
+    const allJobKeys = await redis.keys("bull:brand-processing:*");
+    const jobKeys = allJobKeys.filter(key => {
+      return !key.includes(':lock') && 
+             !key.includes(':meta') && 
+             !key.includes(':marker') &&
+             /bull:brand-processing:\d+$/.test(key);
+    });
+
+    let totalAds = 0;
+    for (const key of jobKeys) {
+      try {
+        const jobData = await redis.hgetall(key);
+        if (jobData && jobData.data) {
+          const parsedData = JSON.parse(jobData.data);
+          if (parsedData.totalAds && Array.isArray(parsedData.totalAds)) {
+            totalAds += parsedData.totalAds.length;
+          }
+        }
+      } catch (error) {
+        logger.warn(`Error parsing ${queueType} brand job ${key}:`, error.message);
+      }
+    }
+
+    logger.info(`${queueType} brands total ads count: ${totalAds}`);
+    return totalAds;
+  } catch (error) {
+    logger.error(`Error getting ${queueType} total ads count:`, error);
+    return 0;
+  }
+}
+
 async function getQueueOverview() {
   try {
     // Get regular Redis instance
@@ -125,6 +162,14 @@ async function getQueueOverview() {
       };
     }
 
+    // Get total ads counts for regular and watchlist brands
+    const [totalAdsRegular, totalAdsWatchlist] = await Promise.all([
+      getTotalAdsCount('regular'),
+      getTotalAdsCount('watchlist')
+    ]);
+
+    // Removed current_page_ads_count calculation
+
     return {
       queue_counts: {
         // Regular queue counts
@@ -137,6 +182,8 @@ async function getQueueOverview() {
       },
       currently_processing: currentlyProcessing,
       watchlist_stats: watchlistStats,
+      total_ads_regular: totalAdsRegular,
+      total_ads_watchlist: totalAdsWatchlist,
     };
   } catch (error) {
     logger.error("Error in getQueueOverview:", error);
@@ -217,10 +264,13 @@ async function getCurrentlyProcessing() {
           }
 
           let brandName;
-          if (brand.actual_name && brand.actual_name.trim() !== '') {
+          // Priority: actual_name > name (only if name is not "Brand") > page_id > Brand ID
+          if (brand.actual_name && brand.actual_name.trim() !== '' && brand.actual_name.toLowerCase() !== 'brand') {
             brandName = brand.actual_name;
           } else if (brand.name && brand.name.trim() !== '' && brand.name.toLowerCase() !== 'brand') {
             brandName = brand.name;
+          } else if (brand.page_id && brand.page_id.trim() !== '') {
+            brandName = brand.page_id;
           } else {
             brandName = `Brand ${processingData.brandId}`;
           }

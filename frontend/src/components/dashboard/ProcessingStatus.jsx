@@ -70,7 +70,7 @@ const ProcessingStatus = ({
   return (
     <div className="grid gap-4 sm:gap-6 grid-cols-1">
       <Card>
-        <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Currently Scraping</h3>
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Regular Currently Scraping</h3>
         {nonWatchlistProcessingBrands.length > 0 ? (
           <div className="space-y-4">
             {/* Header with count */}
@@ -153,12 +153,27 @@ const ProcessingStatus = ({
                   </div>
                   
                   <div className="flex justify-end mt-auto pt-2">
-                    <Badge 
-                      variant={brand.status === 'completed' || brand.status === 'complete' ? 'success' : 'info'} 
-                      className="text-xs"
-                    >
-                      {brand.status === 'completed' || brand.status === 'complete' ? 'Completed' : 'Active'}
-                    </Badge>
+                    {(() => {
+                      const badgeVariant = brand.status === 'completed' || brand.status === 'complete' 
+                        ? 'success' 
+                        : brand.status === 'failed' 
+                          ? 'error' 
+                          : 'info';
+                      console.log(`Regular Brand ${brand.brand_id}: status="${brand.status}", variant="${badgeVariant}"`);
+                      return (
+                        <Badge 
+                          variant={badgeVariant} 
+                          className="text-xs"
+                        >
+                          {brand.status === 'completed' || brand.status === 'complete' 
+                            ? 'Completed' 
+                            : brand.status === 'failed' 
+                              ? 'Failed' 
+                              : 'Active'
+                          }
+                        </Badge>
+                      );
+                    })()}
                   </div>
                 </div>
               ))}
@@ -176,7 +191,7 @@ const ProcessingStatus = ({
               <>
                 <Play className="h-8 w-8 sm:h-12 sm:w-12 text-gray-300 mx-auto mb-2 sm:mb-3" />
                 <p className="text-gray-500 text-sm sm:text-base">
-                  {pendingCount === 0 ? 'No brands in queue' : 'No brands currently processing'}
+                  {pendingCount === 0 ? 'No brands in queue' : 'No regular brands currently processing'}
                 </p>
               </>
             )}

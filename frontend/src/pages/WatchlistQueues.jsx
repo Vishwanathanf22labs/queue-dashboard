@@ -24,18 +24,8 @@ const WatchlistQueues = () => {
     total_pages: 0
   });
   
-  // Get active tab from localStorage first, then URL, then default to 'pending'
-  const getInitialTab = () => {
-    try {
-      const storedTab = localStorage.getItem('watchlistQueues_activeTab');
-      const urlTab = searchParams.get('tab');
-      return urlTab || storedTab || 'pending';
-    } catch {
-      return searchParams.get('tab') || 'pending';
-    }
-  };
-
-  const [activeTab, setActiveTab] = useState(getInitialTab()); // 'pending' or 'failed'
+  // Get active tab from URL only, default to 'pending'
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'pending'); // 'pending' or 'failed'
   const [queueState, setQueueState] = useState({
     searchTerm: searchParams.get('search') || '',
     currentPage: parseInt(searchParams.get('page')) || 1,
@@ -50,6 +40,14 @@ const WatchlistQueues = () => {
   const updateQueueState = (updates) => {
     setQueueState(prev => ({ ...prev, ...updates }));
   };
+
+  // Sync activeTab with URL changes
+  useEffect(() => {
+    const urlTab = searchParams.get('tab');
+    if (urlTab && urlTab !== activeTab) {
+      setActiveTab(urlTab);
+    }
+  }, [searchParams, activeTab]);
 
   const pendingColumns = [
     {
@@ -358,9 +356,6 @@ const WatchlistQueues = () => {
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     updateQueueState({ currentPage: 1, searchTerm: '' });
-    
-    // Save tab to localStorage for cross-navigation persistence
-    localStorage.setItem('watchlistQueues_activeTab', tab);
     
     // Update URL parameters with new tab
     const newParams = new URLSearchParams();
