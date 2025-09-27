@@ -86,15 +86,48 @@ async function getPreComputedQueueCounters(redis, queueType) {
   const counterKey = `queue:${queueType}:counters`;
   
   try {
+    // First try to get pre-computed counters
     const counters = await redis.hgetall(counterKey);
-    return {
-      waiting: parseInt(counters.waiting) || 0,
-      active: parseInt(counters.active) || 0,
-      delayed: parseInt(counters.delayed) || 0,
-      completed: parseInt(counters.completed) || 0,
-      failed: parseInt(counters.failed) || 0,
-      total: parseInt(counters.total) || 0
+    
+    // If counters exist, return them
+    if (counters && Object.keys(counters).length > 0) {
+      return {
+        waiting: parseInt(counters.waiting) || 0,
+        active: parseInt(counters.active) || 0,
+        delayed: parseInt(counters.delayed) || 0,
+        completed: parseInt(counters.completed) || 0,
+        failed: parseInt(counters.failed) || 0,
+        total: parseInt(counters.total) || 0
+      };
+    }
+    
+    // Fallback: Read directly from BullMQ queue lists
+    const [waitingJobs, activeJobs, completedJobs, failedJobs, delayedJobs] = await Promise.all([
+      redis.lrange(`bull:brand-processing:waiting`, 0, -1).catch(() => []),
+      redis.lrange(`bull:brand-processing:active`, 0, -1).catch(() => []),
+      redis.lrange(`bull:brand-processing:completed`, 0, -1).catch(() => []),
+      redis.lrange(`bull:brand-processing:failed`, 0, -1).catch(() => []),
+      redis.lrange(`bull:brand-processing:delayed`, 0, -1).catch(() => [])
+    ]);
+    
+    const realCounters = {
+      waiting: waitingJobs.length,
+      active: activeJobs.length,
+      delayed: delayedJobs.length,
+      completed: completedJobs.length,
+      failed: failedJobs.length,
+      total: waitingJobs.length + activeJobs.length + delayedJobs.length + completedJobs.length + failedJobs.length
     };
+    
+    // Cache the real counters for future use
+    try {
+      await redis.hset(counterKey, realCounters);
+      await redis.expire(counterKey, 60); // Cache for 1 minute
+    } catch (cacheError) {
+      logger.warn(`Failed to cache counters: ${cacheError.message}`);
+    }
+    
+    return realCounters;
   } catch (error) {
     logger.error(`Error getting pre-computed counters for ${queueType}:`, error);
     return {
@@ -393,6 +426,30 @@ async function refreshJobIndex(redis, queueType) {
   const startTime = process.hrtime.bigint();
   
   try {
+    // Get job states from BullMQ queue lists (with error handling)
+    const jobStates = new Map();
+    
+    try {
+      const [waitingJobs, activeJobs, completedJobs, failedJobs, delayedJobs] = await Promise.all([
+        redis.lrange(`bull:brand-processing:waiting`, 0, -1).catch(() => []),
+        redis.lrange(`bull:brand-processing:active`, 0, -1).catch(() => []),
+        redis.lrange(`bull:brand-processing:completed`, 0, -1).catch(() => []),
+        redis.lrange(`bull:brand-processing:failed`, 0, -1).catch(() => []),
+        redis.lrange(`bull:brand-processing:delayed`, 0, -1).catch(() => [])
+      ]);
+      
+      // Create job state maps for O(1) lookup
+      waitingJobs.forEach(jobId => jobStates.set(jobId, 'waiting'));
+      activeJobs.forEach(jobId => jobStates.set(jobId, 'active'));
+      completedJobs.forEach(jobId => jobStates.set(jobId, 'completed'));
+      failedJobs.forEach(jobId => jobStates.set(jobId, 'failed'));
+      delayedJobs.forEach(jobId => jobStates.set(jobId, 'delayed'));
+      
+      logger.info(`Job states loaded: waiting=${waitingJobs.length}, active=${activeJobs.length}, completed=${completedJobs.length}, failed=${failedJobs.length}, delayed=${delayedJobs.length}`);
+    } catch (error) {
+      logger.warn(`Error loading job states, continuing without state info: ${error.message}`);
+    }
+    
     // OPTIMIZATION: Use SCAN instead of KEYS for better performance
     const pattern = "bull:brand-processing:*";
     let cursor = '0';
@@ -409,6 +466,11 @@ async function refreshJobIndex(redis, queueType) {
       !key.includes(':lock') && 
       !key.includes(':meta') && 
       !key.includes(':marker') &&
+      !key.includes(':waiting') &&
+      !key.includes(':active') &&
+      !key.includes(':completed') &&
+      !key.includes(':failed') &&
+      !key.includes(':delayed') &&
       /bull:brand-processing:\d+$/.test(key)
     );
     
@@ -435,13 +497,16 @@ async function refreshJobIndex(redis, queueType) {
         
         const jobId = chunk[index].split(":").pop();
         
+        // Get actual job state from BullMQ queue lists
+        const actualState = jobStates.get(jobId) || 'unknown';
+        
         // Handle empty job data (jobs that exist but have no data)
         if (!jobData || Object.keys(jobData).length === 0) {
           jobs.push({
             id: jobId,
             data: { brandId: null, totalAds: [] }, // Default empty data
             timestamp: Date.now(),
-            state: "unknown"
+            state: actualState
           });
           return;
         }
@@ -457,7 +522,7 @@ async function refreshJobIndex(redis, queueType) {
               id: jobId,
               data: job,
               timestamp: parseInt(jobData.timestamp) || Date.now(),
-              state: jobData.state || "unknown"
+              state: actualState
             });
             brandIds.add(job.brandId);
           } else {
@@ -466,7 +531,7 @@ async function refreshJobIndex(redis, queueType) {
               id: jobId,
               data: { brandId: null, totalAds: [] },
               timestamp: parseInt(jobData.timestamp) || Date.now(),
-              state: jobData.state || "unknown"
+              state: actualState
             });
           }
         } catch (parseError) {
@@ -475,7 +540,7 @@ async function refreshJobIndex(redis, queueType) {
             id: jobId,
             data: { brandId: null, totalAds: [] },
             timestamp: Date.now(),
-            state: "unknown"
+            state: actualState
           });
         }
       });
