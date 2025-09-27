@@ -46,39 +46,13 @@ const ScrapedBrands = () => {
     setDataState(prev => ({ ...prev, ...updates }));
   }, []);
 
-  // const loadScrapedBrands = useCallback(async (page = 1, date = null, sortByParam = null, sortOrderParam = null) => {
-  //   try {
-  //     setIsLoading(true);
-  //     const currentSortBy = sortByParam || sortBy;
-  //     const currentSortOrder = sortOrderParam || sortOrder;
-  //     const response = await scrapedBrandsAPI.getScrapedBrands(page, 10, date, currentSortBy, currentSortOrder);
-
-  //     if (response.data.success) {
-  //       const brands = response.data.data.brands || [];
-  //       const pagination = response.data.data.pagination || {};
-
-  //       updateDataState({
-  //         brands,
-  //         currentPage: pagination.currentPage || 1,
-  //         totalPages: pagination.totalPages || 1,
-  //         totalItems: pagination.totalItems || 0
-  //       });
-  //     } else {
-  //       toast.error(response.data.error || 'Failed to load scraped brands');
-  //     }
-  //   } catch (error) {
-  //     console.error('Error loading scraped brands:', error);
-  //     toast.error('Failed to load scraped brands');
-  //   } finally {
-  //     setIsLoading(false);
-  //   }
-  // }, [updateDataState, sortBy, sortOrder]);
-
   const loadScrapedBrands = useCallback(async (page = 1, date = null, sortByParam = null, sortOrderParam = null) => {
     try {
       // Only set main loading if no data exists, otherwise use pageLoading
       if (!dataState.brands.length) {
         setIsLoading(true);
+      } else {
+        setPageLoading(true);
       }
 
       const currentSortBy = sortByParam || sortBy;
@@ -122,7 +96,7 @@ const ScrapedBrands = () => {
   // 🚀 Fixed search with request ID to prevent stale results
   const searchAbortRef = useRef(null);
   const currentSearchRef = useRef('');
-  
+
   const searchBrands = useCallback(async (query) => {
     // Cancel previous search request if still pending
     if (searchAbortRef.current) {
@@ -139,13 +113,13 @@ const ScrapedBrands = () => {
 
     try {
       setIsSearching(true);
-      
+
       // Store current search query
       currentSearchRef.current = query;
-      
+
       // Create new AbortController for this request
       searchAbortRef.current = new AbortController();
-      
+
       const response = await scrapedBrandsAPI.searchScrapedBrands(query, dataState.selectedDate, {
         signal: searchAbortRef.current.signal
       });
@@ -180,18 +154,6 @@ const ScrapedBrands = () => {
     }
   }, [dataState.selectedDate]);
 
-  // const handleDateChange = (event) => {
-  //   const newDate = event.target.value;
-
-  //   // Update URL params to persist the selected date and reset page to 1
-  //   const newSearchParams = new URLSearchParams(searchParams);
-  //   newSearchParams.set('date', newDate);
-  //   newSearchParams.set('page', '1');
-  //   setSearchParams(newSearchParams);
-
-  //   updateDataState({ selectedDate: newDate, currentPage: 1 });
-  // };
-
   const handleDateInputChange = useCallback((e) => {
     setDateInputValue(e.target.value);
   }, []);
@@ -207,7 +169,7 @@ const ScrapedBrands = () => {
     if (dateInputValue === dataState.selectedDate) return;
 
     const timer = setTimeout(() => {
-      setIsLoading(true);
+      setPageLoading(true);
 
       // Update URL params to persist the selected date and reset page to 1
       const newSearchParams = new URLSearchParams(searchParams);
@@ -223,20 +185,29 @@ const ScrapedBrands = () => {
 
   // 🚀 Fixed search handler with debouncing and minimum chars
   const debounceTimerRef = useRef(null);
-  
+
   const handleSearch = useCallback((query) => {
     setSearchTerm(query);
-    
+
     // Update current search reference immediately
     currentSearchRef.current = query;
-    
+
+    // Update URL parameters to persist search
+    const newSearchParams = new URLSearchParams(searchParams);
+    if (query && query.trim().length >= 3) {
+      newSearchParams.set('search', query);
+    } else {
+      newSearchParams.delete('search');
+    }
+    setSearchParams(newSearchParams, { replace: true });
+
     // Clear results immediately if empty or too short
     if (!query.trim() || query.trim().length < 3) {
       setShowSearchResults(false);
       setSearchResults([]);
       setIsSearching(false);
       currentSearchRef.current = '';
-      
+
       // Cancel any pending search
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
@@ -246,19 +217,40 @@ const ScrapedBrands = () => {
       }
       return;
     }
-    
+
     // Debounce the actual search
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
-    
+
     debounceTimerRef.current = setTimeout(() => {
       // Double-check current search term before making API call
       if (currentSearchRef.current === query) {
         searchBrands(query);
       }
     }, 300);
-  }, [searchBrands]);
+  }, [searchBrands, searchParams, setSearchParams]);
+
+  const clearSearch = useCallback(() => {
+    setSearchTerm('');
+    setShowSearchResults(false);
+    setSearchResults([]);
+    setIsSearching(false);
+    currentSearchRef.current = '';
+
+    // Cancel any pending search
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    if (searchAbortRef.current) {
+      searchAbortRef.current.abort();
+    }
+
+    // Remove search parameter from URL
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.delete('search');
+    setSearchParams(newSearchParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -272,17 +264,15 @@ const ScrapedBrands = () => {
     };
   }, []);
 
-  // const handlePageChange = (page) => {
-  //   updateDataState({ currentPage: page });
-    
-  //   // Update URL parameters to persist page number
-  //   const newSearchParams = new URLSearchParams(searchParams);
-  //   newSearchParams.set('page', page.toString());
-  //   if (dataState.selectedDate) {
-  //     newSearchParams.set('date', dataState.selectedDate);
-  //   }
-  //   setSearchParams(newSearchParams);
-  // };
+  // Read search parameter from URL on component mount and restore search
+  useEffect(() => {
+    const urlSearchTerm = searchParams.get('search');
+    if (urlSearchTerm && urlSearchTerm.trim().length >= 3) {
+      setSearchTerm(urlSearchTerm);
+      currentSearchRef.current = urlSearchTerm;
+      searchBrands(urlSearchTerm);
+    }
+  }, []); // Only run on mount
 
   const handlePageChange = (page) => {
     setPageLoading(true);  // Add loading for pagination
@@ -301,7 +291,7 @@ const ScrapedBrands = () => {
     updateSorting(field, order);
     // Reset to page 1 when sorting changes
     updateDataState({ currentPage: 1 });
-    
+
     // Update URL parameters to reset page to 1
     const newSearchParams = new URLSearchParams(searchParams);
     newSearchParams.set('page', '1');
@@ -309,7 +299,7 @@ const ScrapedBrands = () => {
       newSearchParams.set('date', dataState.selectedDate);
     }
     setSearchParams(newSearchParams);
-    
+
     // Don't call loadScrapedBrands here - let useEffect handle it
   };
 
@@ -378,6 +368,17 @@ const ScrapedBrands = () => {
   }
 
   const displayBrands = showSearchResults ? searchResults : dataState.brands;
+
+  // FIXED: Properly centered loading for page loading
+  if (pageLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+        <div className="max-w-7xl mx-auto flex items-center justify-center min-h-[60vh]">
+          <LoadingSpinner />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
@@ -450,17 +451,11 @@ const ScrapedBrands = () => {
           {/* Date Picker */}
           <div className="flex items-center space-x-2">
             <Calendar className="h-5 w-5 text-gray-500" />
-            {/* <input
-              type="date"
-              value={dataState.selectedDate}
-              onChange={handleDateChange}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            /> */}
             <input
               type="date"
-              value={dateInputValue}  // Change from dataState.selectedDate to dateInputValue
-              onChange={handleDateInputChange}  // Change from handleDateChange to handleDateInputChange
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={dateInputValue}
+              onChange={handleDateInputChange}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent [&::-webkit-calendar-picker-indicator]:ml-2 [&::-webkit-calendar-picker-indicator]:mr-0"
             />
           </div>
 
@@ -469,9 +464,9 @@ const ScrapedBrands = () => {
             <SearchInput
               value={searchTerm}
               onChange={handleSearch}
+              onClear={clearSearch}
               placeholder="Search brands..."
               leftIcon={<Search className="h-4 w-4" />}
-              loading={isSearching}
             />
           </div>
         </div>
@@ -505,7 +500,11 @@ const ScrapedBrands = () => {
         )}
 
         {/* Results */}
-        {showSearchResults && searchResults.length === 0 && searchTerm ? (
+        {isSearching ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+          </div>
+        ) : showSearchResults && searchResults.length === 0 && searchTerm ? (
           <Card className="p-8 text-center">
             <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No brands found</h3>
@@ -519,94 +518,88 @@ const ScrapedBrands = () => {
           </Card>
         ) : (
           <>
-                {/* Brands Grid */}
-                <div className="relative">
-                  {/* Loading overlay for pagination and date changes */}
-                  {(pageLoading || isLoading) && (
-                    <div className="fixed inset-0 bg-gray-50 flex items-center justify-center z-50">
-                      <LoadingSpinner />
-                    </div>
-                  )}
+            {/* Brands Grid */}
+            <div className="relative">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
-              {displayBrands.map((brand) => (
-                <Card key={`${brand.brand_id}-${brand.started_at}`} className="p-4 hover:shadow-md transition-shadow relative">
-                  {/* Watchlist Badge - Top Left Corner */}
-                  {brand.isWatchlist && (
-                    <div className="absolute top-3 left-3 z-10">
-                      <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">
-                        Watchlist
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="space-y-3" style={{ paddingTop: brand.isWatchlist ? '32px' : '0' }}>
-                    {/* Brand Name */}
-                    <div>
-                      <h3 className="font-semibold text-gray-900 truncate" title={brand.brand_name}>
-                        {brand.brand_name}
-                      </h3>
-                      <p className="text-sm text-gray-500">ID: {brand.brand_id}</p>
-                    </div>
-
-                    {/* Ads Counts */}
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="text-center p-2 bg-green-50 rounded">
-                        <p className="text-green-600 font-medium">
-                          {brand.active_ads || 0}
-                        </p>
-                        <p className="text-green-600 text-xs">Active</p>
-                      </div>
-                      <div className="text-center p-2 bg-red-50 rounded">
-                        <p className="text-red-600 font-medium">
-                          {brand.inactive_ads || 0}
-                        </p>
-                        <p className="text-red-600 text-xs">Inactive</p>
-                      </div>
-                    </div>
-
-                    {/* Stopped Ads */}
-                    {brand.stopped_ads && (
-                      <div className="text-center p-2 bg-gray-50 rounded">
-                        <p className="text-gray-600 font-medium">
-                          {brand.stopped_ads}
-                        </p>
-                        <p className="text-gray-600 text-xs">Stopped</p>
+                {displayBrands.map((brand) => (
+                  <Card key={`${brand.brand_id}-${brand.started_at}`} className="p-4 hover:shadow-md transition-shadow relative">
+                    {/* Watchlist Badge - Top Left Corner */}
+                    {brand.isWatchlist && (
+                      <div className="absolute top-3 left-3 z-10">
+                        <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">
+                          Watchlist
+                        </span>
                       </div>
                     )}
 
-                    {/* Comparative Status */}
-                    {brand.comparative_status && (
-                      <div className="flex items-center justify-center">
-                        <Badge
-                          className={`${getComparativeStatusColor(brand.comparative_status)} flex items-center space-x-1`}
-                        >
-                          {getComparativeStatusIcon(brand.comparative_status)}
-                          <span className="capitalize">{brand.comparative_status}</span>
-                        </Badge>
+                    <div className="space-y-3" style={{ paddingTop: brand.isWatchlist ? '32px' : '0' }}>
+                      {/* Brand Name */}
+                      <div>
+                        <h3 className="font-semibold text-gray-900 truncate" title={brand.brand_name}>
+                          {brand.brand_name}
+                        </h3>
+                        <p className="text-sm text-gray-500">ID: {brand.brand_id}</p>
                       </div>
-                    )}
 
-                    {/* Started At */}
-                    <div className="text-xs text-gray-500 text-center">
-                      {formatDate(brand.started_at)}
+                      {/* Ads Counts */}
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="text-center p-2 bg-green-50 rounded">
+                          <p className="text-green-600 font-medium">
+                            {brand.active_ads || 0}
+                          </p>
+                          <p className="text-green-600 text-xs">Active</p>
+                        </div>
+                        <div className="text-center p-2 bg-red-50 rounded">
+                          <p className="text-red-600 font-medium">
+                            {brand.inactive_ads || 0}
+                          </p>
+                          <p className="text-red-600 text-xs">Inactive</p>
+                        </div>
+                      </div>
+
+                      {/* Stopped Ads */}
+                      {brand.stopped_ads && (
+                        <div className="text-center p-2 bg-gray-50 rounded">
+                          <p className="text-gray-600 font-medium">
+                            {brand.stopped_ads}
+                          </p>
+                          <p className="text-gray-600 text-xs">Stopped</p>
+                        </div>
+                      )}
+
+                      {/* Comparative Status */}
+                      {brand.comparative_status && (
+                        <div className="flex items-center justify-center">
+                          <Badge
+                            className={`${getComparativeStatusColor(brand.comparative_status)} flex items-center space-x-1`}
+                          >
+                            {getComparativeStatusIcon(brand.comparative_status)}
+                            <span className="capitalize">{brand.comparative_status}</span>
+                          </Badge>
+                        </div>
+                      )}
+
+                      {/* Started At */}
+                      <div className="text-xs text-gray-500 text-center">
+                        {formatDate(brand.started_at)}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* External Link Icon - Bottom Right */}
-                  {brand.page_id && (
-                    <button
-                      onClick={() => {
-                        const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=${brand.page_id}`;
-                        window.open(url, '_blank', 'noopener,noreferrer');
-                      }}
-                      className="absolute bottom-4 right-4 p-2 text-gray-400 hover:text-blue-600 transition-colors bg-white rounded-full shadow-sm border border-gray-200"
-                      title="View in Facebook Ad Library"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </button>
-                  )}
-                </Card>
-              ))}
+                    {/* External Link Icon - Bottom Right */}
+                    {brand.page_id && (
+                      <button
+                        onClick={() => {
+                          const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=${brand.page_id}`;
+                          window.open(url, '_blank', 'noopener,noreferrer');
+                        }}
+                        className="absolute bottom-4 right-4 p-2 text-gray-400 hover:text-blue-600 transition-colors bg-white rounded-full shadow-sm border border-gray-200"
+                        title="View in Facebook Ad Library"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </button>
+                    )}
+                  </Card>
+                ))}
               </div>
             </div>
 
@@ -629,11 +622,7 @@ const ScrapedBrands = () => {
               <div className="text-center text-sm text-gray-600 mb-4">
                 Showing {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for "{searchTerm}"
                 <button
-                  onClick={() => {
-                    setShowSearchResults(false);
-                    setSearchTerm('');
-                    setSearchResults([]);
-                  }}
+                  onClick={clearSearch}
                   className="ml-2 text-blue-600 hover:text-blue-800 underline"
                 >
                   Clear search

@@ -1,18 +1,21 @@
 import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
-const SortButton = ({ 
-  label, 
-  sortBy, 
-  currentSortBy, 
-  currentSortOrder, 
+const SortButton = ({
+  label,
+  sortBy,
+  currentSortBy,
+  currentSortOrder,
   onSortChange,
   className = ""
 }) => {
   const isActive = currentSortBy === sortBy;
-  
+
   const handleClick = () => {
     if (sortBy === 'normal') {
-      onSortChange('normal', 'desc');
+      // Only call onSortChange if not already on normal sorting with desc order
+      if (!(isActive && currentSortOrder === 'desc')) {
+        onSortChange('normal', 'desc');
+      }
     } else if (isActive) {
       // Toggle between asc and desc
       const newOrder = currentSortOrder === 'desc' ? 'asc' : 'desc';
@@ -31,9 +34,9 @@ const SortButton = ({
     if (!isActive) {
       return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
     }
-    
-    return currentSortOrder === 'desc' ? 
-      <ArrowDown className="h-4 w-4 text-blue-600" /> : 
+
+    return currentSortOrder === 'desc' ?
+      <ArrowDown className="h-4 w-4 text-blue-600" /> :
       <ArrowUp className="h-4 w-4 text-blue-600" />;
   };
 
