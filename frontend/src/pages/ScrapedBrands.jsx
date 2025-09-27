@@ -451,12 +451,23 @@ const ScrapedBrands = () => {
           {/* Date Picker */}
           <div className="flex items-center space-x-2">
             <Calendar className="h-5 w-5 text-gray-500" />
-            <input
-              type="date"
-              value={dateInputValue}
-              onChange={handleDateInputChange}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent [&::-webkit-calendar-picker-indicator]:ml-auto [&::-webkit-calendar-picker-indicator]:mr-2 w-full sm:w-auto min-w-0"
-            />
+            <div className="relative w-full sm:w-auto min-w-0">
+              <input
+                type="date"
+                value={dateInputValue}
+                onChange={handleDateInputChange}
+                className="px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full sm:w-auto min-w-0"
+                style={{
+                  WebkitAppearance: 'none',
+                  MozAppearance: 'textfield'
+                }}
+              />
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+            </div>
           </div>
 
           {/* Search */}
