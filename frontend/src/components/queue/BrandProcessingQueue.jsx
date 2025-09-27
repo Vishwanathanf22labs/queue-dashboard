@@ -10,7 +10,7 @@ import useQueueStore from '../../stores/queueStore';
 import { Users, Eye, ExternalLink, Circle } from 'lucide-react';
 import { openFacebookAdLibrary } from '../../utils/facebookAdLibrary';
 
-const BrandProcessingQueue = ({ onPageChange, onSortChange, totalAdsCount = 0 }) => {
+const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { brandProcessingQueue, loading, error } = useQueueStore();
 
@@ -226,7 +226,7 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, totalAdsCount = 0 })
             <div className="ml-2 sm:ml-3">
               <p className="text-xs sm:text-sm font-medium text-gray-600">Total Ads Found</p>
               <p className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-900">
-                {totalAdsCount || 0}
+                {brandProcessingQueue?.total_ads_regular || 0}
               </p>
             </div>
           </div>

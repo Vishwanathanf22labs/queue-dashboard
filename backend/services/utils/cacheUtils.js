@@ -6,11 +6,11 @@ const crypto = require('crypto');
 const redisCache = new Map();
 const CACHE_TTL = 30000; // 30 seconds
 
-// Redis client setup - using ioredis like other services
+// Redis client setup - using dedicated cache Redis instance
 const redisClient = new Redis({
-  host: process.env.REDIS_HOST,
-  port: process.env.REDIS_PORT,
-  password: process.env.REDIS_PASSWORD,
+  host: process.env.CACHE_REDIS_HOST,
+  port: process.env.CACHE_REDIS_PORT,
+  password: process.env.CACHE_REDIS_PASSWORD,
   maxRetriesPerRequest: 3,
   retryDelayOnFailover: 100,
   enableReadyCheck: false,
@@ -76,7 +76,7 @@ async function getPipelineCache(date, page, perPage, sortBy = 'normal', sortOrde
   return await getCachedData(key);
 }
 
-async function setPipelineCache(date, page, perPage, data, sortBy = 'normal', sortOrder = 'desc', lastId = null, ttl = 120) {
+async function setPipelineCache(date, page, perPage, data, sortBy = 'normal', sortOrder = 'desc', lastId = null, ttl = 300) {
   const key = getCacheKey("pipeline", date, `p${page}`, `n${perPage}`, `s${sortBy}`, `o${sortOrder}`, lastId || '');
   return await setCachedData(key, data, ttl);
 }
@@ -86,12 +86,33 @@ async function getPipelineETag(date, page, perPage, sortBy = 'normal', sortOrder
   return await getCachedData(etagKey);
 }
 
-async function setPipelineETag(date, page, perPage, etag, sortBy = 'normal', sortOrder = 'desc', lastId = null, ttl = 120) {
+async function setPipelineETag(date, page, perPage, etag, sortBy = 'normal', sortOrder = 'desc', lastId = null, ttl = 300) {
   const etagKey = getCacheKey("pipeline", date, `p${page}`, `n${perPage}`, `s${sortBy}`, `o${sortOrder}`, lastId || '', "etag");
   return await setCachedData(etagKey, etag, ttl);
 }
 
-// Cache invalidation function
+// Queue-specific cache functions (pipeline-style)
+async function getQueueCache(queueType, page, limit, sortBy = 'normal', sortOrder = 'desc') {
+  const key = getCacheKey("queue", queueType, `p${page}`, `l${limit}`, `s${sortBy}`, `o${sortOrder}`);
+  return await getCachedData(key);
+}
+
+async function setQueueCache(queueType, page, limit, data, sortBy = 'normal', sortOrder = 'desc', ttl = 600) {
+  const key = getCacheKey("queue", queueType, `p${page}`, `l${limit}`, `s${sortBy}`, `o${sortOrder}`);
+  return await setCachedData(key, data, ttl);
+}
+
+async function getQueueETag(queueType, page, limit, sortBy = 'normal', sortOrder = 'desc') {
+  const etagKey = getCacheKey("queue", queueType, `p${page}`, `l${limit}`, `s${sortBy}`, `o${sortOrder}`, "etag");
+  return await getCachedData(etagKey);
+}
+
+async function setQueueETag(queueType, page, limit, etag, sortBy = 'normal', sortOrder = 'desc', ttl = 600) {
+  const etagKey = getCacheKey("queue", queueType, `p${page}`, `l${limit}`, `s${sortBy}`, `o${sortOrder}`, "etag");
+  return await setCachedData(etagKey, etag, ttl);
+}
+
+// Cache invalidation functions
 async function invalidatePipelineCache(date) {
   try {
     // Get all keys matching the pattern
@@ -107,6 +128,21 @@ async function invalidatePipelineCache(date) {
   }
 }
 
+async function invalidateQueueCache(queueType = null) {
+  try {
+    // Get all keys matching the pattern
+    const pattern = queueType ? `queue:${queueType}:*` : `queue:*`;
+    const keys = await redisClient.keys(pattern);
+    
+    if (keys.length > 0) {
+      await redisClient.del(keys);
+      console.log(`🗑️ Invalidated ${keys.length} queue cache entries for ${queueType || 'all queues'}`);
+    }
+  } catch (error) {
+    console.error('Queue cache invalidation error:', error);
+  }
+}
+
 module.exports = {
   getCacheKey,
   getCachedData,
@@ -117,4 +153,9 @@ module.exports = {
   getPipelineETag,
   setPipelineETag,
   invalidatePipelineCache,
+  getQueueCache,
+  setQueueCache,
+  getQueueETag,
+  setQueueETag,
+  invalidateQueueCache,
 };
