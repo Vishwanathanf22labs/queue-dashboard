@@ -1,18 +1,20 @@
 // Add caching for Redis operations
-const redis = require('redis');
+const Redis = require("ioredis");
 const crypto = require('crypto');
 
 // Fallback in-memory cache
 const redisCache = new Map();
 const CACHE_TTL = 30000; // 30 seconds
 
-// Redis client setup
-const redisClient = redis.createClient({
+// Redis client setup - using ioredis like other services
+const redisClient = new Redis({
   host: process.env.REDIS_HOST,
   port: process.env.REDIS_PORT,
   password: process.env.REDIS_PASSWORD,
+  maxRetriesPerRequest: 3,
+  retryDelayOnFailover: 100,
+  enableReadyCheck: false,
 });
-redisClient.connect().catch(console.error);
 
 // Cache helper functions
 function getCacheKey(prefix, ...args) {
@@ -42,7 +44,7 @@ async function getCachedData(key) {
 async function setCachedData(key, data, ttl = 180) {
   try {
     const serialized = JSON.stringify(data);
-    await redisClient.setEx(key, ttl, serialized);
+    await redisClient.setex(key, ttl, serialized);
     return true;
   } catch (error) {
     console.error('Cache set error:', error);
