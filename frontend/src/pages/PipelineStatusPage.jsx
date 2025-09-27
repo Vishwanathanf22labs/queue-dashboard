@@ -765,7 +765,7 @@ const PipelineStatusPage = () => {
                   type="date"
                   value={dateInputValue}
                   onChange={handleDateInputChange}
-                  className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 [&::-webkit-calendar-picker-indicator]:ml-2 [&::-webkit-calendar-picker-indicator]:mr-0 w-full sm:w-auto min-w-0"
+                  className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 [&::-webkit-calendar-picker-indicator]:ml-auto [&::-webkit-calendar-picker-indicator]:mr-2 w-full sm:w-auto min-w-0"
                 />
               </div>
 
@@ -844,11 +844,11 @@ const PipelineStatusPage = () => {
 
         {/* Brand Cards Grid */}
         {isSearching ? (
-          <Card className="text-center py-12">
+          <div className="text-center py-12">
             <div className="flex items-center justify-center">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
             </div>
-          </Card>
+          </div>
         ) : displayBrands.length === 0 ? (
           <Card className="text-center py-12">
             <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -865,8 +865,8 @@ const PipelineStatusPage = () => {
           </div>
         )}
 
-        {/* Pagination - Only show when not in search mode */}
-        {!showSearchResults && data.pagination.pages > 1 && (
+        {/* Pagination - Only show when not in search mode and not searching */}
+        {!showSearchResults && !isSearching && data.pagination.pages > 1 && (
           <Card>
             <div className="relative">
               {pageLoading && (

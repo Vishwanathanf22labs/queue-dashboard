@@ -9,7 +9,7 @@ import { ChevronUp, ChevronDown } from 'lucide-react';
 import { Eye, Users, ExternalLink, Circle } from 'lucide-react';
 import { openFacebookAdLibrary } from '../../utils/facebookAdLibrary';
 
-const WatchlistAdsCountTable = ({ watchlistBrandsQueue, loading, error, onPageChange, onSortChange, totalAdsCount = 0 }) => {
+const WatchlistAdsCountTable = ({ watchlistBrandsQueue, loading, error, onPageChange, onSortChange }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   
   // Get pagination and sorting state from URL params
@@ -222,7 +222,7 @@ const WatchlistAdsCountTable = ({ watchlistBrandsQueue, loading, error, onPageCh
             <div className="ml-2 sm:ml-3">
               <p className="text-xs sm:text-sm font-medium text-gray-600">Watchlist Ads Found</p>
               <p className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-900">
-                {totalAdsCount || 0}
+                {watchlistBrandsQueue?.total_ads_watchlist || 0}
               </p>
             </div>
           </div>

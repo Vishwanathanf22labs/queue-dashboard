@@ -143,13 +143,27 @@ async function getQueueStats(req, res) {
 async function getBrandProcessingQueue(req, res) {
   try {
     const { page = 1, limit = 10, queueType = 'regular', sortBy = 'normal', sortOrder = 'desc' } = req.query;
+    const ifNoneMatch = req.headers['if-none-match'];
+    
     const processingData = await queueService.getBrandProcessingQueue(
       parseInt(page),
       parseInt(limit),
       queueType,
       sortBy,
-      sortOrder
+      sortOrder,
+      ifNoneMatch
     );
+
+    // Handle ETag caching
+    if (processingData.status === 304) {
+      res.set('ETag', processingData.etag);
+      return res.status(304).end();
+    }
+
+    // Set ETag header for future requests
+    if (processingData.etag) {
+      res.set('ETag', processingData.etag);
+    }
 
     res.status(200).json(processingData);
   } catch (error) {
@@ -165,12 +179,26 @@ async function getBrandProcessingQueue(req, res) {
 async function getWatchlistBrandsQueue(req, res) {
   try {
     const { page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc' } = req.query;
+    const ifNoneMatch = req.headers['if-none-match'];
+    
     const watchlistData = await queueService.getWatchlistBrandsQueue(
       parseInt(page),
       parseInt(limit),
       sortBy,
-      sortOrder
+      sortOrder,
+      ifNoneMatch
     );
+
+    // Handle ETag caching
+    if (watchlistData.status === 304) {
+      res.set('ETag', watchlistData.etag);
+      return res.status(304).end();
+    }
+
+    // Set ETag header for future requests
+    if (watchlistData.etag) {
+      res.set('ETag', watchlistData.etag);
+    }
 
     res.status(200).json(watchlistData);
   } catch (error) {

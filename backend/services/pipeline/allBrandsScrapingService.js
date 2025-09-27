@@ -331,7 +331,7 @@ async function getAllBrandsScrapingStatus(page = 1, perPage = 10, date = null, s
           hasPrev: page > 1,
         },
       };
-      await setPipelineCache(targetDate, page, perPage, result, sortBy, sortOrder, lastId, 60);
+      await setPipelineCache(targetDate, page, perPage, result, sortBy, sortOrder, lastId, 300);
       return result;
     }
 
@@ -395,8 +395,8 @@ async function getAllBrandsScrapingStatus(page = 1, perPage = 10, date = null, s
 
     // Cache result and ETag
     await Promise.all([
-      setPipelineCache(targetDate, page, perPage, result, sortBy, sortOrder, lastId, 120),
-      setPipelineETag(targetDate, page, perPage, etag, sortBy, sortOrder, lastId, 120)
+      setPipelineCache(targetDate, page, perPage, result, sortBy, sortOrder, lastId, 300),
+      setPipelineETag(targetDate, page, perPage, etag, sortBy, sortOrder, lastId, 300)
     ]);
 
     return { ...result, etag, fromCache: false };

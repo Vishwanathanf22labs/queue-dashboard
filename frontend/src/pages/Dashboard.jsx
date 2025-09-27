@@ -64,9 +64,7 @@ const Dashboard = () => {
   const watchlistCompletedCount = overview?.watchlist_stats?.completed_count || 0;
   const watchlistBrands = overview?.watchlist_stats?.brands || [];
 
-  // Extract total ads counts from overview API
-  const regularTotalAds = overview?.total_ads_regular || 0;
-  const watchlistTotalAds = overview?.total_ads_watchlist || 0;
+  // Total ads counts are now provided by individual queue APIs
 
   const [state, setState] = useState({
     scraperStatus: 'unknown',
@@ -405,7 +403,6 @@ const Dashboard = () => {
         error={error}
         onPageChange={handleWatchlistPageChange}
         onSortChange={handleWatchlistSortChange}
-        totalAdsCount={watchlistTotalAds}
       />
 
       <BrandProcessingQueue 
@@ -414,7 +411,6 @@ const Dashboard = () => {
         error={error}
         onPageChange={handleQueuePageChange}
         onSortChange={handleQueueSortChange}
-        totalAdsCount={regularTotalAds}
       />
 
       <SeparateScrapedStats />
