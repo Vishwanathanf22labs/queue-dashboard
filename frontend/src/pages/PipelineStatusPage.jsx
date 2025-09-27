@@ -126,13 +126,18 @@ const PipelineStatusPage = () => {
     }
   }, [selectedDate]);
 
-  // Clear search function with request cancellation
+  // Clear search function with request cancellation and URL cleanup
   const clearSearch = useCallback(() => {
     setSearchTerm('');
     setShowSearchResults(false);
     setSearchResults([]);
     setIsSearching(false);
     setDebouncedSearchTerm('');
+    
+    // Remove search parameter from URL
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.delete('search');
+    setSearchParams(newSearchParams, { replace: true });
     
     // Cancel any pending search requests
     if (debounceTimerRef.current) {
@@ -141,14 +146,23 @@ const PipelineStatusPage = () => {
     if (searchAbortRef.current) {
       searchAbortRef.current.abort();
     }
-  }, []);
+  }, [searchParams, setSearchParams]);
 
-  // 🚀 Simple search handler with stale result prevention
+  // 🚀 Simple search handler with stale result prevention and URL persistence
   const handleSearch = useCallback((query) => {
     setSearchTerm(query);
     
     // Update current search reference immediately
     currentSearchRef.current = query;
+    
+    // Update URL parameters to persist search
+    const newSearchParams = new URLSearchParams(searchParams);
+    if (query && query.trim().length >= 3) {
+      newSearchParams.set('search', query);
+    } else {
+      newSearchParams.delete('search');
+    }
+    setSearchParams(newSearchParams, { replace: true });
     
     // Clear results immediately if empty or too short
     if (!query.trim() || query.trim().length < 3) {
@@ -178,7 +192,7 @@ const PipelineStatusPage = () => {
         searchBrands(query);
       }
     }, 300);
-  }, [searchBrands]);
+  }, [searchBrands, searchParams, setSearchParams]);
 
   // Refs for cleanup
   const debounceTimerRef = useRef(null);
@@ -193,7 +207,7 @@ const PipelineStatusPage = () => {
   }, []);
 
   // Get display brands (search results or paginated data)
-  const displayBrands = showSearchResults ? searchResults : (data.brands || []);
+  const displayBrands = showSearchResults ? (Array.isArray(searchResults) ? searchResults : []) : (Array.isArray(data.brands) ? data.brands : []);
 
   // Memoize API call to prevent unnecessary calls
   const fetchPipelineStatus = useCallback(async (page = currentPage, sortByParam = null, sortOrderParam = null) => {
@@ -203,15 +217,16 @@ const PipelineStatusPage = () => {
       const currentSortOrder = sortOrderParam || sortOrder;
       const response = await pipelineAPI.getAllBrandsStatus(page, 10, selectedDate, currentSortBy, currentSortOrder);
 
-      if (response.data && response.data.brands) {
-        setData(response.data);
+      if (response.data && response.data.data && Array.isArray(response.data.data.brands)) {
+        setData(response.data.data);
       } else {
+        console.warn('Unexpected API response structure:', response.data);
         setData({
-          brands: response.data || [],
+          brands: [],
           pagination: {
             page: 1,
-            limit: 10,
-            total: response.data?.length || 0,
+            perPage: 10,
+            total: 0,
             pages: 1,
             hasNext: false,
             hasPrev: false
@@ -226,7 +241,17 @@ const PipelineStatusPage = () => {
       setRefreshing(false);
       setPageLoading(false);
     }
-  }, [currentPage, selectedDate, sortBy, sortOrder]);
+  }, [selectedDate, sortBy, sortOrder]); // Removed currentPage from deps to prevent infinite loops
+
+  // Read search parameter from URL on component mount and restore search
+  useEffect(() => {
+    const urlSearchTerm = searchParams.get('search');
+    if (urlSearchTerm && urlSearchTerm.trim().length >= 3) {
+      setSearchTerm(urlSearchTerm);
+      currentSearchRef.current = urlSearchTerm;
+      searchBrands(urlSearchTerm);
+    }
+  }, []); // Only run on mount
 
   // Fetch data on component mount and when dependencies change
   useEffect(() => {
@@ -234,7 +259,7 @@ const PipelineStatusPage = () => {
     if (!showSearchResults) {
       fetchPipelineStatus(currentPage);
     }
-  }, [showSearchResults, currentPage, selectedDate, sortBy, sortOrder, fetchPipelineStatus]); // Keep fetchPipelineStatus but with stable dependencies
+  }, [showSearchResults, currentPage, selectedDate, sortBy, sortOrder]);
 
   // FIXED: Debounced date change effect to prevent immediate API calls while typing
   useEffect(() => {
@@ -260,7 +285,7 @@ const PipelineStatusPage = () => {
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     fetchPipelineStatus(currentPage);
-  }, [fetchPipelineStatus, currentPage]);
+  }, [currentPage]);
 
   // const handlePageChange = useCallback(async (newPage) => {
   //   setPageLoading(true);
@@ -283,7 +308,7 @@ const PipelineStatusPage = () => {
   //   }
   // }, [fetchPipelineStatus, searchParams, setSearchParams, selectedDate]);
 
-  const handlePageChange = useCallback(async (newPage) => {
+  const handlePageChange = useCallback((newPage) => {
     setPageLoading(true);  // ✅ Keep this for the loading indicator
     setCurrentPage(newPage);
 
@@ -295,16 +320,15 @@ const PipelineStatusPage = () => {
     }
     setSearchParams(newSearchParams);
 
-    try {
-      await fetchPipelineStatus(newPage);
-    } catch (error) {
-      console.error('Error changing page:', error);
-    } finally {
-      setPageLoading(false);  // ✅ Keep this to reset loading
-    }
-  }, [fetchPipelineStatus, searchParams, setSearchParams, selectedDate]);
+    // The useEffect will automatically trigger fetchPipelineStatus when currentPage changes
+  }, [searchParams, setSearchParams, selectedDate]);
 
   const handleSortChange = useCallback((field, order) => {
+    // Don't do anything if the sort parameters haven't actually changed
+    if (field === sortBy && order === sortOrder) {
+      return;
+    }
+    
     setPageLoading(true);
     updateSorting(field, order);
     setCurrentPage(1); // Reset to page 1 when sorting changes
@@ -318,7 +342,7 @@ const PipelineStatusPage = () => {
     setSearchParams(newSearchParams);
     
     // The useEffect will automatically trigger fetchPipelineStatus when sortBy/sortOrder changes
-  }, [updateSorting, searchParams, setSearchParams, selectedDate]);
+  }, [updateSorting, searchParams, setSearchParams, selectedDate, sortBy, sortOrder]);
 
   // FIXED: New date input change handler that only updates the input value
   const handleDateInputChange = useCallback((e) => {
@@ -443,6 +467,31 @@ const PipelineStatusPage = () => {
 
   const formatDate = useCallback((dateString) => {
     if (!dateString) return '';
+    
+    // If it's a YYYY-MM-DD string, parse it directly without timezone conversion
+    if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      const [year, month, day] = dateString.split('-');
+      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+    
+    // If it's an ISO timestamp, extract just the date part to avoid timezone issues
+    if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(dateString)) {
+      const datePart = dateString.split('T')[0]; // Extract YYYY-MM-DD part
+      const [year, month, day] = datePart.split('-');
+      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+    
+    // For other date formats, use the original logic
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -464,25 +513,10 @@ const PipelineStatusPage = () => {
       percentage = 100;
     }
 
-    let colorClass = 'bg-gray-200';
-
-    if (status === 'COMPLETED') {
-      colorClass = 'bg-green-500';
-    } else if (status === 'PROCESSING' || status === 'WAITING') {
-      colorClass = 'bg-yellow-500';
-    } else if (status === 'FAILED') {
-      colorClass = 'bg-red-500';
-    }
-
+    // Return only the text count without progress bar
     return (
-      <div className="flex items-center gap-2 mt-1">
-        <div className="flex-1 bg-gray-200 rounded-full h-2">
-          <div
-            className={`h-2 rounded-full ${colorClass} transition-all duration-300`}
-            style={{ width: `${percentage}%` }}
-          />
-        </div>
-        <span className="text-xs text-gray-500 min-w-0">
+      <div className="mt-1">
+        <span className="text-xs text-gray-500">
           {displayCompleted}/{displayTotal} ({percentage}%)
         </span>
       </div>
@@ -491,7 +525,7 @@ const PipelineStatusPage = () => {
 
   // Memoize brand card component to prevent unnecessary re-renders
   const BrandCard = React.memo(({ brand }) => (
-    <Card key={brand.brandId} className="hover:shadow-lg transition-shadow duration-200 relative">
+    <Card key={brand.brandId} className="hover:shadow-lg transition-shadow duration-200 relative overflow-hidden">
       {/* Watchlist Badge - Top Left Corner */}
       {brand.isWatchlist && (
         <div className="absolute top-3 left-3 z-10">
@@ -503,14 +537,14 @@ const PipelineStatusPage = () => {
 
       {/* Brand Header */}
       <div className="flex items-start justify-between mb-4">
-        <div className="flex-1 min-w-0" style={{ paddingTop: brand.isWatchlist ? '32px' : '0' }}>
+        <div className="flex-1 min-w-0 overflow-hidden" style={{ paddingTop: brand.isWatchlist ? '32px' : '0' }}>
           <h3 className="text-lg font-semibold text-gray-900 break-words overflow-hidden"
             title={brand.brandName || 'Unknown Brand'}>
             {brand.brandName || 'Unknown Brand'}
           </h3>
           <p className="text-sm text-gray-500 truncate">ID: {brand.brandId}</p>
           {brand.pageId && (
-            <p className="text-xs text-gray-400 truncate">Page: {brand.pageId}</p>
+            <p className="text-xs text-gray-400 truncate break-all">Page: {brand.pageId}</p>
           )}
         </div>
         <div className="flex items-center gap-1">
@@ -525,18 +559,18 @@ const PipelineStatusPage = () => {
       <div className="space-y-3">
         {/* Scraping Status */}
         <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             {getStatusIcon(brand.scraping?.status, brand.scraping?.completed)}
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-gray-900">Scraping</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 break-words">
                 {getStatusText(brand.scraping?.status, brand.scraping?.completed)}
               </p>
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-right flex-shrink-0 ml-2">
             {brand.scraping?.timestamp && (
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-gray-400 whitespace-nowrap">
                 {formatDate(brand.scraping.timestamp)}
               </p>
             )}
@@ -545,18 +579,18 @@ const PipelineStatusPage = () => {
 
         {/* DB Stored Status */}
         <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             {getStatusIcon(brand.dbStored?.status, brand.dbStored?.completed)}
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-gray-900">DB Stored</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 break-words">
                 {brand.dbStored?.status || 'Not started'}
               </p>
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-right flex-shrink-0 ml-2">
             {brand.dbStored?.activeAds > 0 && (
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-gray-400 whitespace-nowrap">
                 {brand.dbStored.activeAds} ads
               </p>
             )}
@@ -565,11 +599,11 @@ const PipelineStatusPage = () => {
 
         {/* Typesense Status */}
         <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             {getStatusIcon(brand.typesense?.status, brand.typesense?.completed)}
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-gray-900">Typesense</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 break-words">
                 {getStatusText(brand.typesense?.status, brand.typesense?.completed)}
               </p>
               {/* Progress indicator for Typesense */}
@@ -580,9 +614,9 @@ const PipelineStatusPage = () => {
               )}
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-right flex-shrink-0 ml-2">
             {brand.typesense?.totalAds > 0 && (
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-gray-400 whitespace-nowrap">
                 {brand.typesense.adsWithTypesense}/{brand.typesense.totalAds} ads
               </p>
             )}
@@ -591,11 +625,11 @@ const PipelineStatusPage = () => {
 
         {/* File Upload Status with enhanced display */}
         <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             {getStatusIcon(brand.fileUpload?.status, brand.fileUpload?.completed)}
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-gray-900">File Upload</p>
-              <p className={`text-xs ${getStatusColor(brand.fileUpload?.status, brand.fileUpload?.completed)}`}>
+              <p className={`text-xs ${getStatusColor(brand.fileUpload?.status, brand.fileUpload?.completed)} break-words`}>
                 {getStatusText(brand.fileUpload?.status, brand.fileUpload?.completed)}
               </p>
               {/* Enhanced progress indicator for file upload */}
@@ -606,10 +640,10 @@ const PipelineStatusPage = () => {
               )}
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-right flex-shrink-0 ml-2">
             {brand.fileUpload?.totalMedia > 0 && (
               <div className="space-y-1">
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-gray-400 whitespace-nowrap">
                   {brand.fileUpload?.status === 'COMPLETED'
                     ? `${brand.fileUpload.totalMedia}/${brand.fileUpload.totalMedia} files`
                     : `${brand.fileUpload.mediaWithAllUrls}/${brand.fileUpload.totalMedia} files`
@@ -619,12 +653,12 @@ const PipelineStatusPage = () => {
                 {(brand.fileUpload?.mediaInQueue > 0 || brand.fileUpload?.mediaFailed > 0) && (
                   <div className="flex flex-col gap-1">
                     {brand.fileUpload.mediaInQueue > 0 && (
-                      <span className="text-xs text-yellow-600">
+                      <span className="text-xs text-yellow-600 whitespace-nowrap">
                         {brand.fileUpload.mediaInQueue} queued
                       </span>
                     )}
                     {brand.fileUpload.mediaFailed > 0 && (
-                      <span className="text-xs text-red-600">
+                      <span className="text-xs text-red-600 whitespace-nowrap">
                         {brand.fileUpload.mediaFailed} failed
                       </span>
                     )}
@@ -644,18 +678,18 @@ const PipelineStatusPage = () => {
               <Activity className="h-4 w-4 text-gray-400" />
               <span className="text-xs font-medium text-gray-600">Queue Status</span>
             </div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
               {/* Typesense Queue Info */}
               {(brand.typesense?.adsInQueue > 0 || brand.typesense?.adsFailed > 0) && (
                 <div className="space-y-1">
                   <span className="font-medium text-gray-600">Typesense:</span>
                   {brand.typesense?.adsInQueue > 0 && (
-                    <div className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-center">
+                    <div className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-center break-words">
                       {brand.typesense.adsInQueue} in queue
                     </div>
                   )}
                   {brand.typesense?.adsFailed > 0 && (
-                    <div className="px-2 py-1 bg-red-100 text-red-800 rounded text-center">
+                    <div className="px-2 py-1 bg-red-100 text-red-800 rounded text-center break-words">
                       {brand.typesense.adsFailed} failed
                     </div>
                   )}
@@ -667,12 +701,12 @@ const PipelineStatusPage = () => {
                 <div className="space-y-1">
                   <span className="font-medium text-gray-600">Files:</span>
                   {brand.fileUpload?.mediaInQueue > 0 && (
-                    <div className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-center">
+                    <div className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-center break-words">
                       {brand.fileUpload.mediaInQueue} queued
                     </div>
                   )}
                   {brand.fileUpload?.mediaFailed > 0 && (
-                    <div className="px-2 py-1 bg-red-100 text-red-800 rounded text-center">
+                    <div className="px-2 py-1 bg-red-100 text-red-800 rounded text-center break-words">
                       {brand.fileUpload.mediaFailed} failed
                     </div>
                   )}
@@ -702,32 +736,36 @@ const PipelineStatusPage = () => {
     return <LoadingSpinner />;
   }
 
-  // if (pageLoading) {
-  //   return <LoadingSpinner />;
-  // }
+  if (pageLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center py-6 gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Pipeline Status Dashboard</h1>
-              <p className="mt-2 text-sm text-gray-600">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-3xl font-bold text-gray-900 break-words">Pipeline Status Dashboard</h1>
+              <p className="mt-2 text-sm text-gray-600 break-words">
                 Monitor the complete processing status for all brands
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto min-w-0">
               {/* FIXED: Date Picker with separate input value */}
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-gray-400" />
+              <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
+                <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
                 <input
                   type="date"
                   value={dateInputValue}
                   onChange={handleDateInputChange}
-                  className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 [&::-webkit-calendar-picker-indicator]:ml-2 [&::-webkit-calendar-picker-indicator]:mr-0 w-full sm:w-auto min-w-0"
                 />
               </div>
 
@@ -737,7 +775,7 @@ const PipelineStatusPage = () => {
                 disabled={refreshing}
                 variant="primary"
                 size="sm"
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 w-full sm:w-auto"
               >
                 {refreshing ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
@@ -752,7 +790,7 @@ const PipelineStatusPage = () => {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 overflow-x-hidden">
         {/* Error Display */}
         {error && <ErrorDisplay error={error} className="mb-6" />}
 
@@ -789,7 +827,6 @@ const PipelineStatusPage = () => {
                 onClear={clearSearch}
                 placeholder="Search brands by name, ID, or page ID..."
                 leftIcon={<Search className="h-4 w-4" />}
-                loading={isSearching}
                 className="w-full"
               />
             </div>
@@ -806,7 +843,13 @@ const PipelineStatusPage = () => {
         </Card>
 
         {/* Brand Cards Grid */}
-        {displayBrands.length === 0 ? (
+        {isSearching ? (
+          <Card className="text-center py-12">
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            </div>
+          </Card>
+        ) : displayBrands.length === 0 ? (
           <Card className="text-center py-12">
             <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No brands found</h3>
@@ -815,19 +858,10 @@ const PipelineStatusPage = () => {
             </p>
           </Card>
         ) : (
-          <div className="relative">
-            {/* Full-viewport overlay loading that looks like full-page loading */}
-            {pageLoading && (
-              <div className="fixed inset-0 bg-gray-50 flex items-center justify-center z-50">
-                <LoadingSpinner />
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
-              {displayBrands.map((brand) => (
-                <BrandCard key={brand.brandId} brand={brand} />
-              ))}
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
+            {displayBrands.map((brand) => (
+              <BrandCard key={brand.brandId} brand={brand} />
+            ))}
           </div>
         )}
 
@@ -844,11 +878,11 @@ const PipelineStatusPage = () => {
                 </div>
               )}
               <Pagination
-                currentPage={data.pagination.page}
-                totalPages={data.pagination.pages}
+                currentPage={data.pagination.page || 1}
+                totalPages={data.pagination.pages || 1}
                 onPageChange={handlePageChange}
-                totalItems={data.pagination.total}
-                itemsPerPage={data.pagination.limit}
+                totalItems={data.pagination.total || 0}
+                itemsPerPage={data.pagination.perPage || data.pagination.limit || 10}
                 showPageInfo={true}
               />
             </div>
@@ -873,8 +907,8 @@ const PipelineStatusPage = () => {
         {/* Footer */}
         <div className="mt-8 text-center text-sm text-gray-500">
           <p>Last updated: {new Date().toLocaleString()}</p>
-          {selectedDate && (
-            <p className="mt-1">Showing data for: {formatDate(selectedDate)}</p>
+          {data.date && (
+            <p className="mt-1">Showing data for: {formatDate(data.date)}</p>
           )}
         </div>
       </div>
