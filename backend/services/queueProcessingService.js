@@ -1,9 +1,7 @@
 const { PAGINATION, JOB_FETCH_LIMIT } = require("../config/constants");
 const { Queue } = require("bullmq");
 const { getQueueRedis, getGlobalRedis } = require("../utils/redisSelector");
-const Brand = require("../models/Brand");
 const logger = require("../utils/logger");
-const WatchList = require("../models/WatchList");
 const { Op } = require("sequelize");
 const crypto = require('crypto');
 const { 
@@ -219,6 +217,9 @@ async function refreshBrandCache() {
   const startTime = process.hrtime.bigint();
   
   try {
+    // Require Brand model dynamically to get the latest version
+    const { Brand } = require("../models");
+    
     // Get all unique brand IDs from job indices
     const allBrandIds = new Set();
     Object.values(jobIndex).forEach(index => {
@@ -1041,6 +1042,31 @@ async function getWatchlistBrandsQueue(
   }
 }
 
+// Function to clear all caches when environment changes
+function clearAllCaches() {
+  try {
+    logger.info('🧹 Clearing all queue processing caches for environment switch...');
+    
+    // Clear cached queue instances
+    regularBrandProcessingQueue = null;
+    watchlistBrandProcessingQueue = null;
+    
+    // Clear job indices
+    jobIndex = {
+      regular: { jobs: [], lastUpdated: 0, brandIds: new Set() },
+      watchlist: { jobs: [], lastUpdated: 0, brandIds: new Set() }
+    };
+    
+    // Clear brand cache
+    brandCache.clear();
+    brandCacheLastUpdated = 0;
+    
+    logger.info('✅ All queue processing caches cleared successfully');
+  } catch (error) {
+    logger.error('❌ Error clearing queue processing caches:', error);
+  }
+}
+
 module.exports = {
   initializeBullMQQueues,
   getBullMQJobStates,
@@ -1052,4 +1078,5 @@ module.exports = {
   updateQueueCounters,
   getPerformanceMetrics,
   resetPerformanceMetrics,
+  clearAllCaches,
 };

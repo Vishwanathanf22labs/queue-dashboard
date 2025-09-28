@@ -1,4 +1,4 @@
-const { Brand, BrandsDailyStatus, Ad, AdMediaItem } = require("../../models");
+// Models will be required dynamically
 const { Op } = require("sequelize");
 const { getCacheKey, getCachedData, setCachedData } = require("../utils/cacheUtils");
 const { getTypesenseBullQueueData, getTypesenseFailedQueueData, getFileUploadBullQueueData } = require("../utils/redisUtils");
@@ -10,6 +10,9 @@ const { getFileUploadStatus } = require("./fileUploadService");
  */
 async function getBrandScrapingStatus(brandId, date = null) {
   try {
+    // Require models dynamically to get the latest version
+    const { Brand, BrandsDailyStatus, Ad, AdMediaItem } = require("../../models");
+    
     const targetDate = date || new Date().toISOString().split("T")[0];
     const cacheKey = getCacheKey("brand", brandId, targetDate);
     const cached = getCachedData(cacheKey);

@@ -36,8 +36,9 @@ async function uploadCsvToMadangles(req, res) {
       contentType: req.file.mimetype || "text/csv",
     });
 
-    // Get madangles-scraper URL from environment or use default
-    const madanglesUrl = process.env.MADANGLES_SCRAPER_URL;
+    // Get madangles-scraper URL from environment configuration
+    const { getScraperUrl } = require('../config/environmentConfig');
+    const madanglesUrl = getScraperUrl();
     const endpoint = `${madanglesUrl}/facebook/brands/`;
 
     logger.info(`Forwarding CSV to: ${endpoint}`);

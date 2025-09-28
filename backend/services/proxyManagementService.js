@@ -6,8 +6,8 @@ const proxySwitch = require("./proxy/proxySwitchService");
 
 module.exports = {
   // CRUD Operations
-  addProxy: (ip, port, country, username, password, type, namespace) => 
-    proxyCRUD.addProxy(ip, port, country, username, password, type, namespace),
+  addProxy: (ip, port, country, username, password, type, namespace, userAgent, viewport) => 
+    proxyCRUD.addProxy(ip, port, country, username, password, type, namespace, userAgent, viewport),
   removeProxy: proxyCRUD.removeProxy,
   updateProxy: proxyCRUD.updateProxy,
   clearAllProxies: proxyCRUD.clearAllProxies,

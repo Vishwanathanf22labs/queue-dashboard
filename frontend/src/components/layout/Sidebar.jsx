@@ -3,9 +3,12 @@ import { NavLink } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { navItems } from '../../constants/data';
 import Button from '../ui/Button';
+import EnvironmentSelector from '../ui/EnvironmentSelector';
+import useEnvironmentStore from '../../stores/environmentStore';
 
 const Sidebar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { currentEnvironment, changeEnvironment } = useEnvironmentStore();
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -72,6 +75,14 @@ const Sidebar = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 scrollbar-hide pb-8">
+          {/* Environment Selector */}
+          <div className="mb-6">
+            <EnvironmentSelector 
+              onEnvironmentChange={changeEnvironment}
+              currentEnvironment={currentEnvironment}
+            />
+          </div>
+
           <nav className="space-y-2">
             {navItems.map((item) => {
               const Icon = item.icon;

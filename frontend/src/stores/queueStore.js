@@ -23,6 +23,24 @@ const useQueueStore = create((set, get) => ({
   setError: (error) => set({ error }),
   clearError: () => set({ error: null }),
 
+  // Clear all cached data (useful when switching environments)
+  clearAllData: () => set({
+    overview: null,
+    nextBrand: null,
+    nextWatchlistBrand: null,
+    pendingBrands: null,
+    failedBrands: null,
+    watchlistBrands: null,
+    watchlistPendingBrands: null,
+    watchlistFailedBrands: null,
+    brandProcessingQueue: null,
+    watchlistBrandsQueue: null,
+    scrapedStats: null,
+    separateScrapedStats: null,
+    loading: false,
+    error: null
+  }),
+
   fetchOverview: async () => {
     try {
       set({ loading: true, error: null });

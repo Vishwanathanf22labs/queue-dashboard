@@ -1,8 +1,10 @@
-const { globalRedis } = require("../../config/redis");
+const { getGlobalRedis } = require("../../utils/redisSelector");
 const logger = require("../../utils/logger");
-const { REDIS_KEYS } = require("../../config/constants");
 
-const PROXY_IPS_KEY = REDIS_KEYS.GLOBAL.PROXY_IPS;
+// Function to get dynamic Redis keys
+function getRedisKeys() {
+  return require("../../config/constants").REDIS_KEYS;
+}
 
 /**
  * Auto-switch to next working proxy when current fails
@@ -54,7 +56,7 @@ async function switchToNextWorkingProxy(failedProxyKey) {
 async function getNextAvailableProxy() {
   try {
     // Get all proxy keys
-    const proxyKeys = await globalRedis.keys(`${PROXY_IPS_KEY}:*`);
+    const proxyKeys = await getGlobalRedis().keys(`${PROXY_IPS_KEY}:*`);
     
     if (proxyKeys.length === 0) {
       return {
@@ -67,7 +69,7 @@ async function getNextAvailableProxy() {
     // Get all proxy data from hashes
     const allProxies = [];
     for (const key of proxyKeys) {
-      const proxyData = await globalRedis.hgetall(key);
+      const proxyData = await getGlobalRedis().hgetall(key);
       if (Object.keys(proxyData).length > 0) {
         const keyParts = key.split(':');
         const proxy = {
@@ -109,7 +111,7 @@ async function getNextAvailableProxy() {
     const newSuccessCount = parseInt(bestProxy.successCount || 0) + 1;
 
     // Update in Redis hash
-    await globalRedis.hset(bestProxy.id, {
+    await getGlobalRedis().hset(bestProxy.id, {
       successCount: newSuccessCount.toString()
     });
 
@@ -168,12 +170,12 @@ function calculateProxyScore(proxy) {
 async function getProxyRotationHistory() {
   try {
     // Get all proxy keys
-    const proxyKeys = await globalRedis.keys(`${PROXY_IPS_KEY}:*`);
+    const proxyKeys = await getGlobalRedis().keys(`${PROXY_IPS_KEY}:*`);
     
     // Get all proxy data from hashes
     const allProxies = [];
     for (const key of proxyKeys) {
-      const proxyData = await globalRedis.hgetall(key);
+      const proxyData = await getGlobalRedis().hgetall(key);
       if (Object.keys(proxyData).length > 0) {
         const keyParts = key.split(':');
         const proxy = {
@@ -233,7 +235,7 @@ async function getProxyRotationHistory() {
 async function forceRotateToProxy(targetProxyKey) {
   try {
     // Check if target proxy exists
-    const targetProxy = await globalRedis.hgetall(targetProxyKey);
+    const targetProxy = await getGlobalRedis().hgetall(targetProxyKey);
     
     if (Object.keys(targetProxy).length === 0) {
       return {
@@ -255,7 +257,7 @@ async function forceRotateToProxy(targetProxyKey) {
     const newSuccessCount = parseInt(targetProxy.successCount || 0) + 1;
     
     // Update in Redis hash
-    await globalRedis.hset(targetProxyKey, {
+    await getGlobalRedis().hset(targetProxyKey, {
       successCount: newSuccessCount.toString()
     });
     
@@ -292,7 +294,7 @@ async function forceRotateToProxy(targetProxyKey) {
 async function getFailoverRecommendations() {
   try {
     // Get all proxy keys
-    const proxyKeys = await globalRedis.keys(`${PROXY_IPS_KEY}:*`);
+    const proxyKeys = await getGlobalRedis().keys(`${PROXY_IPS_KEY}:*`);
     
     const recommendations = {
       critical: [], // Proxies that need immediate attention
@@ -302,7 +304,7 @@ async function getFailoverRecommendations() {
     
     // Get all proxy data from hashes
     for (const key of proxyKeys) {
-      const proxyData = await globalRedis.hgetall(key);
+      const proxyData = await getGlobalRedis().hgetall(key);
       if (Object.keys(proxyData).length > 0) {
         const keyParts = key.split(':');
         const failCount = parseInt(proxyData.failCount || 0);
@@ -392,7 +394,7 @@ function calculateHealthScore(failCount, successCount, isActive) {
 async function updateProxyStatus(proxyKey, isWorking) {
   try {
     // Check if proxy exists
-    const existingProxy = await globalRedis.hgetall(proxyKey);
+    const existingProxy = await getGlobalRedis().hgetall(proxyKey);
     if (Object.keys(existingProxy).length === 0) {
       return {
         success: false,
@@ -407,7 +409,7 @@ async function updateProxyStatus(proxyKey, isWorking) {
     };
 
     // Update in Redis hash
-    await globalRedis.hset(proxyKey, updateFields);
+    await getGlobalRedis().hset(proxyKey, updateFields);
     
     return {
       success: true,

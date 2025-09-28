@@ -1,9 +1,16 @@
 const { getQueueRedis, getGlobalRedis } = require("../utils/redisSelector");
 const logger = require("../utils/logger");
-const { QUEUES, REDIS_KEYS } = require("../config/constants");
+const { QUEUES } = require("../config/constants");
+
+// Function to get dynamic Redis keys
+function getRedisKeys() {
+  return require("../config/constants").REDIS_KEYS;
+}
 
 async function clearAllQueues() {
   try {
+    const REDIS_KEYS = getRedisKeys();
+    
     logger.info("Clearing all queues (regular and watchlist pending and failed)");
 
     // Get both Redis instances
@@ -48,6 +55,8 @@ async function clearAllQueues() {
 
 async function clearPendingQueue(queueType = 'regular') {
   try {
+    const REDIS_KEYS = getRedisKeys();
+    
     logger.info(`Clearing entire ${queueType} pending queue`);
 
     const redis = getQueueRedis(queueType);
@@ -73,6 +82,8 @@ async function clearPendingQueue(queueType = 'regular') {
 
 async function clearFailedQueue(queueType = 'regular') {
   try {
+    const REDIS_KEYS = getRedisKeys();
+    
     logger.info(`Clearing entire ${queueType} failed queue`);
 
     const redis = getQueueRedis(queueType);
@@ -98,6 +109,8 @@ async function clearFailedQueue(queueType = 'regular') {
 
 async function clearWatchlistPendingQueue() {
   try {
+    const REDIS_KEYS = getRedisKeys();
+    
     logger.info("Clearing entire watchlist pending queue");
 
     const redis = getQueueRedis('watchlist');
@@ -123,6 +136,8 @@ async function clearWatchlistPendingQueue() {
 
 async function clearWatchlistFailedQueue() {
   try {
+    const REDIS_KEYS = getRedisKeys();
+    
     logger.info("Clearing entire watchlist failed queue");
 
     const redis = getQueueRedis('watchlist');

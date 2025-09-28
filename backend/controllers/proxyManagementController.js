@@ -5,7 +5,7 @@ const scraperControlService = require("../services/scraperControlService");
 
 async function addProxy(req, res) {
   try {
-    const { ip, port, country, username, password, type, namespace } = req.body;
+    const { ip, port, country, username, password, type, namespace, userAgent, viewport } = req.body;
 
     // Validate required fields
     if (!ip) {
@@ -32,7 +32,80 @@ async function addProxy(req, res) {
       });
     }
 
-    const result = await proxyManagementService.addProxy(ip, port, country, username, password, type, namespace);
+    // Validate required fields
+    if (!username) {
+      return res.status(400).json({
+        success: false,
+        message: "Username is required"
+      });
+    }
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: "Password is required"
+      });
+    }
+
+    if (!type) {
+      return res.status(400).json({
+        success: false,
+        message: "Protocol is required"
+      });
+    }
+
+    if (!namespace) {
+      return res.status(400).json({
+        success: false,
+        message: "Namespace is required"
+      });
+    }
+
+    // Validate namespace values
+    const validNamespaces = ["non-watchlist", "watchlist"];
+    if (!validNamespaces.includes(namespace)) {
+      return res.status(400).json({
+        success: false,
+        message: `Namespace must be one of: ${validNamespaces.join(", ")}`
+      });
+    }
+
+    if (!userAgent) {
+      return res.status(400).json({
+        success: false,
+        message: "User Agent is required"
+      });
+    }
+
+    if (!viewport) {
+      return res.status(400).json({
+        success: false,
+        message: "Viewport is required"
+      });
+    }
+
+    // Validate viewport format - accept width,height format
+    const viewportRegex = /^\d+,\d+$/;
+    if (!viewportRegex.test(viewport)) {
+      return res.status(400).json({
+        success: false,
+        message: "Viewport must be in format: width,height (e.g., 1366,768)"
+      });
+    }
+    
+    // Validate individual dimensions
+    const [width, height] = viewport.split(',');
+    const widthNum = parseInt(width);
+    const heightNum = parseInt(height);
+    
+    if (isNaN(widthNum) || isNaN(heightNum) || widthNum <= 0 || heightNum <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Viewport dimensions must be positive numbers"
+      });
+    }
+
+    const result = await proxyManagementService.addProxy(ip, port, country, username, password, type, namespace, userAgent, viewport);
     
     if (result.success) {
       res.status(201).json(result);
@@ -42,6 +115,85 @@ async function addProxy(req, res) {
 
   } catch (error) {
     logger.error("Error in addProxy controller:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+}
+
+async function updateProxy(req, res) {
+  try {
+    const { proxyId } = req.params;
+    const { namespace, userAgent, viewport } = req.body;
+
+    // Validate required fields
+    if (!namespace) {
+      return res.status(400).json({
+        success: false,
+        message: "Namespace is required"
+      });
+    }
+
+    if (!userAgent) {
+      return res.status(400).json({
+        success: false,
+        message: "User Agent is required"
+      });
+    }
+
+    if (!viewport) {
+      return res.status(400).json({
+        success: false,
+        message: "Viewport is required"
+      });
+    }
+
+    // Validate namespace values
+    const validNamespaces = ["non-watchlist", "watchlist"];
+    if (!validNamespaces.includes(namespace)) {
+      return res.status(400).json({
+        success: false,
+        message: `Namespace must be one of: ${validNamespaces.join(", ")}`
+      });
+    }
+
+    // Validate viewport format - accept width,height format
+    const viewportRegex = /^\d+,\d+$/;
+    if (!viewportRegex.test(viewport)) {
+      return res.status(400).json({
+        success: false,
+        message: "Viewport must be in format: width,height (e.g., 1366,768)"
+      });
+    }
+    
+    // Validate individual dimensions
+    const [width, height] = viewport.split(',');
+    const widthNum = parseInt(width);
+    const heightNum = parseInt(height);
+    
+    if (isNaN(widthNum) || isNaN(heightNum) || widthNum <= 0 || heightNum <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Viewport dimensions must be positive numbers"
+      });
+    }
+
+    const result = await proxyManagementService.updateProxy(proxyId, {
+      namespace,
+      userAgent,
+      viewport
+    });
+    
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      res.status(400).json(result);
+    }
+
+  } catch (error) {
+    logger.error("Error in updateProxy controller:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -445,6 +597,7 @@ module.exports = {
   getProxyStats,
   getProxyManagementStats, // ← NEW: Get proxy management stats
   getNextProxy,
+  updateProxy,
   updateProxyStatus,
   clearAllProxies,
   getAvailableProxies,

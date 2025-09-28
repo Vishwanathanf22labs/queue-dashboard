@@ -1,16 +1,21 @@
 const Redis = require("ioredis");
 const { getQueueRedis } = require("../../utils/redisSelector");
+const { getRedisConfig } = require("../../config/environmentConfig");
 
 // Connect to separate Redis instances for watchlist and regular Bull queues
 let watchlistRedis = null;
 let regularRedis = null;
 
 try {
+  // Get Redis configurations based on current environment
+  const watchlistRedisConfig = getRedisConfig('watchlist');
+  const regularRedisConfig = getRedisConfig('regular');
+
   // Watchlist Redis connection
   watchlistRedis = new Redis({
-    host: process.env.WATCHLIST_REDIS_QUEUE_HOST,
-    port: process.env.WATCHLIST_REDIS_QUEUE_PORT,
-    password: process.env.WATCHLIST_REDIS_QUEUE_PASSWORD,
+    host: watchlistRedisConfig.host,
+    port: watchlistRedisConfig.port,
+    password: watchlistRedisConfig.password,
     maxRetriesPerRequest: 3,
     retryDelayOnFailover: 100,
     enableReadyCheck: false,
@@ -27,9 +32,9 @@ try {
 
   // Regular Redis connection
   regularRedis = new Redis({
-    host: process.env.REGULAR_REDIS_QUEUE_HOST,
-    port: process.env.REGULAR_REDIS_QUEUE_PORT,
-    password: process.env.REGULAR_REDIS_QUEUE_PASSWORD,
+    host: regularRedisConfig.host,
+    port: regularRedisConfig.port,
+    password: regularRedisConfig.password,
     maxRetriesPerRequest: 3,
     retryDelayOnFailover: 100,
     enableReadyCheck: false,

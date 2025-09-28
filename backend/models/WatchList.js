@@ -1,7 +1,7 @@
 const Sequelize = require('sequelize');
-const db = require('../config/database');
+const { getDatabaseConnection } = require('../config/database');
 
-const WatchList = db.define(
+const WatchList = getDatabaseConnection().define(
   'watch_lists',
   {
     id: {

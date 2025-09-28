@@ -1,8 +1,10 @@
-const { globalRedis } = require("../../config/redis");
+ const { getGlobalRedis } = require("../../utils/redisSelector");
 const logger = require("../../utils/logger");
-const { REDIS_KEYS } = require("../../config/constants");
 
-const PROXY_IPS_KEY = REDIS_KEYS.GLOBAL.PROXY_IPS;
+// Function to get dynamic Redis keys
+function getRedisKeys() {
+  return require("../../config/constants").REDIS_KEYS;
+}
 
 /**
  * Update proxy working status
@@ -10,7 +12,7 @@ const PROXY_IPS_KEY = REDIS_KEYS.GLOBAL.PROXY_IPS;
 async function updateProxyStatus(proxyKey, isWorking) {
   try {
     // Check if proxy exists
-    const existingProxy = await globalRedis.hgetall(proxyKey);
+    const existingProxy = await getGlobalRedis().hgetall(proxyKey);
     if (Object.keys(existingProxy).length === 0) {
       return {
         success: false,
@@ -24,15 +26,34 @@ async function updateProxyStatus(proxyKey, isWorking) {
       active: isWorking.toString()
     };
 
-    // If proxy failed, log it for monitoring
+    // If proxy failed, set failure reason and disabledAt timestamp
     if (!isWorking) {
-      logger.info(`Proxy ${proxyKey} failed, marking as inactive`);
+      const now = new Date();
+      updateFields.failure_reason = 'manual deactive';
+      updateFields.disabledAt = now.getTime().toString();
+      updateFields.disabled_date = now.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+      updateFields.disabled_time = now.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit',
+        hour12: true 
+      });
+      logger.info(`Proxy ${proxyKey} manually deactivated by user at ${now.toISOString()}`);
     } else {
-      logger.info(`Proxy ${proxyKey} recovered, marking as active`);
+      // Clear failure reason and disabledAt when marking as working
+      updateFields.failure_reason = '';
+      updateFields.disabledAt = '';
+      updateFields.disabled_date = '';
+      updateFields.disabled_time = '';
+      logger.info(`Proxy ${proxyKey} manually activated by user`);
     }
 
     // Update in Redis hash
-    await globalRedis.hset(proxyKey, updateFields);
+    await getGlobalRedis().hset(proxyKey, updateFields);
 
     return {
       success: true,
@@ -57,7 +78,7 @@ async function updateProxyStatus(proxyKey, isWorking) {
 async function markProxyAsFailed(proxyKey, failureReason = 'Scraping failed') {
   try {
     // Check if proxy exists
-    const existingProxy = await globalRedis.hgetall(proxyKey);
+    const existingProxy = await getGlobalRedis().hgetall(proxyKey);
     if (Object.keys(existingProxy).length === 0) {
       return {
         success: false,
@@ -68,14 +89,27 @@ async function markProxyAsFailed(proxyKey, failureReason = 'Scraping failed') {
 
     // Update failure fields - only essential fields
     const currentFailCount = parseInt(existingProxy.failCount || 0);
+    const now = new Date();
     const updateFields = {
       failCount: (currentFailCount + 1).toString(),
       active: "false", // Set to inactive when failed
-      failure_reason: failureReason // Store the actual failure reason
+      failure_reason: failureReason, // Store the actual failure reason
+      disabledAt: now.getTime().toString(),
+      disabled_date: now.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      }),
+      disabled_time: now.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit',
+        hour12: true 
+      })
     };
 
     // Mark proxy as failed
-    await globalRedis.hset(proxyKey, updateFields);
+    await getGlobalRedis().hset(proxyKey, updateFields);
 
     logger.warn(`SCRAPER: Proxy ${proxyKey} marked as failed. Reason: ${failureReason}`);
 
@@ -103,7 +137,7 @@ async function markProxyAsFailed(proxyKey, failureReason = 'Scraping failed') {
 async function markProxyAsWorking(proxyKey) {
   try {
     // Check if proxy exists
-    const existingProxy = await globalRedis.hgetall(proxyKey);
+    const existingProxy = await getGlobalRedis().hgetall(proxyKey);
     if (Object.keys(existingProxy).length === 0) {
       return {
         success: false,
@@ -116,11 +150,15 @@ async function markProxyAsWorking(proxyKey) {
     const currentSuccessCount = parseInt(existingProxy.successCount || 0);
     const updateFields = {
       successCount: (currentSuccessCount + 1).toString(),
-      active: "true" // Set to active when working
+      active: "true", // Set to active when working
+      failure_reason: '', // Clear failure reason
+      disabledAt: '', // Clear disabled timestamp
+      disabled_date: '', // Clear disabled date
+      disabled_time: '' // Clear disabled time
     };
 
     // Mark proxy as working
-    await globalRedis.hset(proxyKey, updateFields);
+    await getGlobalRedis().hset(proxyKey, updateFields);
 
     logger.info(`SCRAPER: Proxy ${proxyKey} marked as working. Success count: ${currentSuccessCount + 1}`);
 
@@ -147,12 +185,12 @@ async function markProxyAsWorking(proxyKey) {
 async function getNextWorkingProxy() {
   try {
     // Get all proxy keys
-    const proxyKeys = await globalRedis.keys(`${PROXY_IPS_KEY}:*`);
+    const proxyKeys = await getGlobalRedis().keys(`${PROXY_IPS_KEY}:*`);
     
     // Get all proxy data from hashes
     const allProxies = [];
     for (const key of proxyKeys) {
-      const proxyData = await globalRedis.hgetall(key);
+      const proxyData = await getGlobalRedis().hgetall(key);
       if (Object.keys(proxyData).length > 0) {
         const keyParts = key.split(':');
         const proxy = {
@@ -212,7 +250,7 @@ async function getNextWorkingProxy() {
 async function checkProxyHealth(proxyKey) {
   try {
     // Check if proxy exists
-    const existingProxy = await globalRedis.hgetall(proxyKey);
+    const existingProxy = await getGlobalRedis().hgetall(proxyKey);
     if (Object.keys(existingProxy).length === 0) {
       return {
         success: false,
@@ -253,7 +291,7 @@ async function checkProxyHealth(proxyKey) {
 async function getSystemHealth() {
   try {
     // Get all proxy keys
-    const proxyKeys = await globalRedis.keys(`${PROXY_IPS_KEY}:*`);
+    const proxyKeys = await getGlobalRedis().keys(`${PROXY_IPS_KEY}:*`);
     
     if (proxyKeys.length === 0) {
       return {
@@ -272,7 +310,7 @@ async function getSystemHealth() {
     // Get all proxy data from hashes
     const allProxies = [];
     for (const key of proxyKeys) {
-      const proxyData = await globalRedis.hgetall(key);
+      const proxyData = await getGlobalRedis().hgetall(key);
       if (Object.keys(proxyData).length > 0) {
         allProxies.push({
           id: key,
@@ -342,13 +380,13 @@ async function bulkUpdateStatus(updates) {
       const { proxyId, isWorking, reason } = update;
       
       // Check if proxy exists
-      const existingProxy = await globalRedis.hgetall(proxyId);
+      const existingProxy = await getGlobalRedis().hgetall(proxyId);
       if (Object.keys(existingProxy).length > 0) {
         const updateFields = {
           active: isWorking.toString()
         };
         
-        await globalRedis.hset(proxyId, updateFields);
+        await getGlobalRedis().hset(proxyId, updateFields);
         
         results.push({
           proxyId,
@@ -436,7 +474,7 @@ function getOverallStatus(activeCount, inactiveCount, healthScore) {
 async function getPerformanceMetrics() {
   try {
     // Get all proxy keys
-    const proxyKeys = await globalRedis.keys(`${PROXY_IPS_KEY}:*`);
+    const proxyKeys = await getGlobalRedis().keys(`${PROXY_IPS_KEY}:*`);
     
     const metrics = {
       total_proxies: proxyKeys.length,
@@ -454,7 +492,7 @@ async function getPerformanceMetrics() {
     
     // Get all proxy data from hashes
     for (const key of proxyKeys) {
-      const proxyData = await globalRedis.hgetall(key);
+      const proxyData = await getGlobalRedis().hgetall(key);
       if (Object.keys(proxyData).length > 0) {
         const failCount = parseInt(proxyData.failCount || 0);
         const successCount = parseInt(proxyData.successCount || 0);
@@ -491,7 +529,7 @@ async function getPerformanceMetrics() {
 async function unlockProxy(lockKey) {
   try {
     // Check if lock exists
-    const lockData = await globalRedis.get(lockKey);
+    const lockData = await getGlobalRedis().get(lockKey);
     if (!lockData) {
       return {
         success: false,
@@ -501,7 +539,7 @@ async function unlockProxy(lockKey) {
     }
 
     // Delete the lock key
-    await globalRedis.del(lockKey);
+    await getGlobalRedis().del(lockKey);
     
     logger.info(`Proxy unlocked successfully: ${lockKey} (was locked by: ${lockData})`);
 

@@ -1,5 +1,5 @@
 const logger = require("../utils/logger");
-
+const { getAdminConfig } = require("../config/environmentConfig");
 
 let adminStatusCache = {
   isAdmin: false,
@@ -11,8 +11,10 @@ const login = async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
-    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+    // Get admin credentials based on current environment
+    const adminConfig = getAdminConfig();
+    const ADMIN_USERNAME = adminConfig.username;
+    const ADMIN_PASSWORD = adminConfig.password;
 
     if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
       const sessionToken = generateSessionToken();

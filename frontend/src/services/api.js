@@ -32,7 +32,7 @@ export const queueAPI = {
     params.append("page", page);
     params.append("limit", limit);
     if (search && search.trim()) params.append("search", search);
-    return api.get(`/queue/watchlist-pending-brands-prod?${params.toString()}`);
+    return api.get(`/queue/watchlist-pending-brands?${params.toString()}`);
   },
 
   getWatchlistFailedBrands: (page = 1, limit = 100, search = null) => {
@@ -40,7 +40,7 @@ export const queueAPI = {
     params.append("page", page);
     params.append("limit", limit);
     if (search && search.trim()) params.append("search", search);
-    return api.get(`/queue/watchlist-failed-brands-prod?${params.toString()}`);
+    return api.get(`/queue/watchlist-failed-brands?${params.toString()}`);
   },
 
   getCurrentlyProcessing: () => api.get("/queue/currently-processing"),
@@ -84,19 +84,23 @@ export const queueAPI = {
 
   addSingleBrand: (data) => api.post("/queue/add-single", data),
 
-  addBulkBrandsFromCSV: (file) => {
+  addBulkBrandsFromCSV: (file, queueType = 'regular') => {
     const formData = new FormData();
     formData.append("csv", file);
-    return api.post("/queue/add-bulk-csv", formData, {
+    const params = new URLSearchParams();
+    params.append("queueType", queueType);
+    return api.post(`/queue/add-bulk-csv?${params.toString()}`, formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
     });
   },
 
-  addAllBrands: (status = null) => {
-    const params = status ? `?status=${status}` : "";
-    return api.post(`/queue/add-all${params}`);
+  addAllBrands: (status = null, queueType = 'regular') => {
+    const params = new URLSearchParams();
+    if (status) params.append("status", status);
+    params.append("queueType", queueType);
+    return api.post(`/queue/add-all?${params.toString()}`);
   },
 
   searchBrands: (query, limit = 8) => {
@@ -161,6 +165,12 @@ export const adminAPI = {
   login: (credentials) => api.post("/admin/login", credentials),
   logout: () => api.post("/admin/logout"),
   checkStatus: () => api.get("/admin/status"),
+};
+
+export const environmentAPI = {
+  getCurrent: () => api.get("/environment/current"),
+  getAvailable: () => api.get("/environment"),
+  switch: (environment) => api.post("/environment/switch", { environment }),
 };
 
 export const scrapedBrandsAPI = {

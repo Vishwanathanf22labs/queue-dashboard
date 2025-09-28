@@ -6,8 +6,9 @@ const adminRoutes = require("./routes/adminRoutes");
 const pipelineStatusRoutes = require("./routes/pipelineStatus");
 const madanglesRoutes = require("./routes/madanglesRoutes");
 const scrapedBrandsRoutes = require("./routes/scrapedBrandsRoutes");
+const environmentRoutes = require("./routes/environmentRoutes");
 
-const sequelize = require("./config/database");
+const { sequelize } = require("./config/database");
 const { globalRedis, watchlistRedis, regularRedis } = require("./config/redis");
 require("dotenv").config();
 
@@ -39,6 +40,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/pipeline-status", pipelineStatusRoutes);
 app.use("/api/madangles", madanglesRoutes);
 app.use("/api/scraped-brands", scrapedBrandsRoutes);
+app.use("/api/environment", environmentRoutes);
 
 
 const server = app.listen(PORT, () => {

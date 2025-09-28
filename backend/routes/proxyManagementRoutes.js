@@ -8,6 +8,7 @@ const {
   getProxyStats,
   getProxyManagementStats,
   getNextProxy,
+  updateProxy,
   updateProxyStatus,
   clearAllProxies,
   getAvailableProxies,
@@ -31,6 +32,7 @@ router.get("/next", getNextProxy);
 
 // Admin routes (require authentication)
 router.post("/add", adminAuth, addProxy);
+router.put("/update/:proxyId", adminAuth, updateProxy);
 router.delete("/remove/:proxyId", adminAuth, removeProxy);
 router.put("/status/:proxyId", adminAuth, updateProxyStatus);
 router.post("/switch/:failedProxyId", adminAuth, switchToNextWorkingProxy);

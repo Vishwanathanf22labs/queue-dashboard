@@ -4,6 +4,7 @@ import Card from '../ui/Card';
 import Input from '../ui/Input';
 import CustomDropdown from '../ui/CustomDropdown';
 import { proxyAPI } from '../../services/api';
+import { validateNamespace, validateViewport } from '../../utils/validation';
 import toast from 'react-hot-toast';
 
 const ProxyManager = ({ onProxyAdded, onRefreshProxies }) => {
@@ -15,7 +16,9 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies }) => {
       type: 'http',
       username: '',
       password: '',
-      namespace: ''
+      namespace: '',
+      userAgent: '',
+      viewport: ''
     },
     isLoading: false
   });
@@ -50,6 +53,40 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies }) => {
       return;
     }
 
+    if (!state.formData.username) {
+      toast.error('Username is required');
+      return;
+    }
+
+    if (!state.formData.password) {
+      toast.error('Password is required');
+      return;
+    }
+
+    if (!state.formData.type) {
+      toast.error('Protocol is required');
+      return;
+    }
+
+    // Validate namespace
+    const namespaceValidation = validateNamespace(state.formData.namespace);
+    if (!namespaceValidation.success) {
+      toast.error(namespaceValidation.error);
+      return;
+    }
+
+    if (!state.formData.userAgent) {
+      toast.error('User Agent is required');
+      return;
+    }
+
+    // Validate viewport
+    const viewportValidation = validateViewport(state.formData.viewport);
+    if (!viewportValidation.success) {
+      toast.error(viewportValidation.error);
+      return;
+    }
+
     setState(prev => ({ ...prev, isLoading: true }));
     try {
       const response = await proxyAPI.addProxy(state.formData);
@@ -65,7 +102,9 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies }) => {
             type: 'http',
             username: '',
             password: '',
-            namespace: ''
+            namespace: '',
+            userAgent: '',
+            viewport: ''
           },
           isLoading: false
         }));
@@ -120,18 +159,24 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies }) => {
             fullWidth
           />
 
-          <CustomDropdown
-            options={[
-              { value: 'http', label: 'HTTP' },
-              { value: 'https', label: 'HTTPS' },
-              { value: 'socks4', label: 'SOCKS4' },
-              { value: 'socks5', label: 'SOCKS5' }
-            ]}
-            value={state.formData.type}
-            onChange={handleTypeChange}
-            placeholder="Select type"
-            className="w-full"
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Protocol <span className="text-red-500">*</span>
+            </label>
+            <CustomDropdown
+              options={[
+                { value: 'http', label: 'HTTP' },
+                { value: 'https', label: 'HTTPS' },
+                { value: 'socks4', label: 'SOCKS4' },
+                { value: 'socks5', label: 'SOCKS5' }
+              ]}
+              value={state.formData.type}
+              onChange={handleTypeChange}
+              placeholder="Select protocol"
+              className="w-full"
+              required
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -141,6 +186,7 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies }) => {
             value={state.formData.username}
             onChange={(value) => handleInputChange('username', value)}
             placeholder="proxyuser"
+            required
             fullWidth
           />
 
@@ -152,17 +198,48 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies }) => {
             onChange={(value) => handleInputChange('password', value)}
             placeholder="proxypass"
             showPasswordToggle
+            required
             fullWidth
           />
         </div>
 
         <div className="grid grid-cols-1 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Namespace <span className="text-red-500">*</span>
+            </label>
+            <CustomDropdown
+              options={[
+                { value: 'non-watchlist', label: 'Non-Watchlist' },
+                { value: 'watchlist', label: 'Watchlist' }
+              ]}
+              value={state.formData.namespace}
+              onChange={(value) => handleInputChange('namespace', value)}
+              placeholder="Select namespace"
+              className="w-full"
+              required
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
-            label="Namespace (Optional)"
-            name="namespace"
-            value={state.formData.namespace}
-            onChange={(value) => handleInputChange('namespace', value)}
-            placeholder="Enter namespace for this proxy"
+            label="User Agent"
+            name="userAgent"
+            value={state.formData.userAgent}
+            onChange={(value) => handleInputChange('userAgent', value)}
+            placeholder="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            required
+            fullWidth
+          />
+
+          <Input
+            label="Viewport"
+            name="viewport"
+            value={state.formData.viewport}
+            onChange={(value) => handleInputChange('viewport', value)}
+            placeholder="1366,768"
+            required
             fullWidth
           />
         </div>

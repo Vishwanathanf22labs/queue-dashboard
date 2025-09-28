@@ -11,6 +11,7 @@ import DashboardStats from '../components/dashboard/DashboardStats';
 import ProcessingStatus from '../components/dashboard/ProcessingStatus';
 import QuickActions from '../components/dashboard/QuickActions';
 import useQueueStore from '../stores/queueStore';
+import useEnvironmentStore from '../stores/environmentStore';
 import { queueAPI } from '../services/api';
 import WatchlistProcessingStatus from '../components/dashboard/WatchlistProcessingStatus';
 import WatchlistAdsCountTable from '../components/queue/WatchlistAdsCountTable';
@@ -35,6 +36,8 @@ const Dashboard = () => {
     brandProcessingQueue,
     watchlistBrandsQueue
   } = useQueueStore();
+
+  const { currentEnvironment } = useEnvironmentStore();
 
   const currentlyProcessing = overview?.currently_processing;
   const pendingCount = overview?.queue_counts?.pending || 0;
@@ -327,6 +330,17 @@ const Dashboard = () => {
       clearTimeout(timer);
     };
   }, []);
+
+  // Reload data when environment changes
+  useEffect(() => {
+    if (!initialLoading) {
+      loadData().then(() => {
+        // Wait a moment for state to update, then log the overview
+        setTimeout(() => {
+        }, 100);
+      });
+    }
+  }, [currentEnvironment]);
 
   useEffect(() => {
     return () => {

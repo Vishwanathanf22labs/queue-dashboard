@@ -2,12 +2,18 @@ const queueClearService = require("./queueClearService");
 const queueMoveService = require("./queueMoveService");
 const queueRemoveService = require("./queueRemoveService");
 const { getQueueRedis, getGlobalRedis } = require("../utils/redisSelector");
-const { QUEUES, REDIS_KEYS } = require("../config/constants");
+const { QUEUES } = require("../config/constants");
 const logger = require("../utils/logger");
-const Brand = require("../models/Brand");
+
+// Function to get dynamic Redis keys
+function getRedisKeys() {
+  return require("../config/constants").REDIS_KEYS;
+}
 
 async function getQueueStats() {
   try {
+    const REDIS_KEYS = getRedisKeys();
+    
     // Get regular Redis instance
     const regularRedis = getQueueRedis('regular');
     const watchlistRedis = getQueueRedis('watchlist');
@@ -43,6 +49,10 @@ async function getQueueStats() {
 
 async function changeBrandScore(queueType, brandName, newScore) {
   try {
+    // Require Brand model dynamically to get the latest version
+    const { Brand } = require("../models");
+    const REDIS_KEYS = getRedisKeys();
+    
     // Define queue configurations with new Redis structure
     const queueConfigs = {
       pending: {

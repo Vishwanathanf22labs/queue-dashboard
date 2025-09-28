@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Button from '../ui/Button';
 import BrandSearch from '../ui/BrandSearch';
@@ -8,6 +9,8 @@ import { queueAPI } from '../../services/api';
 import { Plus, Check } from 'lucide-react';
 
 const SingleBrandForm = ({ loading, isSubmitting, onSubmittingChange }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  
   const getInitialSingleBrand = () => {
     try {
       const saved = localStorage.getItem('addBrands_singleBrand');
@@ -18,6 +21,20 @@ const SingleBrandForm = ({ loading, isSubmitting, onSubmittingChange }) => {
   };
 
   const [singleBrandForm, setSingleBrandForm] = useState(getInitialSingleBrand());
+  
+  // Get queueType from URL params or default to 'regular'
+  const queueType = searchParams.get('queueType') || 'regular';
+
+  // Function to update URL params when queueType changes
+  const updateQueueType = (newQueueType) => {
+    const newSearchParams = new URLSearchParams(searchParams);
+    if (newQueueType === 'regular') {
+      newSearchParams.delete('queueType');
+    } else {
+      newSearchParams.set('queueType', newQueueType);
+    }
+    setSearchParams(newSearchParams);
+  };
 
   useEffect(() => {
     localStorage.setItem('addBrands_singleBrand', JSON.stringify(singleBrandForm));
@@ -69,7 +86,8 @@ const SingleBrandForm = ({ loading, isSubmitting, onSubmittingChange }) => {
     const validation = validateSingleBrand({
       id: parseInt(singleBrandForm.id),
       page_id: singleBrandForm.page_id,
-      score: singleBrandForm.score || 0
+      score: singleBrandForm.score || 0,
+      queueType: queueType
     });
 
     if (!validation.success) {
@@ -100,6 +118,38 @@ const SingleBrandForm = ({ loading, isSubmitting, onSubmittingChange }) => {
       <div>
         <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">Add Single Brand</h3>
         <div className="space-y-3 sm:space-y-4">
+          <div>
+            <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2 sm:mb-3">
+              Queue Type <span className="text-red-500">*</span>
+            </label>
+            <div className="flex space-x-4 mb-4">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="queueType"
+                  value="regular"
+                  checked={queueType === 'regular'}
+                  onChange={(e) => updateQueueType(e.target.value)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 accent-blue-600"
+                  disabled={isSubmitting || loading}
+                />
+                <span className="ml-2 text-base font-semibold text-gray-700">Regular Queue</span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="queueType"
+                  value="watchlist"
+                  checked={queueType === 'watchlist'}
+                  onChange={(e) => updateQueueType(e.target.value)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 accent-blue-600"
+                  disabled={isSubmitting || loading}
+                />
+                <span className="ml-2 text-base font-semibold text-gray-700">Watchlist Queue</span>
+              </label>
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2 sm:mb-3">
               Search Brand <span className="text-red-500">*</span>

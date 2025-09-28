@@ -1,4 +1,4 @@
-const { Brand, BrandsDailyStatus, Ad, AdMediaItem, WatchList } = require("../../models");
+// Models will be required dynamically
 const { Op } = require("sequelize");
 const { 
   getCacheKey, 
@@ -17,6 +17,9 @@ const pLimit = require('p-limit').default;
  * Get brand IDs for a page - OPTIMIZED with cursor-based pagination
  */
 async function getBrandIdsForPage(page, perPage, lastId, date, sortBy, sortOrder) {
+  // Require models dynamically to get the latest version
+  const { Brand, BrandsDailyStatus, Ad, AdMediaItem, WatchList } = require("../../models");
+  
   const startDate = new Date(date + "T00:00:00.000Z");
   const endDate = new Date(date + "T23:59:59.999Z");
   
@@ -165,6 +168,9 @@ async function getBrandIdsForPage(page, perPage, lastId, date, sortBy, sortOrder
  * Get total count of brands for a date - OPTIMIZED
  */
 async function getTotalBrandsCount(date) {
+  // Require models dynamically to get the latest version
+  const { Brand, BrandsDailyStatus, Ad, AdMediaItem, WatchList } = require("../../models");
+  
   const startDate = new Date(date + "T00:00:00.000Z");
   const endDate = new Date(date + "T23:59:59.999Z");
   
@@ -185,6 +191,9 @@ async function getTotalBrandsCount(date) {
  * Batch fetch all required data for multiple brands
  */
 async function batchFetchBrandData(brandIds, date) {
+  // Require models dynamically to get the latest version
+  const { Brand, BrandsDailyStatus, Ad, AdMediaItem, WatchList } = require("../../models");
+  
   const startDate = new Date(date + "T00:00:00.000Z");
   const endDate = new Date(date + "T23:59:59.999Z");
 
@@ -296,6 +305,9 @@ async function fetchQueueVersionsForBrands(redis, brandIds) {
  * Main optimized function - Get scraping status for all brands with batched queries
  */
 async function getAllBrandsScrapingStatus(page = 1, perPage = 10, date = null, sortBy = 'normal', sortOrder = 'desc', lastId = null) {
+  // Require models dynamically to get the latest version
+  const { Brand, BrandsDailyStatus, Ad, AdMediaItem, WatchList } = require("../../models");
+  
   const startTime = Date.now();
   
   try {
@@ -410,7 +422,10 @@ async function getAllBrandsScrapingStatus(page = 1, perPage = 10, date = null, s
  * Process individual brand status with batched data
  */
 async function processBrandStatus(brandId, targetDate, brandMap, dailyStatusMap, adsStatsMap, mediaStatsMap, queueData, watchlistBrandIds) {
-      const brand = brandMap.get(brandId);
+  // Require models dynamically to get the latest version
+  const { Brand, BrandsDailyStatus, Ad, AdMediaItem, WatchList } = require("../../models");
+  
+  const brand = brandMap.get(brandId);
   if (!brand) return null;
 
       const dailyStatus = dailyStatusMap.get(brandId);
@@ -507,6 +522,9 @@ async function processBrandStatus(brandId, targetDate, brandMap, dailyStatusMap,
  * Search brands pipeline status - optimized version
  */
 async function searchBrandsPipelineStatus(query, date = null) {
+  // Require models dynamically to get the latest version
+  const { Brand, BrandsDailyStatus, Ad, AdMediaItem, WatchList } = require("../../models");
+  
   const startTime = Date.now();
   
   try {

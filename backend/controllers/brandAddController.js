@@ -60,10 +60,11 @@ async function addAllBrands(req, res) {
     const { status, queueType = 'regular' } = req.query; // Get status filter and queueType from query params
     
     // Validate status filter if provided
-    if (status && !['Active', 'Inactive'].includes(status)) {
+    const validFilters = ['Active', 'Inactive', 'watchlist_active', 'watchlist_inactive'];
+    if (status && !validFilters.includes(status)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid status filter. Must be 'Active' or 'Inactive'"
+        message: "Invalid status filter. Must be one of: 'Active', 'Inactive', 'watchlist_active', 'watchlist_inactive'"
       });
     }
 

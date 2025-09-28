@@ -1,5 +1,4 @@
 const { Op } = require('sequelize');
-const { Brand, BrandsDailyStatus, WatchList } = require('../models');
 
 class ScrapedBrandsService {
   /**
@@ -11,6 +10,9 @@ class ScrapedBrandsService {
    */
   static async getScrapedBrands(page = 1, limit = 10, date = null, sortBy = 'normal', sortOrder = 'desc') {
     try {
+      // Require models dynamically to get the latest version
+      const { Brand, BrandsDailyStatus, WatchList } = require('../models');
+      
       // Use provided date if given, otherwise use current date
       let targetDate;
       if (date) {
@@ -224,6 +226,9 @@ class ScrapedBrandsService {
    */
   static async searchScrapedBrands(query, date = null) {
     try {
+      // Require models dynamically to get the latest version
+      const { Brand, BrandsDailyStatus, WatchList } = require('../models');
+      
       // Use provided date if given, otherwise use current date
       let targetDate;
       if (date) {
@@ -369,6 +374,9 @@ class ScrapedBrandsService {
    */
   static async getScrapedBrandsStats(date = null) {
     try {
+      // Require models dynamically to get the latest version
+      const { Brand, BrandsDailyStatus, WatchList } = require('../models');
+      
       // Use provided date if given, otherwise use current date
       let targetDate;
       if (date) {
