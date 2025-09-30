@@ -85,7 +85,7 @@ const Dashboard = () => {
   });
 
   const { interval: refreshInterval, isRefreshing, formattedStartTime } = state.refreshState;
-  const { scraperStatus, scraperStatusLoading } = state;
+  const { scraperStatus, scraperStatusLoading, scraperStatusData } = state;
 
   const updateState = (updates) => {
     setState(prev => ({ ...prev, ...updates }));
@@ -102,25 +102,27 @@ const Dashboard = () => {
     try {
       updateState({ scraperStatusLoading: true });
       const response = await queueAPI.getScraperStatus();
-      const status = response.data?.status || 'unknown';
-      updateState({ scraperStatus: status });
+      const statusData = response.data;
+      const status = statusData?.status || 'unknown';
+      
+      // Store the full status response including startTime and stopTime
+      updateState({ 
+        scraperStatus: status,
+        scraperStatusData: statusData
+      });
     } catch (error) {
       console.error('Failed to fetch scraper status:', error);
-      updateState({ scraperStatus: 'unknown' });
+      updateState({ 
+        scraperStatus: 'unknown',
+        scraperStatusData: null
+      });
     } finally {
       updateState({ scraperStatusLoading: false });
     }
   };
 
-  // Override scraper status if there's a currently processing brand
-  useEffect(() => {
-    if (currentlyProcessing && !scraperStatusLoading) {
-      // If there's a brand processing, force status to 'running'
-      if (scraperStatus !== 'running') {
-        updateState({ scraperStatus: 'running' });
-      }
-    }
-  }, [currentlyProcessing, scraperStatus, scraperStatusLoading]);
+  // Note: Removed the override logic that was forcing status to 'running'
+  // Now we show the actual API status from the scraper control service
 
   useEffect(() => {
     if (currentlyProcessing) {
@@ -374,8 +376,8 @@ const Dashboard = () => {
         isRefreshing={isRefreshing}
         onManualRefresh={handleManualRefresh}
         onIntervalChange={changeRefreshInterval}
-        regularCooldown={pendingCount === 0 && failedCount === 0}
-        watchlistCooldown={watchlistPendingCount === 0 && watchlistFailedCount === 0}
+        scraperStatus={scraperStatus}
+        scraperStatusData={scraperStatusData}
       />
 
       <DashboardStats

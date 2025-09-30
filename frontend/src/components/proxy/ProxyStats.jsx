@@ -7,8 +7,9 @@ const ProxyStats = ({ stats, managementStats }) => {
 
   return (
     <div className="space-y-6">
-      {/* Main Proxy Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* First Row - 4 Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        {/* 1. Total Proxies */}
         <Card padding="p-6">
           <div className="text-center">
             <div className="flex justify-center mb-3">
@@ -23,6 +24,7 @@ const ProxyStats = ({ stats, managementStats }) => {
           </div>
         </Card>
 
+        {/* 2. Working Proxies */}
         <Card padding="p-6">
           <div className="text-center">
             <div className="flex justify-center mb-3">
@@ -37,6 +39,7 @@ const ProxyStats = ({ stats, managementStats }) => {
           </div>
         </Card>
 
+        {/* 3. Failed Proxies */}
         <Card padding="p-6">
           <div className="text-center">
             <div className="flex justify-center mb-3">
@@ -53,6 +56,7 @@ const ProxyStats = ({ stats, managementStats }) => {
           </div>
         </Card>
 
+        {/* 4. Total Usage */}
         <Card padding="p-6">
           <div className="text-center">
             <div className="flex justify-center mb-3">
@@ -68,9 +72,58 @@ const ProxyStats = ({ stats, managementStats }) => {
         </Card>
       </div>
 
-      {/* Management Stats */}
-      {managementStats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Second Row - 3 Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* 5. Total Success Count */}
+        <Card padding="p-6">
+          <div className="text-center">
+            <div className="flex justify-center mb-3">
+              <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+            <p className="text-sm font-medium text-gray-500 mb-2">Total Success Count</p>
+            <p className="text-2xl font-semibold text-green-600">{stats?.total_success_count || 0}</p>
+          </div>
+        </Card>
+
+        {/* 6. Total Failed Count */}
+        <Card padding="p-6">
+          <div className="text-center">
+            <div className="flex justify-center mb-3">
+              <div className="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+            <p className="text-sm font-medium text-gray-500 mb-2">Total Failed Count</p>
+            <p className="text-2xl font-semibold text-red-600">{stats?.total_failed_count || 0}</p>
+          </div>
+        </Card>
+
+        {/* 7. Locked Proxies */}
+        <Card padding="p-6">
+          <div className="text-center">
+            <div className="flex justify-center mb-3">
+              <div className="w-8 h-8 bg-orange-500 rounded-md flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+            </div>
+            <p className="text-sm font-medium text-gray-500 mb-2">Locked Proxies</p>
+            <p className="text-2xl font-semibold text-orange-600">{stats?.locked_proxies || 0}</p>
+          </div>
+        </Card>
+      </div>
+
+      {/* Third Row - 3 Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* 8. Total Added */}
+        {managementStats && (
           <Card padding="p-6">
             <div className="text-center">
               <div className="flex justify-center mb-3">
@@ -84,7 +137,10 @@ const ProxyStats = ({ stats, managementStats }) => {
               <p className="text-2xl font-semibold text-emerald-600">{managementStats?.total_added || 0}</p>
             </div>
           </Card>
+        )}
 
+        {/* 9. Total Removed */}
+        {managementStats && (
           <Card padding="p-6">
             <div className="text-center">
               <div className="flex justify-center mb-3">
@@ -98,7 +154,10 @@ const ProxyStats = ({ stats, managementStats }) => {
               <p className="text-2xl font-semibold text-rose-600">{managementStats?.total_removed || 0}</p>
             </div>
           </Card>
+        )}
 
+        {/* 10. Last Updated */}
+        {managementStats && (
           <Card padding="p-6">
             <div className="text-center">
               <div className="flex justify-center mb-3">
@@ -114,8 +173,8 @@ const ProxyStats = ({ stats, managementStats }) => {
               </p>
             </div>
           </Card>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

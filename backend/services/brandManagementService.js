@@ -240,6 +240,60 @@ async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular') {
         raw: true,
       });
       filterMessage = 'watchlist inactive';
+    } else if (statusFilter === 'watchlist_all') {
+      // All watchlist brands (both active and inactive)
+      allBrands = await Brand.findAll({
+        where: {
+          ...whereClause,
+          id: {
+            [Op.in]: Brand.sequelize.literal(`(SELECT DISTINCT brand_id FROM watch_lists)`)
+          }
+        },
+        attributes: ["id", "page_id"],
+        raw: true,
+      });
+      filterMessage = 'all watchlist brands';
+    } else if (statusFilter === 'regular_active') {
+      // Regular active brands (not in watchlist)
+      allBrands = await Brand.findAll({
+        where: {
+          ...whereClause,
+          status: 'Active',
+          id: {
+            [Op.notIn]: Brand.sequelize.literal(`(SELECT DISTINCT brand_id FROM watch_lists)`)
+          }
+        },
+        attributes: ["id", "page_id"],
+        raw: true,
+      });
+      filterMessage = 'regular active brands';
+    } else if (statusFilter === 'regular_inactive') {
+      // Regular inactive brands (not in watchlist)
+      allBrands = await Brand.findAll({
+        where: {
+          ...whereClause,
+          status: 'Inactive',
+          id: {
+            [Op.notIn]: Brand.sequelize.literal(`(SELECT DISTINCT brand_id FROM watch_lists)`)
+          }
+        },
+        attributes: ["id", "page_id"],
+        raw: true,
+      });
+      filterMessage = 'regular inactive brands';
+    } else if (statusFilter === 'regular_all') {
+      // All regular brands (both active and inactive, not in watchlist)
+      allBrands = await Brand.findAll({
+        where: {
+          ...whereClause,
+          id: {
+            [Op.notIn]: Brand.sequelize.literal(`(SELECT DISTINCT brand_id FROM watch_lists)`)
+          }
+        },
+        attributes: ["id", "page_id"],
+        raw: true,
+      });
+      filterMessage = 'all regular brands';
     } else {
       // Original logic for 'Active', 'Inactive', or null
       if (statusFilter && ['Active', 'Inactive'].includes(statusFilter)) {
@@ -290,9 +344,12 @@ async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular') {
             id: brand.id,
             page_id: brand.page_id
           });
-          // Add to sorted set with default score 0 (normal priority)
-          const defaultScore = 0;
-          pipeline.zadd(queueKey, defaultScore, queueItem);
+          // Add to sorted set with priority score based on filter type
+          let priorityScore = 0; // Default score for regular operations
+          if (statusFilter === 'watchlist_active' || statusFilter === 'watchlist_inactive' || queueType === 'watchlist') {
+            priorityScore = 1; // Higher priority for all watchlist operations
+          }
+          pipeline.zadd(queueKey, priorityScore, queueItem);
           existingPageIds.add(brand.page_id);
           addedCount++;
         } else {
@@ -480,6 +537,31 @@ async function searchBrands(query, limit = 8) {
       // Create search conditions for all variations
       const searchConditions = [];
       
+      // Check if query is numeric (for page_id or brand_id search)
+      const isNumericQuery = /^\d+$/.test(searchQuery);
+      
+      if (isNumericQuery) {
+        // If query is numeric, search by page_id and brand_id
+        searchConditions.push(
+          { page_id: searchQuery }, // Keep as string for page_id
+          { id: parseInt(searchQuery) }
+        );
+        
+        // Also search by the numeric query in name and actual_name columns
+        searchConditions.push(
+          {
+            name: {
+              [Op.iLike]: `%${searchQuery}%`
+            },
+          },
+          {
+            actual_name: {
+              [Op.iLike]: `%${searchQuery}%`
+            },
+          }
+        );
+      }
+      
       uniqueVariations.forEach(variation => {
         searchConditions.push(
           {
@@ -547,6 +629,16 @@ async function searchBrands(query, limit = 8) {
       // Fallback to simple search with variations
       const simpleSearchConditions = [];
       
+      // For numeric queries, add numeric search conditions to fallback too
+      if (isNumericQuery) {
+        simpleSearchConditions.push(
+          { page_id: searchQuery }, // Keep as string for page_id
+          { id: parseInt(searchQuery) },
+          { name: { [Op.iLike]: `%${searchQuery}%` } },
+          { actual_name: { [Op.iLike]: `%${searchQuery}%` } }
+        );
+      }
+      
       uniqueVariations.forEach(variation => {
         simpleSearchConditions.push(
           { name: { [Op.iLike]: `%${variation}%` } },
@@ -592,7 +684,11 @@ async function getBrandCountsByStatus() {
         COUNT(CASE WHEN status = 'Active' THEN 1 END) as active,
         COUNT(CASE WHEN status = 'Inactive' THEN 1 END) as inactive,
         COUNT(CASE WHEN status = 'Active' AND id IN (SELECT DISTINCT brand_id FROM watch_lists) THEN 1 END) as watchlist_active,
-        COUNT(CASE WHEN status = 'Inactive' AND id IN (SELECT DISTINCT brand_id FROM watch_lists) THEN 1 END) as watchlist_inactive
+        COUNT(CASE WHEN status = 'Inactive' AND id IN (SELECT DISTINCT brand_id FROM watch_lists) THEN 1 END) as watchlist_inactive,
+        COUNT(CASE WHEN status = 'Active' AND id NOT IN (SELECT DISTINCT brand_id FROM watch_lists) THEN 1 END) as regular_active,
+        COUNT(CASE WHEN status = 'Inactive' AND id NOT IN (SELECT DISTINCT brand_id FROM watch_lists) THEN 1 END) as regular_inactive,
+        COUNT(CASE WHEN id IN (SELECT DISTINCT brand_id FROM watch_lists) THEN 1 END) as watchlist_all,
+        COUNT(CASE WHEN id NOT IN (SELECT DISTINCT brand_id FROM watch_lists) THEN 1 END) as regular_all
       FROM brands 
       WHERE page_id IS NOT NULL AND page_id != ''
     `, {
@@ -610,6 +706,10 @@ async function getBrandCountsByStatus() {
         inactive: parseInt(counts.inactive),
         watchlist_active: parseInt(counts.watchlist_active),
         watchlist_inactive: parseInt(counts.watchlist_inactive),
+        regular_active: parseInt(counts.regular_active),
+        regular_inactive: parseInt(counts.regular_inactive),
+        watchlist_all: parseInt(counts.watchlist_all),
+        regular_all: parseInt(counts.regular_all),
       },
     };
   } catch (error) {

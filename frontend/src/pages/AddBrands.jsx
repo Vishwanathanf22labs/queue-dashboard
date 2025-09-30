@@ -18,8 +18,15 @@ const AddBrands = () => {
 
   const getInitialLoginModalState = () => {
     try {
-      const saved = localStorage.getItem('addBrands_showLoginModal');
-      return saved ? JSON.parse(saved) : false;
+      // Check if this is a page refresh by looking for a specific flag
+      const isPageRefresh = sessionStorage.getItem('addBrandsPageRefreshed') === 'true';
+      if (isPageRefresh) {
+        // Clear the flag and check for saved login modal state
+        sessionStorage.removeItem('addBrandsPageRefreshed');
+        const saved = localStorage.getItem('addBrands_showLoginModal');
+        return saved ? JSON.parse(saved) : false;
+      }
+      return false;
     } catch {
       return false;
     }
@@ -47,6 +54,35 @@ const AddBrands = () => {
     if (savedTab && ['single', 'csv', 'all', 'madangles'].includes(savedTab)) {
       updateFormState({ activeTab: savedTab });
     }
+  }, []);
+
+  // Effect to detect page refresh and restore admin login modal state
+  useEffect(() => {
+    // Detect if this is a page refresh (not initial load)
+    const isInitialLoad = !sessionStorage.getItem('addBrandsPageVisited');
+    if (!isInitialLoad) {
+      // This is a page refresh, set the flag
+      sessionStorage.setItem('addBrandsPageRefreshed', 'true');
+    } else {
+      // This is initial load, mark page as visited
+      sessionStorage.setItem('addBrandsPageVisited', 'true');
+    }
+
+    const savedLoginModalState = getInitialLoginModalState();
+    if (savedLoginModalState) {
+      setState(prev => ({ ...prev, showLoginModal: savedLoginModalState }));
+    }
+  }, []);
+
+  // Cleanup effect to clear persistence when component unmounts (page navigation)
+  useEffect(() => {
+    return () => {
+      // Only clear if this is not a page refresh (i.e., user is navigating away)
+      const isPageRefresh = sessionStorage.getItem('addBrandsPageRefreshed') === 'true';
+      if (!isPageRefresh) {
+        localStorage.removeItem('addBrands_showLoginModal');
+      }
+    };
   }, []);
 
   useEffect(() => {

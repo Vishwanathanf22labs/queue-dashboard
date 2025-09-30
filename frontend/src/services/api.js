@@ -211,6 +211,12 @@ export const pipelineAPI = {
     params.append("sortOrder", sortOrder);
     return api.get(`/pipeline-status/all?${params.toString()}`);
   },
+
+  getOverallStats: (date = null) => {
+    const params = new URLSearchParams();
+    if (date) params.append("date", date);
+    return api.get(`/pipeline-status/overall-stats?${params.toString()}`);
+  },
   
   searchBrandsStatus: (query, date = null) => {
     const params = new URLSearchParams();
@@ -262,6 +268,7 @@ export const proxyAPI = {
       )}&criteria=${criteria}`
     ),
   unlockProxy: (lockKey) => api.post("/queue/proxy/unlock", { lockKey }),
+  lockProxy: (proxyId, identifier, namespace) => api.post("/queue/proxy/lock", { proxyId, identifier, namespace }),
 };
 
 export default api;

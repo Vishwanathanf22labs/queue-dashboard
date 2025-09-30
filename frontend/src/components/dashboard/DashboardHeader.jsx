@@ -8,8 +8,8 @@ const DashboardHeader = ({
   isRefreshing, 
   onManualRefresh, 
   onIntervalChange,
-  regularCooldown = false,
-  watchlistCooldown = false
+  scraperStatus,
+  scraperStatusData
 }) => {
   const refreshIntervals = [
     { value: 0, label: 'Off' },
@@ -32,8 +32,8 @@ const DashboardHeader = ({
             </div>
             <div className="mt-2 sm:mt-0 sm:ml-4">
               <CooldownIndicator
-                regularCooldown={regularCooldown}
-                watchlistCooldown={watchlistCooldown}
+                scraperStatus={scraperStatus}
+                scraperStatusData={scraperStatusData}
               />
             </div>
           </div>

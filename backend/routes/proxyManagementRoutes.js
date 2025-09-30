@@ -18,6 +18,7 @@ const {
   markProxyAsFailed,
   markProxyAsWorking,
   getNextWorkingProxy,
+  lockProxy,
   unlockProxy
 } = require("../controllers/proxyManagementController");
 
@@ -37,6 +38,7 @@ router.delete("/remove/:proxyId", adminAuth, removeProxy);
 router.put("/status/:proxyId", adminAuth, updateProxyStatus);
 router.post("/switch/:failedProxyId", adminAuth, switchToNextWorkingProxy);
 router.delete("/clear", adminAuth, clearAllProxies);
+router.post("/lock", adminAuth, lockProxy);
 router.post("/unlock", adminAuth, unlockProxy);
 
 // NEW: Scraper routes (no auth needed - scraper calls these)

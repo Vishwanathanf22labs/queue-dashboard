@@ -34,6 +34,7 @@ module.exports = {
   getNextWorkingProxy: proxyHealth.getNextWorkingProxy,  // ← Scraper calls this
   
   // NEW: Proxy Lock Functions
+  lockProxy: proxyHealth.lockProxy,                       // ← Lock proxy functionality
   unlockProxy: proxyHealth.unlockProxy,                   // ← Unlock proxy functionality
   
   // Switch Operations

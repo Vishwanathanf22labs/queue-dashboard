@@ -62,26 +62,43 @@ const AddAllBrandsForm = ({ loading, isSubmitting, onSubmittingChange }) => {
         <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2 sm:mb-3 lg:mb-4">Add All Brands</h3>
 
         {brandCounts && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
-            <div className="bg-gray-50 rounded-lg p-3 text-center">
-              <div className="text-lg font-semibold text-gray-900">{brandCounts.total}</div>
-              <div className="text-xs text-gray-600">Total Brands</div>
+          <div className="space-y-3 mb-4">
+            {/* First row - 4 cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="bg-gray-50 rounded-lg p-3 text-center">
+                <div className="text-lg font-semibold text-gray-900">{brandCounts.total}</div>
+                <div className="text-xs text-gray-600">Total Brands</div>
+              </div>
+              <div className="bg-blue-50 rounded-lg p-3 text-center">
+                <div className="text-lg font-semibold text-blue-600">{brandCounts.regular_all}</div>
+                <div className="text-xs text-blue-600">All Regular Brands</div>
+              </div>
+              <div className="bg-purple-50 rounded-lg p-3 text-center">
+                <div className="text-lg font-semibold text-purple-600">{brandCounts.watchlist_all}</div>
+                <div className="text-xs text-purple-600">All Watchlist Brands</div>
+              </div>
+              <div className="bg-green-50 rounded-lg p-3 text-center">
+                <div className="text-lg font-semibold text-green-600">{brandCounts.regular_active}</div>
+                <div className="text-xs text-green-600">Regular Active</div>
+              </div>
             </div>
-            <div className="bg-green-50 rounded-lg p-3 text-center">
-              <div className="text-lg font-semibold text-green-600">{brandCounts.active}</div>
-              <div className="text-xs text-green-600">Active Brands</div>
-            </div>
-            <div className="bg-red-50 rounded-lg p-3 text-center">
-              <div className="text-lg font-semibold text-red-600">{brandCounts.inactive}</div>
-              <div className="text-xs text-gray-600">Inactive Brands</div>
-            </div>
-            <div className="bg-blue-50 rounded-lg p-3 text-center">
-              <div className="text-lg font-semibold text-blue-600">{brandCounts.watchlist_active}</div>
-              <div className="text-xs text-blue-600">Watchlist Active</div>
-            </div>
-            <div className="bg-purple-50 rounded-lg p-3 text-center">
-              <div className="text-lg font-semibold text-purple-600">{brandCounts.watchlist_inactive}</div>
-              <div className="text-xs text-purple-600">Watchlist Inactive</div>
+            
+            {/* Second row - 3 cards centered */}
+            <div className="flex justify-center">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full lg:w-3/4">
+                <div className="bg-red-50 rounded-lg p-3 text-center">
+                  <div className="text-lg font-semibold text-red-600">{brandCounts.regular_inactive}</div>
+                  <div className="text-xs text-red-600">Regular Inactive</div>
+                </div>
+                <div className="bg-indigo-50 rounded-lg p-3 text-center">
+                  <div className="text-lg font-semibold text-indigo-600">{brandCounts.watchlist_active}</div>
+                  <div className="text-xs text-indigo-600">Watchlist Active</div>
+                </div>
+                <div className="bg-pink-50 rounded-lg p-3 text-center">
+                  <div className="text-lg font-semibold text-pink-600">{brandCounts.watchlist_inactive}</div>
+                  <div className="text-xs text-pink-600">Watchlist Inactive</div>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -125,20 +142,28 @@ const AddAllBrandsForm = ({ loading, isSubmitting, onSubmittingChange }) => {
               label: `All Brands ${brandCounts ? `(${brandCounts.total})` : ''}`
             },
             {
-              value: 'Active',
-              label: `Active Brands Only ${brandCounts ? `(${brandCounts.active})` : ''}`
+              value: 'regular_all',
+              label: `All Regular Brands ${brandCounts ? `(${brandCounts.regular_all})` : ''}`
             },
             {
-              value: 'Inactive',
-              label: `Inactive Brands Only ${brandCounts ? `(${brandCounts.inactive})` : ''}`
+              value: 'watchlist_all',
+              label: `All Watchlist Brands ${brandCounts ? `(${brandCounts.watchlist_all})` : ''}`
+            },
+            {
+              value: 'regular_active',
+              label: `Regular Active Brands ${brandCounts ? `(${brandCounts.regular_active})` : ''}`
+            },
+            {
+              value: 'regular_inactive',
+              label: `Regular Inactive Brands ${brandCounts ? `(${brandCounts.regular_inactive})` : ''}`
             },
             {
               value: 'watchlist_active',
-              label: `Watchlist Active ${brandCounts ? `(${brandCounts.watchlist_active})` : ''}`
+              label: `Watchlist Active Brands ${brandCounts ? `(${brandCounts.watchlist_active})` : ''}`
             },
             {
               value: 'watchlist_inactive',
-              label: `Watchlist Inactive ${brandCounts ? `(${brandCounts.watchlist_inactive})` : ''}`
+              label: `Watchlist Inactive Brands ${brandCounts ? `(${brandCounts.watchlist_inactive})` : ''}`
             }
           ]}
           value={statusFilter}
@@ -157,6 +182,18 @@ const AddAllBrandsForm = ({ loading, isSubmitting, onSubmittingChange }) => {
             ? 'Adding Brands...'
             : statusFilter === 'all'
               ? 'Add All Brands to Queue'
+              : statusFilter === 'regular_all'
+                ? 'Add All Regular Brands to Queue'
+              : statusFilter === 'watchlist_all'
+                ? 'Add All Watchlist Brands to Queue'
+              : statusFilter === 'regular_active'
+                ? 'Add Regular Active Brands to Queue'
+              : statusFilter === 'regular_inactive'
+                ? 'Add Regular Inactive Brands to Queue'
+              : statusFilter === 'watchlist_active'
+                ? 'Add Watchlist Active Brands to Queue'
+              : statusFilter === 'watchlist_inactive'
+                ? 'Add Watchlist Inactive Brands to Queue'
               : `Add ${statusFilter} Brands to Queue`
           }
         </Button>

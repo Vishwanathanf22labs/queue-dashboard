@@ -24,6 +24,51 @@ const QueueManagement = () => {
   const failedSearchRef = useRef('');
   const isInitialMountRef = useRef(true);
   
+  // Helper function to get initial confirmation dialog state from localStorage
+  // Only restore on page refresh (when the component mounts fresh)
+  const getInitialConfirmDialogState = () => {
+    try {
+      // Check if this is a page refresh by looking for a specific flag
+      const isPageRefresh = sessionStorage.getItem('queueManagementPageRefreshed') === 'true';
+      const wasPageVisited = sessionStorage.getItem('queueManagementPageVisited') === 'true';
+      
+      // Only restore if it's a page refresh AND the page was previously visited
+      // If page was not visited, it's a fresh navigation, not a refresh
+      if (isPageRefresh && wasPageVisited) {
+        // Clear the flag and check for saved confirmation dialog state
+        sessionStorage.removeItem('queueManagementPageRefreshed');
+        const saved = localStorage.getItem('queueManagement_confirmDialog');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          return {
+            showConfirmDialog: parsed.showConfirmDialog || false,
+            confirmText: parsed.confirmText || '',
+            confirmAction: parsed.confirmAction || ''
+          };
+        }
+      } else {
+        // Clear any stale refresh flags
+        sessionStorage.removeItem('queueManagementPageRefreshed');
+      }
+      // If not a page refresh, clear any existing dialog state
+      localStorage.removeItem('queueManagement_confirmDialog');
+      return {
+        showConfirmDialog: false,
+        confirmText: '',
+        confirmAction: ''
+      };
+    } catch {
+      return {
+        showConfirmDialog: false,
+        confirmText: '',
+        confirmAction: ''
+      };
+    }
+  };
+
+  // State for confirmation dialog persistence
+  const [confirmDialogState, setConfirmDialogState] = useState(getInitialConfirmDialogState);
+  
   const {
     loading: storeLoading,
     error: storeError,
@@ -355,6 +400,35 @@ const QueueManagement = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [failed.searchTerm]);
 
+  // Detect page refresh and set flag
+  useEffect(() => {
+    // Detect if this is a page refresh (not initial load)
+    const isInitialLoad = !sessionStorage.getItem('queueManagementPageVisited');
+    
+    if (!isInitialLoad) {
+      // This is a page refresh, set the flag
+      sessionStorage.setItem('queueManagementPageRefreshed', 'true');
+    } else {
+      // This is initial load, mark page as visited
+      sessionStorage.setItem('queueManagementPageVisited', 'true');
+    }
+
+    // Cleanup function to clear the visited flag when navigating away
+    return () => {
+      sessionStorage.removeItem('queueManagementPageVisited');
+    };
+  }, []);
+
+  // Save confirmation dialog state to localStorage whenever it changes
+  useEffect(() => {
+    if (confirmDialogState.showConfirmDialog) {
+      localStorage.setItem('queueManagement_confirmDialog', JSON.stringify(confirmDialogState));
+    } else {
+      localStorage.removeItem('queueManagement_confirmDialog');
+    }
+  }, [confirmDialogState]);
+
+
   const handlePendingSearch = (searchTerm) => {
     updatePendingState({ searchTerm });
 
@@ -591,6 +665,8 @@ const QueueManagement = () => {
         <QueueControls 
           isProcessingAction={isProcessingAction}
           onAdminAction={handleAdminAction}
+          confirmDialogState={confirmDialogState}
+          onConfirmDialogStateChange={setConfirmDialogState}
         />
       </Card>
 

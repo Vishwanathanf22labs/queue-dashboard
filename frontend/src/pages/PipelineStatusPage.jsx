@@ -39,6 +39,10 @@ const PipelineStatusPage = () => {
     }
   });
 
+  // Separate state for overall stats
+  const [overallStats, setOverallStats] = useState(null);
+  const [overallStatsLoading, setOverallStatsLoading] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
@@ -209,6 +213,26 @@ const PipelineStatusPage = () => {
   // Get display brands (search results or paginated data)
   const displayBrands = showSearchResults ? (Array.isArray(searchResults) ? searchResults : []) : (Array.isArray(data.brands) ? data.brands : []);
 
+  // Separate function to fetch overall stats
+  const fetchOverallStats = useCallback(async () => {
+    try {
+      setOverallStatsLoading(true);
+      const response = await pipelineAPI.getOverallStats(selectedDate);
+      
+      if (response.data && response.data.data && response.data.data.overallStats) {
+        setOverallStats(response.data.data.overallStats);
+      } else {
+        console.warn('Unexpected overall stats response structure:', response.data);
+        setOverallStats(null);
+      }
+    } catch (error) {
+      console.error('Error fetching overall stats:', error);
+      setOverallStats(null);
+    } finally {
+      setOverallStatsLoading(false);
+    }
+  }, [selectedDate]);
+
   // Memoize API call to prevent unnecessary calls
   const fetchPipelineStatus = useCallback(async (page = currentPage, sortByParam = null, sortOrderParam = null) => {
     try {
@@ -253,13 +277,19 @@ const PipelineStatusPage = () => {
     }
   }, []); // Only run on mount
 
-  // Fetch data on component mount and when dependencies change
+  // Fetch overall stats only when date changes (not on pagination/sorting)
   useEffect(() => {
-    // Only fetch paginated data if not in search mode
+    if (!showSearchResults) {
+      fetchOverallStats();
+    }
+  }, [selectedDate, showSearchResults, fetchOverallStats]);
+
+  // Fetch pipeline data when pagination/sorting changes
+  useEffect(() => {
     if (!showSearchResults) {
       fetchPipelineStatus(currentPage);
     }
-  }, [showSearchResults, currentPage, selectedDate, sortBy, sortOrder]);
+  }, [showSearchResults, currentPage, sortBy, sortOrder, fetchPipelineStatus]);
 
   // FIXED: Debounced date change effect to prevent immediate API calls while typing
   useEffect(() => {
@@ -760,7 +790,7 @@ const PipelineStatusPage = () => {
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto min-w-0">
               {/* FIXED: Date Picker with separate input value */}
               <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
-                <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0 sm:hidden" />
                 <div className="relative w-full sm:w-auto min-w-0">
                   <input
                     type="date"
@@ -772,7 +802,7 @@ const PipelineStatusPage = () => {
                       MozAppearance: 'textfield'
                     }}
                   />
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none sm:hidden">
                     <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
@@ -804,6 +834,141 @@ const PipelineStatusPage = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 overflow-x-hidden">
         {/* Error Display */}
         {error && <ErrorDisplay error={error} className="mb-6" />}
+
+        {/* Overall Stats Cards - Only show when not in search mode */}
+        {!showSearchResults && overallStats && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            {/* Scraping Stats */}
+            <Card className="p-3">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                </div>
+                <p className="text-sm font-medium text-gray-600">Scraping</p>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Total Brands:</span>
+                  <span className="text-gray-700 font-semibold">{overallStats.scraping.totalBrands}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Completed:</span>
+                  <span className="text-green-600 font-semibold">{overallStats.scraping.completed}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Failed:</span>
+                  <span className="text-red-600 font-semibold">{overallStats.scraping.failed}</span>
+                </div>
+              </div>
+            </Card>
+
+            {/* DB Stored Stats */}
+            <Card className="p-3">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Activity className="h-4 w-4 text-blue-600" />
+                </div>
+                <p className="text-sm font-medium text-gray-600">DB Stored</p>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Total Brands:</span>
+                  <span className="text-gray-700 font-semibold">{overallStats.dbStored.totalBrands}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Total Ads:</span>
+                  <span className="text-blue-600 font-semibold">{overallStats.dbStored.totalDbStoredAds}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Completed:</span>
+                  <span className="text-green-600 font-semibold">{overallStats.dbStored.completed}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Failed:</span>
+                  <span className="text-red-600 font-semibold">{overallStats.dbStored.failed}</span>
+                </div>
+              </div>
+            </Card>
+
+            {/* Typesense Stats */}
+            <Card className="p-3">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Search className="h-4 w-4 text-purple-600" />
+                </div>
+                <p className="text-sm font-medium text-gray-600">Typesense</p>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Total Brands:</span>
+                  <span className="text-gray-700 font-semibold">{overallStats.typesense.totalBrands}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Ads Processed:</span>
+                  <span className="text-gray-700 font-semibold">{overallStats.typesense.totalAdsProcessed}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Ads Indexed:</span>
+                  <span className="text-gray-700 font-semibold">{overallStats.typesense.totalAdsWithTypesense}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Completed:</span>
+                  <span className="text-green-600 font-semibold">{overallStats.typesense.completed}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Failed:</span>
+                  <span className="text-red-600 font-semibold">{overallStats.typesense.failed}</span>
+                </div>
+              </div>
+            </Card>
+
+            {/* File Upload Stats */}
+            <Card className="p-3">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Clock className="h-4 w-4 text-orange-600" />
+                </div>
+                <p className="text-sm font-medium text-gray-600">File Upload</p>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Total Brands:</span>
+                  <span className="text-gray-700 font-semibold">{overallStats.fileUpload.totalBrands}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Total Files:</span>
+                  <span className="text-gray-700 font-semibold">{overallStats.fileUpload.totalMediaItems}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Completed Brands:</span>
+                  <span className="text-green-600 font-semibold">{overallStats.fileUpload.completedBrands}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Failed Brands:</span>
+                  <span className="text-red-600 font-semibold">{overallStats.fileUpload.failedBrands}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Completed Files:</span>
+                  <span className="text-green-600 font-semibold">{overallStats.fileUpload.completedMedia}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Failed Files:</span>
+                  <span className="text-red-600 font-semibold">{overallStats.fileUpload.failedMedia}</span>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Loading indicator for overall stats */}
+        {!showSearchResults && overallStatsLoading && (
+          <Card className="mb-6 p-4">
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              <span className="ml-2 text-sm text-gray-600">Loading overall stats...</span>
+            </div>
+          </Card>
+        )}
 
         {/* Sorting Controls - Only show when not in search mode */}
         {!showSearchResults && (

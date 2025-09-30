@@ -1,68 +1,100 @@
-import { useState } from 'react';
 import Button from '../ui/Button';
 import { Trash2, ArrowRight, ArrowLeft, X } from 'lucide-react';
 
-const QueueControls = ({ isProcessingAction, onAdminAction }) => {
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [confirmText, setConfirmText] = useState('');
-  const [confirmAction, setConfirmAction] = useState('');
+const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, onConfirmDialogStateChange }) => {
+  const { showConfirmDialog, confirmText, confirmAction } = confirmDialogState;
 
   const handleClearAllClick = () => {
-    setConfirmAction('Clear All Queues');
-    setShowConfirmDialog(true);
-    setConfirmText('');
+    onConfirmDialogStateChange({
+      showConfirmDialog: true,
+      confirmText: '',
+      confirmAction: 'Clear All Queues'
+    });
   };
 
   const handleWatchlistClearPendingClick = () => {
-    setConfirmAction('Clear Watchlist Pending Queue');
-    setShowConfirmDialog(true);
-    setConfirmText('');
+    onConfirmDialogStateChange({
+      showConfirmDialog: true,
+      confirmText: '',
+      confirmAction: 'Clear Watchlist Pending Queue'
+    });
   };
 
   const handleWatchlistClearFailedClick = () => {
-    setConfirmAction('Clear Watchlist Failed Queue');
-    setShowConfirmDialog(true);
-    setConfirmText('');
+    onConfirmDialogStateChange({
+      showConfirmDialog: true,
+      confirmText: '',
+      confirmAction: 'Clear Watchlist Failed Queue'
+    });
   };
 
   const handleWatchlistPendingToFailedClick = () => {
-    setConfirmAction('Move All Watchlist Pending to Failed');
-    setShowConfirmDialog(true);
-    setConfirmText('');
+    onConfirmDialogStateChange({
+      showConfirmDialog: true,
+      confirmText: '',
+      confirmAction: 'Move All Watchlist Pending to Failed'
+    });
   };
 
   const handleWatchlistFailedToPendingClick = () => {
-    setConfirmAction('Move All Watchlist Failed to Pending');
-    setShowConfirmDialog(true);
-    setConfirmText('');
+    onConfirmDialogStateChange({
+      showConfirmDialog: true,
+      confirmText: '',
+      confirmAction: 'Move All Watchlist Failed to Pending'
+    });
   };
 
   const handleClearPendingClick = () => {
-    setConfirmAction('Clear Pending Queue');
-    setShowConfirmDialog(true);
-    setConfirmText('');
+    onConfirmDialogStateChange({
+      showConfirmDialog: true,
+      confirmText: '',
+      confirmAction: 'Clear Pending Queue'
+    });
   };
 
   const handleClearFailedClick = () => {
-    setConfirmAction('Clear Failed Queue');
-    setShowConfirmDialog(true);
-    setConfirmText('');
+    onConfirmDialogStateChange({
+      showConfirmDialog: true,
+      confirmText: '',
+      confirmAction: 'Clear Failed Queue'
+    });
+  };
+
+  const handlePendingToFailedClick = () => {
+    onConfirmDialogStateChange({
+      showConfirmDialog: true,
+      confirmText: '',
+      confirmAction: 'Move All Pending to Failed'
+    });
+  };
+
+  const handleFailedToPendingClick = () => {
+    onConfirmDialogStateChange({
+      showConfirmDialog: true,
+      confirmText: '',
+      confirmAction: 'Move All Failed to Pending'
+    });
   };
 
   const handleConfirmAction = () => {
     if (confirmText.toLowerCase() === 'confirm') {
       onAdminAction(confirmAction);
-      setShowConfirmDialog(false);
-      setConfirmText('');
-      setConfirmAction('');
+      onConfirmDialogStateChange({
+        showConfirmDialog: false,
+        confirmText: '',
+        confirmAction: ''
+      });
     }
   };
 
   const handleCancelAction = () => {
-    setShowConfirmDialog(false);
-    setConfirmText('');
-    setConfirmAction('');
+    onConfirmDialogStateChange({
+      showConfirmDialog: false,
+      confirmText: '',
+      confirmAction: ''
+    });
   };
+
   return (
     <div className="p-3 sm:p-4 lg:p-6">
       <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">Queue Management Controls</h2>
@@ -111,7 +143,7 @@ const QueueControls = ({ isProcessingAction, onAdminAction }) => {
 
           <Button
             variant="info"
-            onClick={() => onAdminAction('Move All Pending to Failed')}
+            onClick={handlePendingToFailedClick}
             disabled={isProcessingAction}
             className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5"
           >
@@ -123,7 +155,7 @@ const QueueControls = ({ isProcessingAction, onAdminAction }) => {
 
           <Button
             variant="success"
-            onClick={() => onAdminAction('Move All Failed to Pending')}
+            onClick={handleFailedToPendingClick}
             disabled={isProcessingAction}
             className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5"
           >
@@ -217,7 +249,10 @@ const QueueControls = ({ isProcessingAction, onAdminAction }) => {
               <input
                 type="text"
                 value={confirmText}
-                onChange={(e) => setConfirmText(e.target.value)}
+                onChange={(e) => onConfirmDialogStateChange({
+                  ...confirmDialogState,
+                  confirmText: e.target.value
+                })}
                 placeholder="Type 'confirm' here"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
                 autoFocus

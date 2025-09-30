@@ -80,9 +80,8 @@ const ProcessingStatus = ({
               </span>
               {!scraperStatusLoading && (
                 (() => {
-                  // If there's a currently processing brand, show 'running' status
-                  const effectiveStatus = currentlyProcessing ? 'running' : scraperStatus;
-                  const statusInfo = getScraperStatusInfo(effectiveStatus);
+                  // Show the actual API status instead of overriding it
+                  const statusInfo = getScraperStatusInfo(scraperStatus);
                   const StatusIcon = statusInfo.icon;
                   return (
                     <Badge variant={statusInfo.variant} className="flex items-center space-x-1">

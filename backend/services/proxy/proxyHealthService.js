@@ -526,6 +526,66 @@ async function getPerformanceMetrics() {
   }
 }
 
+async function lockProxy(proxyId, identifier, namespace) {
+  try {
+    // Extract proxy details from proxyId (format: "ips:IP:PORT:USERNAME:PASSWORD")
+    // The proxyId is actually the full proxy identifier string
+    const parts = proxyId.split(':');
+    if (parts.length < 5) {
+      return {
+        success: false,
+        message: "Invalid proxy ID format - expected format: ips:IP:PORT:USERNAME:PASSWORD",
+        data: null
+      };
+    }
+
+    // Extract IP, PORT, USERNAME, PASSWORD from proxyId
+    const ip = parts[1];
+    const port = parts[2];
+    const username = parts[3];
+    const password = parts[4]; // This is the proxy's password (e.g., "vishwa")
+
+    // Create lock key in format: proxy:lock:IP:PORT:USERNAME:PASSWORD
+    // The password is the proxy's identifier (e.g., "vishwa")
+    const lockKey = `proxy:lock:${ip}:${port}:${username}:${password}`;
+    
+    // The lock value is what the user typed in the modal (e.g., "watchlist:1")
+    const lockValue = identifier;
+
+    // Check if proxy is already locked
+    const existingLock = await getGlobalRedis().get(lockKey);
+    if (existingLock) {
+      return {
+        success: false,
+        message: "Proxy is already locked",
+        data: {
+          lock_key: lockKey,
+          current_worker: existingLock
+        }
+      };
+    }
+
+    // Set the lock with TTL of 1 hour (3600 seconds)
+    await getGlobalRedis().setex(lockKey, 3600, lockValue);
+    
+    logger.info(`Proxy locked successfully: ${lockKey} (locked by: ${lockValue})`);
+
+    return {
+      success: true,
+      message: "Proxy locked successfully",
+      data: {
+        lock_key: lockKey,
+        lock_value: lockValue,
+        proxy_id: proxyId
+      }
+    };
+
+  } catch (error) {
+    logger.error("Error locking proxy:", error);
+    throw error;
+  }
+}
+
 async function unlockProxy(lockKey) {
   try {
     // Check if lock exists
@@ -567,5 +627,6 @@ module.exports = {
   getSystemHealth,
   bulkUpdateStatus,
   getPerformanceMetrics,
+  lockProxy,             // ← NEW: Lock proxy functionality
   unlockProxy            // ← NEW: Unlock proxy functionality
 };

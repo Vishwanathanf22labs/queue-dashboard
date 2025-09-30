@@ -245,7 +245,18 @@ const WatchlistAdsCountTable = ({ watchlistBrandsQueue, loading, error, onPageCh
 
       <Card>
         <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mb-3 sm:mb-4">
-          <h3 className="text-base sm:text-lg font-semibold text-blue-900">Watchlist Brands in Queue</h3>
+          <div>
+            <h3 className="text-base sm:text-lg font-semibold text-blue-900">Watchlist Brands in Queue</h3>
+            <div className="flex items-center space-x-2 mt-1">
+              <div className="flex items-center space-x-1">
+                <Circle className="h-3 w-3 text-green-500" fill="currentColor" />
+                <span className="text-sm font-medium text-gray-700">Active:</span>
+                <span className="text-sm font-bold text-gray-900">
+                  {watchlistBrandsQueue?.analytics?.pre_computed_counters?.active || 0}
+                </span>
+              </div>
+            </div>
+          </div>
           <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-2">
             <div className="text-xs sm:text-sm text-gray-600">
               Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} watchlist brands

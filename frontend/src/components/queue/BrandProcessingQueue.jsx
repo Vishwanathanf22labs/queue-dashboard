@@ -149,7 +149,7 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
   const columns = [
     {
       key: 'brand',
-      label: 'Brand',
+      label: 'Regular Brand',
       sortable: false, // Brand name is not sortable
       render: (value, brand) => (
         <div>
@@ -172,7 +172,7 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
             ID: {brand.brand_id} | Page: {brand.page_id}
           </div>
           {brand.page_category && (
-            <div className="text-xs text-gray-400 max-w-[115px] sm:max-w-none truncate">
+            <div className="text-xs text-blue-600 max-w-[115px] sm:max-w-none truncate">
               {brand.page_category}
             </div>
           )}
@@ -251,6 +251,15 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
         <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mb-3 sm:mb-4">
           <div>
             <h3 className="text-base sm:text-lg font-semibold text-gray-900">Regular Brands in Queue</h3>
+            <div className="flex items-center space-x-2 mt-1">
+              <div className="flex items-center space-x-1">
+                <Circle className="h-3 w-3 text-green-500" fill="currentColor" />
+                <span className="text-sm font-medium text-gray-700">Active:</span>
+                <span className="text-sm font-bold text-gray-900">
+                  {brandProcessingQueue?.analytics?.pre_computed_counters?.active || 0}
+                </span>
+              </div>
+            </div>
           </div>
           <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-2">
             <div className="text-xs sm:text-sm text-gray-600">
@@ -319,7 +328,7 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
                     <tr>
                       <SortableHeader
                         field="normal"
-                        label="Brand"
+                        label="Regular Brand"
                         currentSortBy={sortBy}
                         currentSortOrder={sortOrder}
                         onSortChange={handleSortChange}

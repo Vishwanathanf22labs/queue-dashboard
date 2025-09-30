@@ -174,7 +174,7 @@ async function getTotalBrandsCount(date) {
   const startDate = new Date(date + "T00:00:00.000Z");
   const endDate = new Date(date + "T23:59:59.999Z");
   
-  // Use efficient SQL query to count distinct brands
+  // Use efficient SQL query to count distinct brands (including NULL active_ads)
   const result = await BrandsDailyStatus.sequelize.query(`
     SELECT COUNT(DISTINCT brand_id) as total_brands
     FROM brand_daily_statuses 
@@ -312,6 +312,8 @@ async function getAllBrandsScrapingStatus(page = 1, perPage = 10, date = null, s
   
   try {
     const targetDate = date || new Date().toISOString().split("T")[0];
+    const startDate = new Date(targetDate + "T00:00:00.000Z");
+    const endDate = new Date(targetDate + "T23:59:59.999Z");
     
     // Check cache first
     const cached = await getPipelineCache(targetDate, page, perPage, sortBy, sortOrder, lastId);
@@ -385,6 +387,7 @@ async function getAllBrandsScrapingStatus(page = 1, perPage = 10, date = null, s
     )).filter(status => status !== null); // Filter out null values
 
     const totalBrands = await getTotalBrandsCount(targetDate);
+    
     const result = {
       brands: statuses,
       date: targetDate,
@@ -519,6 +522,160 @@ async function processBrandStatus(brandId, targetDate, brandMap, dailyStatusMap,
 }
 
 /**
+ * Get overall pipeline statistics - separate endpoint with caching
+ */
+async function getOverallPipelineStats(date = null) {
+  // Require models dynamically to get the latest version
+  const { Brand, BrandsDailyStatus, Ad, AdMediaItem, WatchList } = require("../../models");
+  
+  const startTime = Date.now();
+  
+  try {
+    const targetDate = date || new Date().toISOString().split("T")[0];
+    const startDate = new Date(targetDate + "T00:00:00.000Z");
+    const endDate = new Date(targetDate + "T23:59:59.999Z");
+    
+    // Check cache first
+    const cacheKey = getCacheKey("overall_stats", targetDate);
+    const cached = await getCachedData(cacheKey);
+    if (cached) {
+      return { ...cached, fromCache: true };
+    }
+
+    // ETag will be generated later after we have the stats
+
+    // Get total brands count
+    const totalBrands = await getTotalBrandsCount(targetDate);
+
+    // OPTIMIZED: Single comprehensive query for all stats
+    const overallStatsQuery = await BrandsDailyStatus.sequelize.query(`
+      WITH latest_brand_status AS (
+        SELECT DISTINCT ON (brand_id) 
+          brand_id, status, active_ads, started_at, created_at
+        FROM brand_daily_statuses 
+        WHERE started_at >= $1 AND started_at < $2
+        ORDER BY brand_id, started_at DESC
+      ),
+      typesense_stats AS (
+        SELECT 
+          COUNT(*) as total_ads,
+          COUNT(CASE WHEN typesense_id IS NOT NULL THEN 1 END) as ads_with_typesense,
+          COUNT(DISTINCT brand_id) as brands_with_ads,
+          COUNT(DISTINCT CASE WHEN typesense_id IS NOT NULL THEN brand_id END) as brands_completed
+        FROM ads 
+        WHERE typesense_updated_at >= $1 AND typesense_updated_at < $2
+      ),
+      file_stats AS (
+        SELECT 
+          COUNT(DISTINCT ami.id) as total_media,
+          COUNT(DISTINCT CASE WHEN ami.updated_at >= bds.started_at THEN ami.id END) as completed_media,
+          COUNT(DISTINCT a.brand_id) as brands_with_media,
+          COUNT(DISTINCT CASE WHEN ami.updated_at >= bds.started_at THEN a.brand_id END) as brands_completed
+        FROM ads a
+        JOIN ads_media_items ami ON a.id = ami.ad_id
+        JOIN brand_daily_statuses bds ON a.brand_id = bds.brand_id
+        WHERE DATE(a.typesense_updated_at) = $3
+          AND DATE(bds.started_at) = $3
+      ),
+      brand_stats AS (
+        SELECT 
+          COUNT(brand_id) as total_brands,
+          COUNT(CASE WHEN status IN ('Started', 'Completed') THEN 1 END) as scraping_completed,
+          COUNT(CASE WHEN status = 'Blocked' THEN 1 END) as scraping_failed,
+          COALESCE(SUM(active_ads), 0) as total_stored_ads,
+          COUNT(CASE WHEN status = 'Completed' THEN 1 END) as db_completed,
+          COUNT(CASE WHEN status != 'Completed' THEN 1 END) as db_failed
+        FROM latest_brand_status
+      )
+      SELECT 
+        -- Scraping & DB stats
+        bs.total_brands,
+        bs.scraping_completed,
+        bs.scraping_failed,
+        bs.total_stored_ads,
+        bs.db_completed,
+        bs.db_failed,
+        
+        -- Typesense stats
+        ts.total_ads,
+        ts.ads_with_typesense,
+        ts.brands_with_ads as typesense_total_brands,
+        ts.brands_completed as typesense_completed,
+        (ts.brands_with_ads - ts.brands_completed) as typesense_failed,
+        
+        -- File upload stats
+        COALESCE(fs.total_media, 0) as total_media,
+        COALESCE(fs.completed_media, 0) as completed_media,
+        COALESCE(fs.brands_with_media, 0) as file_total_brands,
+        COALESCE(fs.brands_completed, 0) as file_completed,
+        COALESCE((fs.brands_with_media - fs.brands_completed), 0) as file_failed
+      FROM brand_stats bs
+      CROSS JOIN typesense_stats ts
+      CROSS JOIN file_stats fs
+    `, {
+      bind: [startDate, endDate, targetDate],
+      type: BrandsDailyStatus.sequelize.QueryTypes.SELECT
+    });
+
+    const stats = overallStatsQuery[0];
+
+    const overallStats = {
+      scraping: {
+        totalBrands: parseInt(stats.total_brands),
+        completed: parseInt(stats.scraping_completed),
+        failed: parseInt(stats.scraping_failed)
+      },
+      dbStored: {
+        totalBrands: parseInt(stats.total_brands),
+        totalDbStoredAds: parseInt(stats.total_stored_ads),
+        completed: parseInt(stats.db_completed),
+        failed: parseInt(stats.db_failed)
+      },
+      typesense: {
+        totalAdsProcessed: parseInt(stats.total_ads),
+        totalAdsWithTypesense: parseInt(stats.ads_with_typesense),
+        totalBrands: parseInt(stats.typesense_total_brands),
+        completed: parseInt(stats.typesense_completed),
+        failed: parseInt(stats.typesense_failed)
+      },
+      fileUpload: {
+        totalBrands: parseInt(stats.file_total_brands),
+        totalMediaItems: parseInt(stats.total_media),
+        completedBrands: parseInt(stats.file_completed),
+        failedBrands: parseInt(stats.file_failed),
+        completedMedia: parseInt(stats.completed_media),
+        failedMedia: parseInt(stats.total_media - stats.completed_media)
+      }
+    };
+
+    const result = {
+      date: targetDate,
+      overallStats,
+      totalBrands
+    };
+
+    // Generate ETag
+    const etag = generateETag({
+      date: targetDate,
+      stats: JSON.stringify(overallStats),
+      timestamp: Date.now()
+    });
+
+    // Cache result and ETag
+    await Promise.all([
+      setCachedData(cacheKey, result, 300), // 5 minutes cache
+      setPipelineETag(targetDate, 'overall_stats', '1', etag, 'normal', 'desc', null, 300)
+    ]);
+
+
+    return { ...result, etag, fromCache: false };
+  } catch (error) {
+    console.error("Error getting overall pipeline stats:", error);
+    throw error;
+  }
+}
+
+/**
  * Search brands pipeline status - optimized version
  */
 async function searchBrandsPipelineStatus(query, date = null) {
@@ -546,12 +703,16 @@ async function searchBrandsPipelineStatus(query, date = null) {
     const isNumericQuery = !isNaN(query) && !isNaN(parseInt(query));
     const normalizedQuery = query.toLowerCase().replace(/\s+/g, '');
     
+    // Check if the numeric query is within PostgreSQL integer range
+    const numericValue = parseInt(query);
+    const isWithinIntRange = isNumericQuery && numericValue >= -2147483648 && numericValue <= 2147483647;
+    
     // OPTIMIZED: Use raw SQL for complex search
-    const searchQuery = isNumericQuery ? `
+    const searchQuery = (isNumericQuery && isWithinIntRange) ? `
       SELECT DISTINCT bds.*, b.name, b.actual_name, b.page_id, b.logo_url_aws
       FROM brand_daily_statuses bds
       JOIN brands b ON bds.brand_id = b.id  
-      WHERE bds.brand_id = $1 AND bds.created_at BETWEEN $2 AND $3
+      WHERE (b.id = $1 OR b.page_id = $4) AND bds.created_at BETWEEN $2 AND $3
       AND b.status != 'Inactive'
       ORDER BY bds.created_at DESC
     ` : `
@@ -565,8 +726,8 @@ async function searchBrandsPipelineStatus(query, date = null) {
       ORDER BY bds.created_at DESC
     `;
 
-    const bindings = isNumericQuery ? 
-      [parseInt(query), startDate, endDate] :
+    const bindings = (isNumericQuery && isWithinIntRange) ? 
+      [numericValue, startDate, endDate, query] :
       [`%${query.toLowerCase()}%`, startDate, endDate, `%${normalizedQuery}%`];
 
     const searchResults = await BrandsDailyStatus.sequelize.query(searchQuery, {
@@ -633,6 +794,7 @@ async function searchBrandsPipelineStatus(query, date = null) {
 
 module.exports = {
   getAllBrandsScrapingStatus,
+  getOverallPipelineStats,
   searchBrandsPipelineStatus,
   getBrandIdsForPage,
   getTotalBrandsCount,

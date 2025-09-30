@@ -561,6 +561,35 @@ async function getNextWorkingProxy(req, res) {
 }
 
 
+async function lockProxy(req, res) {
+  try {
+    const { proxyId, identifier, namespace } = req.body;
+
+    if (!proxyId || !identifier) {
+      return res.status(400).json({
+        success: false,
+        message: "Proxy ID and identifier are required"
+      });
+    }
+
+    const result = await proxyManagementService.lockProxy(proxyId, identifier, namespace);
+    
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      res.status(400).json(result);
+    }
+
+  } catch (error) {
+    logger.error('Error in lockProxy controller:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+}
+
 async function unlockProxy(req, res) {
   try {
     const { lockKey } = req.body;
@@ -607,6 +636,7 @@ module.exports = {
   markProxyAsFailed,     
   markProxyAsWorking,    
   getNextWorkingProxy,    
+  lockProxy,              // ← NEW: Lock proxy functionality
   unlockProxy            
 };
 

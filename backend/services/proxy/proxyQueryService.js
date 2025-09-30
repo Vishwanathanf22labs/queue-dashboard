@@ -481,27 +481,51 @@ async function getProxyStats() {
     const proxyKeys = await getGlobalRedis().keys(`${PROXY_IPS_KEY}:*`);
     const totalProxies = proxyKeys.length;
     
-    // Get all proxy data from hashes
+    // Get all proxy data from hashes (same logic as getProxies)
     const allProxies = [];
     for (const key of proxyKeys) {
       const proxyData = await getGlobalRedis().hgetall(key);
       if (Object.keys(proxyData).length > 0) {
-        allProxies.push({
+        // Parse the proxy key to extract IP, port, username, password
+        const keyParts = key.split(':');
+        const proxy = {
           id: key,
+          ip: keyParts[1],
+          port: keyParts[2],
+          username: keyParts[3],
+          password: keyParts[4],
           ...proxyData
-        });
+        };
+        
+        allProxies.push(proxy);
       }
     }
     
     let activeCount = 0;
     let totalUsage = 0;
+    let totalSuccessCount = 0;
+    let totalFailedCount = 0;
+    let lockedProxiesCount = 0;
+    
+    // Get all proxy lock keys to count locked proxies
+    const lockKeys = await getGlobalRedis().keys("proxy:lock:*");
     
     allProxies.forEach(proxy => {
       if (proxy.active === "true") activeCount++;
-      totalUsage += parseInt(proxy.failCount || 0) + parseInt(proxy.successCount || 0);
+      
+      // Get success/fail counts from proxy data
+      const successCount = parseInt(proxy.successCount || proxy.success_count || proxy.success || 0);
+      const failCount = parseInt(proxy.failCount || proxy.fail_count || proxy.failed || 0);
+      
+      totalUsage += successCount + failCount;
+      totalSuccessCount += successCount;
+      totalFailedCount += failCount;
     });
 
-    logger.info(`Proxy stats calculated: total=${totalProxies}, active=${activeCount}, usage=${totalUsage}`);
+    // Count locked proxies by checking if any proxy has a lock
+    lockedProxiesCount = lockKeys.length;
+
+    logger.info(`Proxy stats calculated: total=${totalProxies}, active=${activeCount}, usage=${totalUsage}, success=${totalSuccessCount}, failed=${totalFailedCount}, locked=${lockedProxiesCount}`);
 
     return {
       success: true,
@@ -511,6 +535,9 @@ async function getProxyStats() {
         active_proxies: activeCount,  // ✅ FIXED: Now shows actual active count
         working_proxies: activeCount,
         total_usage: totalUsage,
+        total_success_count: totalSuccessCount,
+        total_failed_count: totalFailedCount,
+        locked_proxies: lockedProxiesCount,
         average_usage: totalProxies > 0 ? Math.round(totalUsage / totalProxies) : 0
       }
     };

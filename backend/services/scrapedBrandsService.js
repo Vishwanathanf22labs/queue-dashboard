@@ -261,11 +261,6 @@ class ScrapedBrandsService {
         }
       };
       
-      // If query is numeric, search by brand_id
-      if (isNumericQuery) {
-        whereClause.brand_id = parseInt(query);
-      }
-
       // Search across all pages using Sequelize ORM with flexible matching
       const searchResults = await BrandsDailyStatus.findAll({
         where: whereClause,
@@ -280,7 +275,12 @@ class ScrapedBrandsService {
               'page_id'
             ],
             required: true,
-            where: isNumericQuery ? {} : {
+            where: isNumericQuery ? {
+              [Op.or]: [
+                { page_id: query }, // Search by page_id as string (handles leading zeros like '0004')
+                { id: parseInt(query) } // Also search by brand_id as integer
+              ]
+            } : {
               [Op.or]: [
                 // 🔍 Exact match with spaces
                 {

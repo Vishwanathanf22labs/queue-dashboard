@@ -145,8 +145,8 @@ const WatchlistQueues = () => {
 
         return (
           <div className="flex items-center">
-            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-orange-100 rounded-full flex items-center justify-center">
-              <span className="text-xs sm:text-sm font-medium text-orange-600">
+            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-red-100 rounded-full flex items-center justify-center">
+              <span className="text-xs sm:text-sm font-medium text-red-600">
                 {position}
               </span>
             </div>
@@ -218,8 +218,50 @@ const WatchlistQueues = () => {
     {
       key: 'status',
       label: 'Status',
-      render: () => <Badge variant="error">Watchlist Failed</Badge>,
+      render: () => <Badge variant="error">Failed</Badge>,
       className: 'hidden sm:table-cell'
+    },
+    {
+      key: 'error_message',
+      label: 'Error Message',
+      render: (value, row) => {
+        const errorMessage = value || row.error_message || 'Unknown error';
+        
+        // Extract the important part of the error message - get the last meaningful part
+        let importantPart = errorMessage;
+        
+        // If it contains ':', get the part after the last colon
+        if (errorMessage.includes(':')) {
+          const parts = errorMessage.split(':');
+          importantPart = parts[parts.length - 1].trim();
+        }
+        
+        // Further shorten common error patterns
+        if (importantPart.toLowerCase().includes('no matching script tag found')) {
+          importantPart = 'No script tag';
+        } else if (importantPart.toLowerCase().includes('session closed')) {
+          importantPart = 'Session closed';
+        } else if (importantPart.toLowerCase().includes('target closed')) {
+          importantPart = 'Target closed';
+        } else if (importantPart.toLowerCase().includes('protocol error')) {
+          importantPart = 'Protocol error';
+        } else if (importantPart.toLowerCase().includes('timeout')) {
+          importantPart = 'Timeout';
+        } else if (importantPart.toLowerCase().includes('network')) {
+          importantPart = 'Network error';
+        } else if (importantPart.toLowerCase().includes('connection')) {
+          importantPart = 'Connection error';
+        } else if (importantPart.toLowerCase().includes('failed to extract')) {
+          importantPart = 'Extraction failed';
+        }
+        
+        return (
+          <div className="text-xs text-red-600 max-w-[100px] sm:max-w-[150px] truncate font-medium" title={errorMessage}>
+            {importantPart}
+          </div>
+        );
+      },
+      className: 'hidden lg:table-cell'
     }
   ];
 
@@ -405,28 +447,46 @@ const WatchlistQueues = () => {
 
       {/* Tabs */}
       <Card>
-        <div className="flex space-x-1">
-          <button
-            onClick={() => handleTabChange('pending')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'pending'
-                ? 'bg-purple-100 text-purple-700 border border-purple-200'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-            }`}
-          >
-            Pending Queue
-          </button>
-          <button
-            onClick={() => handleTabChange('failed')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'failed'
-                ? 'bg-orange-100 text-orange-700 border border-orange-200'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-            }`}
-          >
-            <XCircle className="h-4 w-4" />
-            Failed Queue
-          </button>
+        <div className="flex items-center justify-between">
+          <div className="flex space-x-1">
+            <button
+              onClick={() => handleTabChange('pending')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'pending'
+                  ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              Pending Queue
+            </button>
+            <button
+              onClick={() => handleTabChange('failed')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'failed'
+                  ? 'bg-orange-100 text-orange-700 border border-orange-200'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <XCircle className="h-4 w-4" />
+              Failed Queue
+            </button>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-600">Items per page:</span>
+            <CustomDropdown
+              options={[
+                { value: 10, label: '10' },
+                { value: 25, label: '25' },
+                { value: 50, label: '50' },
+                { value: 100, label: '100' }
+              ]}
+              value={itemsPerPage}
+              onChange={handleItemsPerPageChange}
+              placeholder="Select items per page"
+              className="w-20"
+            />
+          </div>
         </div>
       </Card>
 
@@ -441,117 +501,42 @@ const WatchlistQueues = () => {
         </div>
       </div>
 
-             {/* Stats Card */}
-       <Card>
-         {/* Desktop Layout */}
-         <div className="hidden md:flex items-center justify-between">
-           <div className="flex items-center gap-4">
-             <div className="flex items-center gap-2">
-               {activeTab === 'pending' ? (
-                 <Clock className="h-5 w-5 text-purple-600" />
-               ) : (
-                 <AlertCircle className="h-5 w-5 text-orange-600" />
-               )}
-               <span className="text-sm font-medium text-gray-600">
-                 Total {activeTab === 'pending' ? 'Pending' : 'Failed'} Brands:
-               </span>
-               <span className={`text-lg font-bold text-${tabColor}-600`}>
-                 {originalTotals.total_items || pagination?.total_items || brands?.length || 0}
-               </span>
-             </div>
-             <div className="flex items-center gap-2">
-               <span className="text-sm font-medium text-gray-600">Current Page:</span>
-               <span className="text-lg font-bold text-gray-900">{currentPage}</span>
-             </div>
-             <div className="flex items-center gap-2">
-               <span className="text-sm font-medium text-gray-600">Total Pages:</span>
-               <span className="text-lg font-bold text-gray-900">
-                 {Math.ceil((originalTotals.total_items || pagination?.total_items || brands.length) / itemsPerPage)}
-               </span>
-             </div>
-             <div className="flex items-center gap-2">
-               <span className="text-sm font-medium text-gray-600">Showing:</span>
-               <span className="text-sm font-medium text-gray-900">
-                 {brands?.length || 0} of {pagination?.total_items || 0}
-               </span>
-             </div>
-             <div className="flex items-center gap-2">
-               <span className="text-sm font-medium text-gray-600">Items per page:</span>
-               <CustomDropdown
-                 options={[
-                   { value: 10, label: '10' },
-                   { value: 25, label: '25' },
-                   { value: 50, label: '50' },
-                   { value: 100, label: '100' }
-                 ]}
-                 value={itemsPerPage}
-                 onChange={handleItemsPerPageChange}
-                 placeholder="Select items per page"
-                 className="w-20"
-               />
-             </div>
-           </div>
-         </div>
+      {/* Tab-specific Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className={`rounded-lg p-3 text-center ${activeTab === 'pending' ? 'bg-purple-100' : 'bg-red-100'}`}>
+          <div className="flex items-center justify-center gap-2 mb-1">
+            {activeTab === 'pending' ? (
+              <Clock className="h-4 w-4 text-purple-700" />
+            ) : (
+              <XCircle className="h-4 w-4 text-red-700" />
+            )}
+            <span className="text-sm font-medium text-gray-700">
+              Total {activeTab === 'pending' ? 'Pending' : 'Failed'} Brands
+            </span>
+          </div>
+          <div className={`text-lg font-semibold ${activeTab === 'pending' ? 'text-purple-700' : 'text-red-700'}`}>
+            {originalTotals.total_items || pagination?.total_items || 0}
+          </div>
+        </div>
+        
+        <div className="bg-gray-100 rounded-lg p-3 text-center">
+          <div className="text-sm font-medium text-gray-700 mb-1">Current Page</div>
+          <div className="text-lg font-semibold text-gray-900">{currentPage}</div>
+        </div>
+        
+        <div className="bg-gray-100 rounded-lg p-3 text-center">
+          <div className="text-sm font-medium text-gray-700 mb-1">Total Pages</div>
+          <div className="text-lg font-semibold text-gray-900">{pagination?.total_pages || 0}</div>
+        </div>
+        
+        <div className="bg-gray-100 rounded-lg p-3 text-center">
+          <div className="text-sm font-medium text-gray-700 mb-1">Showing</div>
+          <div className="text-lg font-semibold text-gray-900">
+            {brands?.length || 0} of {pagination?.total_items || 0}
+          </div>
+        </div>
+      </div>
 
-         {/* Mobile Layout */}
-         <div className="md:hidden space-y-4">
-           {/* Main Stats Row */}
-           <div className="flex items-center justify-between">
-             <div className="flex items-center gap-2">
-               {activeTab === 'pending' ? (
-                 <Clock className="h-5 w-5 text-purple-600" />
-               ) : (
-                 <AlertCircle className="h-5 w-5 text-orange-600" />
-               )}
-               <span className="text-sm font-medium text-gray-600">
-                 Total {activeTab === 'pending' ? 'Pending' : 'Failed'} Brands:
-               </span>
-             </div>
-             <span className={`text-lg font-bold text-${tabColor}-600`}>
-               {originalTotals.total_items || pagination?.total_items || brands?.length || 0}
-             </span>
-           </div>
-
-           {/* Page Info Row */}
-           <div className="flex items-center justify-between">
-             <span className="text-sm font-medium text-gray-600">Current Page:</span>
-             <span className="text-lg font-bold text-gray-900">{currentPage}</span>
-           </div>
-
-           {/* Total Pages Row */}
-           <div className="flex items-center justify-between">
-             <span className="text-sm font-medium text-gray-600">Total Pages:</span>
-             <span className="text-lg font-bold text-gray-900">
-               {Math.ceil((originalTotals.total_items || pagination?.total_items || brands.length) / itemsPerPage)}
-             </span>
-           </div>
-
-           {/* Showing Row */}
-           <div className="flex items-center justify-between">
-             <span className="text-sm font-medium text-gray-600">Showing:</span>
-             <span className="text-sm font-medium text-gray-900">
-               {brands?.length || 0} of {pagination?.total_items || 0}
-             </span>
-           </div>
-
-           {/* Items per page Row */}
-           <div className="flex items-center justify-between">
-             <span className="text-sm font-medium text-gray-600">Items per page:</span>
-             <CustomDropdown
-               options={[
-                 { value: 10, label: '10' },
-                 { value: 25, label: '25' },
-                 { value: 50, label: '50' },
-                 { value: 100, label: '100' }
-               ]}
-               value={itemsPerPage}
-               onChange={handleItemsPerPageChange}
-               placeholder="Select items per page"
-               className="w-20"
-             />
-           </div>
-         </div>
-       </Card>
 
       {/* Search */}
       <Card>
@@ -644,8 +629,8 @@ const WatchlistQueues = () => {
                    <div className="flex items-center justify-between">
                      <div className="flex items-center space-x-3">
                        {/* Position Circle */}
-                       <div className={`w-8 h-8 ${isPending ? 'bg-purple-100' : 'bg-orange-100'} rounded-full flex items-center justify-center`}>
-                         <span className={`text-sm font-medium ${isPending ? 'text-purple-600' : 'text-orange-600'}`}>
+                       <div className={`w-8 h-8 ${isPending ? 'bg-purple-100' : 'bg-red-100'} rounded-full flex items-center justify-center`}>
+                         <span className={`text-sm font-medium ${isPending ? 'text-purple-600' : 'text-red-600'}`}>
                            {position}
                          </span>
                        </div>
@@ -653,7 +638,7 @@ const WatchlistQueues = () => {
                      </div>
                      <div className="flex items-center space-x-2">
                        <Badge variant={isPending ? "info" : "error"}>
-                         {isPending ? 'Watchlist Pending' : 'Watchlist Failed'}
+                         {isPending ? 'Watchlist Pending' : 'Failed'}
                        </Badge>
                      </div>
                    </div>
@@ -669,6 +654,47 @@ const WatchlistQueues = () => {
                        <span className="ml-2 font-medium text-gray-900 font-mono">{pageId}</span>
                      </div>
                    </div>
+
+                   {/* Error Message - Only show for failed brands */}
+                   {!isPending && (
+                     <div className="pt-2">
+                       <span className="text-gray-500 text-sm">Error:</span>
+                       <p className="text-sm text-red-600 mt-1 break-words font-medium" title={brand.error_message || 'Unknown error'}>
+                         {(() => {
+                           const errorMessage = brand.error_message || 'Unknown error';
+                           // Extract the important part of the error message - get the last meaningful part
+                           let importantPart = errorMessage;
+                           
+                           // If it contains ':', get the part after the last colon
+                           if (errorMessage.includes(':')) {
+                             const parts = errorMessage.split(':');
+                             importantPart = parts[parts.length - 1].trim();
+                           }
+                           
+                           // Further shorten common error patterns
+                           if (importantPart.toLowerCase().includes('no matching script tag found')) {
+                             importantPart = 'No script tag';
+                           } else if (importantPart.toLowerCase().includes('session closed')) {
+                             importantPart = 'Session closed';
+                           } else if (importantPart.toLowerCase().includes('target closed')) {
+                             importantPart = 'Target closed';
+                           } else if (importantPart.toLowerCase().includes('protocol error')) {
+                             importantPart = 'Protocol error';
+                           } else if (importantPart.toLowerCase().includes('timeout')) {
+                             importantPart = 'Timeout';
+                           } else if (importantPart.toLowerCase().includes('network')) {
+                             importantPart = 'Network error';
+                           } else if (importantPart.toLowerCase().includes('connection')) {
+                             importantPart = 'Connection error';
+                           } else if (importantPart.toLowerCase().includes('failed to extract')) {
+                             importantPart = 'Extraction failed';
+                           }
+                           
+                           return importantPart;
+                         })()}
+                       </p>
+                     </div>
+                   )}
 
                    {/* External Link Icon - Bottom Right */}
                    {pageId && pageId !== 'N/A' && (
