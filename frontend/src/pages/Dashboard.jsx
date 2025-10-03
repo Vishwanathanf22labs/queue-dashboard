@@ -11,9 +11,16 @@ import DashboardStats from '../components/dashboard/DashboardStats';
 import ProcessingStatus from '../components/dashboard/ProcessingStatus';
 import QuickActions from '../components/dashboard/QuickActions';
 import useQueueStore from '../stores/queueStore';
+import useEnvironmentStore from '../stores/environmentStore';
 import { queueAPI } from '../services/api';
 import WatchlistProcessingStatus from '../components/dashboard/WatchlistProcessingStatus';
 import WatchlistAdsCountTable from '../components/queue/WatchlistAdsCountTable';
+import RegularAdUpdateQueue from '../components/queue/RegularAdUpdateQueue';
+import WatchlistAdUpdateQueue from '../components/queue/WatchlistAdUpdateQueue';
+import RegularBrandProcessing from '../components/dashboard/RegularBrandProcessing';
+import WatchlistBrandProcessing from '../components/dashboard/WatchlistBrandProcessing';
+import RegularAdUpdateProcessing from '../components/dashboard/RegularAdUpdateProcessing';
+import WatchlistAdUpdateProcessing from '../components/dashboard/WatchlistAdUpdateProcessing';
 
 const Dashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -31,10 +38,58 @@ const Dashboard = () => {
     fetchNextWatchlistBrand,
     fetchBrandProcessingQueue,
     fetchWatchlistBrandsQueue,
+    fetchAllRegularBrandProcessingJobs,
+    fetchAllWatchlistBrandProcessingJobs,
     fetchSeparateScrapedStats,
     brandProcessingQueue,
-    watchlistBrandsQueue
+    watchlistBrandsQueue,
+    allRegularBrandProcessingJobs,
+    allWatchlistBrandProcessingJobs,
+    adUpdateQueue,
+    watchlistAdUpdateQueue,
+    allRegularAdUpdateJobs,
+    allWatchlistAdUpdateJobs,
+    fetchAdUpdateQueue,
+    fetchWatchlistAdUpdateQueue,
+    fetchAllRegularAdUpdateJobs,
+    fetchAllWatchlistAdUpdateJobs
   } = useQueueStore();
+
+  // Search states for 4 separate tables
+  const [searchStates, setSearchStates] = useState({
+    regularBrands: {
+      searchTerm: searchParams.get('regularBrandsSearch') || '',
+      isSearching: false
+    },
+    watchlistBrands: {
+      searchTerm: searchParams.get('watchlistBrandsSearch') || '',
+      isSearching: false
+    },
+    regularAdUpdate: {
+      searchTerm: searchParams.get('regularAdSearch') || '',
+      isSearching: false
+    },
+    watchlistAdUpdate: {
+      searchTerm: searchParams.get('watchlistAdSearch') || '',
+      isSearching: false
+    }
+  });
+
+  // Refs for debouncing and stale request prevention
+  const searchRefs = useRef({
+    regularBrands: '',
+    watchlistBrands: '',
+    regularAdUpdate: '',
+    watchlistAdUpdate: ''
+  });
+  const debounceTimers = useRef({
+    regularBrands: null,
+    watchlistBrands: null,
+    regularAdUpdate: null,
+    watchlistAdUpdate: null
+  });
+
+  const { currentEnvironment, isLoading: environmentLoading } = useEnvironmentStore();
 
   const currentlyProcessing = overview?.currently_processing;
   const pendingCount = overview?.queue_counts?.pending || 0;
@@ -82,7 +137,7 @@ const Dashboard = () => {
   });
 
   const { interval: refreshInterval, isRefreshing, formattedStartTime } = state.refreshState;
-  const { scraperStatus, scraperStatusLoading } = state;
+  const { scraperStatus, scraperStatusLoading, scraperStatusData } = state;
 
   const updateState = (updates) => {
     setState(prev => ({ ...prev, ...updates }));
@@ -99,25 +154,27 @@ const Dashboard = () => {
     try {
       updateState({ scraperStatusLoading: true });
       const response = await queueAPI.getScraperStatus();
-      const status = response.data?.status || 'unknown';
-      updateState({ scraperStatus: status });
+      const statusData = response.data;
+      const status = statusData?.status || 'unknown';
+      
+      // Store the full status response including startTime and stopTime
+      updateState({ 
+        scraperStatus: status,
+        scraperStatusData: statusData
+      });
     } catch (error) {
       console.error('Failed to fetch scraper status:', error);
-      updateState({ scraperStatus: 'unknown' });
+      updateState({ 
+        scraperStatus: 'unknown',
+        scraperStatusData: null
+      });
     } finally {
       updateState({ scraperStatusLoading: false });
     }
   };
 
-  // Override scraper status if there's a currently processing brand
-  useEffect(() => {
-    if (currentlyProcessing && !scraperStatusLoading) {
-      // If there's a brand processing, force status to 'running'
-      if (scraperStatus !== 'running') {
-        updateState({ scraperStatus: 'running' });
-      }
-    }
-  }, [currentlyProcessing, scraperStatus, scraperStatusLoading]);
+  // Note: Removed the override logic that was forcing status to 'running'
+  // Now we show the actual API status from the scraper control service
 
   useEffect(() => {
     if (currentlyProcessing) {
@@ -157,22 +214,50 @@ const Dashboard = () => {
     try {
       updateRefreshState({ isRefreshing: true });
       
+      // Invalidate cache first to ensure fresh data
+      try {
+        await queueAPI.invalidateQueueCache();
+      } catch (cacheError) {
+        console.warn('Cache invalidation failed:', cacheError);
+        // Continue with data loading even if cache invalidation fails
+      }
+
+      // Clear any cached data in the store to ensure fresh data
+      useQueueStore.getState().clearAllData();
+      
       // Always fetch overview first to get queue counts
       const overviewData = await fetchOverview();
       
-      // Get sorting and pagination state from URL params
+      // Get sorting, pagination, AND search state from URL params
       const regularBrandsPage = parseInt(searchParams.get('regularPage')) || 1;
       const regularBrandsSortBy = searchParams.get('regularSortBy') || 'normal';
       const regularBrandsSortOrder = searchParams.get('regularSortOrder') || 'desc';
+      const regularBrandsSearch = searchParams.get('regularBrandsSearch') || null;
       
       const watchlistPage = parseInt(searchParams.get('watchlistPage')) || 1;
       const watchlistSortBy = searchParams.get('watchlistSortBy') || 'normal';
       const watchlistSortOrder = searchParams.get('watchlistSortOrder') || 'desc';
+      const watchlistBrandsSearch = searchParams.get('watchlistBrandsSearch') || null;
       
+      const regularAdUpdatePage = parseInt(searchParams.get('regularAdUpdatePage')) || 1;
+      const regularAdUpdateSortBy = searchParams.get('regularAdUpdateSortBy') || 'normal';
+      const regularAdUpdateSortOrder = searchParams.get('regularAdUpdateSortOrder') || 'desc';
+      const regularAdSearch = searchParams.get('regularAdSearch') || null;
+      
+      const watchlistAdUpdatePage = parseInt(searchParams.get('watchlistAdUpdatePage')) || 1;
+      const watchlistAdUpdateSortBy = searchParams.get('watchlistAdUpdateSortBy') || 'normal';
+      const watchlistAdUpdateSortOrder = searchParams.get('watchlistAdUpdateSortOrder') || 'desc';
+      const watchlistAdSearch = searchParams.get('watchlistAdSearch') || null;
       
       const promises = [
-        fetchBrandProcessingQueue(regularBrandsPage, 10, regularBrandsSortBy, regularBrandsSortOrder),
-        fetchWatchlistBrandsQueue(watchlistPage, 10, watchlistSortBy, watchlistSortOrder),
+        fetchBrandProcessingQueue(regularBrandsPage, 10, regularBrandsSortBy, regularBrandsSortOrder, regularBrandsSearch),
+        fetchWatchlistBrandsQueue(watchlistPage, 10, watchlistSortBy, watchlistSortOrder, watchlistBrandsSearch),
+        fetchAllRegularBrandProcessingJobs(),
+        fetchAllWatchlistBrandProcessingJobs(),
+        fetchAdUpdateQueue(regularAdUpdatePage, 10, regularAdUpdateSortBy, regularAdUpdateSortOrder, regularAdSearch),
+        fetchWatchlistAdUpdateQueue(watchlistAdUpdatePage, 10, watchlistAdUpdateSortBy, watchlistAdUpdateSortOrder, watchlistAdSearch),
+        fetchAllRegularAdUpdateJobs(),
+        fetchAllWatchlistAdUpdateJobs(),
         fetchSeparateScrapedStats(null, 7),
         fetchScraperStatus()
       ];
@@ -207,10 +292,341 @@ const Dashboard = () => {
       newParams.set('regularSortOrder', sortOrder);
       setSearchParams(newParams);
       
-      await fetchBrandProcessingQueue(newPage, 10, sortBy, sortOrder);
+      const searchTerm = searchStates.regularBrands.searchTerm;
+      await fetchBrandProcessingQueue(newPage, 10, sortBy, sortOrder, searchTerm || null);
     } catch (error) {
       toast.error(`Failed to load page ${newPage}: ${error.message || error}`);
     }
+  };
+
+  // Search handlers for 4 tables
+  const handleRegularBrandsSearch = (value) => {
+    setSearchStates(prev => ({
+      ...prev,
+      regularBrands: { ...prev.regularBrands, searchTerm: value }
+    }));
+
+    // Update URL params
+    const newParams = new URLSearchParams(searchParams);
+    if (value && value.trim()) {
+      newParams.set('regularBrandsSearch', value);
+      newParams.set('regularPage', '1');
+    } else {
+      newParams.delete('regularBrandsSearch');
+      newParams.set('regularPage', '1');
+    }
+    setSearchParams(newParams, { replace: true });
+
+    // Clear existing timer
+    if (debounceTimers.current.regularBrands) {
+      clearTimeout(debounceTimers.current.regularBrands);
+    }
+
+    // Handle empty search immediately
+    if (!value || value.trim() === '') {
+      searchRefs.current.regularBrands = '';
+      setSearchStates(prev => ({
+        ...prev,
+        regularBrands: { searchTerm: '', isSearching: false }
+      }));
+      const sortBy = searchParams.get('regularSortBy') || 'normal';
+      const sortOrder = searchParams.get('regularSortOrder') || 'desc';
+      fetchBrandProcessingQueue(1, 10, sortBy, sortOrder, null);
+      return;
+    }
+
+    // Debounce search
+    if (value.trim().length >= 3) {
+      setSearchStates(prev => ({
+        ...prev,
+        regularBrands: { ...prev.regularBrands, isSearching: true }
+      }));
+
+      debounceTimers.current.regularBrands = setTimeout(async () => {
+        searchRefs.current.regularBrands = value;
+        const sortBy = searchParams.get('regularSortBy') || 'normal';
+        const sortOrder = searchParams.get('regularSortOrder') || 'desc';
+        
+        try {
+          await fetchBrandProcessingQueue(1, 10, sortBy, sortOrder, value);
+          
+          if (searchRefs.current.regularBrands === value) {
+            setSearchStates(prev => ({
+              ...prev,
+              regularBrands: { ...prev.regularBrands, isSearching: false }
+            }));
+          }
+        } catch (error) {
+          if (searchRefs.current.regularBrands === value) {
+            setSearchStates(prev => ({
+              ...prev,
+              regularBrands: { ...prev.regularBrands, isSearching: false }
+            }));
+          }
+        }
+      }, 300);
+    }
+  };
+
+  const handleWatchlistBrandsSearch = (value) => {
+    setSearchStates(prev => ({
+      ...prev,
+      watchlistBrands: { ...prev.watchlistBrands, searchTerm: value }
+    }));
+
+    const newParams = new URLSearchParams(searchParams);
+    if (value && value.trim()) {
+      newParams.set('watchlistBrandsSearch', value);
+      newParams.set('watchlistPage', '1');
+    } else {
+      newParams.delete('watchlistBrandsSearch');
+      newParams.set('watchlistPage', '1');
+    }
+    setSearchParams(newParams, { replace: true });
+
+    if (debounceTimers.current.watchlistBrands) {
+      clearTimeout(debounceTimers.current.watchlistBrands);
+    }
+
+    if (!value || value.trim() === '') {
+      searchRefs.current.watchlistBrands = '';
+      setSearchStates(prev => ({
+        ...prev,
+        watchlistBrands: { searchTerm: '', isSearching: false }
+      }));
+      const sortBy = searchParams.get('watchlistSortBy') || 'normal';
+      const sortOrder = searchParams.get('watchlistSortOrder') || 'desc';
+      fetchWatchlistBrandsQueue(1, 10, sortBy, sortOrder, null);
+      return;
+    }
+
+    if (value.trim().length >= 3) {
+      setSearchStates(prev => ({
+        ...prev,
+        watchlistBrands: { ...prev.watchlistBrands, isSearching: true }
+      }));
+
+      debounceTimers.current.watchlistBrands = setTimeout(async () => {
+        searchRefs.current.watchlistBrands = value;
+        const sortBy = searchParams.get('watchlistSortBy') || 'normal';
+        const sortOrder = searchParams.get('watchlistSortOrder') || 'desc';
+        
+        try {
+          await fetchWatchlistBrandsQueue(1, 10, sortBy, sortOrder, value);
+          
+          if (searchRefs.current.watchlistBrands === value) {
+            setSearchStates(prev => ({
+              ...prev,
+              watchlistBrands: { ...prev.watchlistBrands, isSearching: false }
+            }));
+          }
+        } catch (error) {
+          if (searchRefs.current.watchlistBrands === value) {
+            setSearchStates(prev => ({
+              ...prev,
+              watchlistBrands: { ...prev.watchlistBrands, isSearching: false }
+            }));
+          }
+        }
+      }, 300);
+    }
+  };
+
+  const handleRegularAdUpdateSearch = (value) => {
+    setSearchStates(prev => ({
+      ...prev,
+      regularAdUpdate: { ...prev.regularAdUpdate, searchTerm: value }
+    }));
+
+    const newParams = new URLSearchParams(searchParams);
+    if (value && value.trim()) {
+      newParams.set('regularAdSearch', value);
+      newParams.set('regularAdUpdatePage', '1');
+    } else {
+      newParams.delete('regularAdSearch');
+      newParams.set('regularAdUpdatePage', '1');
+    }
+    setSearchParams(newParams, { replace: true });
+
+    if (debounceTimers.current.regularAdUpdate) {
+      clearTimeout(debounceTimers.current.regularAdUpdate);
+    }
+
+    if (!value || value.trim() === '') {
+      searchRefs.current.regularAdUpdate = '';
+      setSearchStates(prev => ({
+        ...prev,
+        regularAdUpdate: { searchTerm: '', isSearching: false }
+      }));
+      const sortBy = searchParams.get('regularAdUpdateSortBy') || 'normal';
+      const sortOrder = searchParams.get('regularAdUpdateSortOrder') || 'desc';
+      fetchAdUpdateQueue(1, 10, sortBy, sortOrder, null);
+      return;
+    }
+
+    if (value.trim().length >= 3) {
+      setSearchStates(prev => ({
+        ...prev,
+        regularAdUpdate: { ...prev.regularAdUpdate, isSearching: true }
+      }));
+
+      debounceTimers.current.regularAdUpdate = setTimeout(async () => {
+        searchRefs.current.regularAdUpdate = value;
+        const sortBy = searchParams.get('regularAdUpdateSortBy') || 'normal';
+        const sortOrder = searchParams.get('regularAdUpdateSortOrder') || 'desc';
+        
+        try {
+          await fetchAdUpdateQueue(1, 10, sortBy, sortOrder, value);
+          
+          if (searchRefs.current.regularAdUpdate === value) {
+            setSearchStates(prev => ({
+              ...prev,
+              regularAdUpdate: { ...prev.regularAdUpdate, isSearching: false }
+            }));
+          }
+        } catch (error) {
+          if (searchRefs.current.regularAdUpdate === value) {
+            setSearchStates(prev => ({
+              ...prev,
+              regularAdUpdate: { ...prev.regularAdUpdate, isSearching: false }
+            }));
+          }
+        }
+      }, 300);
+    }
+  };
+
+  const handleWatchlistAdUpdateSearch = (value) => {
+    setSearchStates(prev => ({
+      ...prev,
+      watchlistAdUpdate: { ...prev.watchlistAdUpdate, searchTerm: value }
+    }));
+
+    const newParams = new URLSearchParams(searchParams);
+    if (value && value.trim()) {
+      newParams.set('watchlistAdSearch', value);
+      newParams.set('watchlistAdUpdatePage', '1');
+    } else {
+      newParams.delete('watchlistAdSearch');
+      newParams.set('watchlistAdUpdatePage', '1');
+    }
+    setSearchParams(newParams, { replace: true });
+
+    if (debounceTimers.current.watchlistAdUpdate) {
+      clearTimeout(debounceTimers.current.watchlistAdUpdate);
+    }
+
+    if (!value || value.trim() === '') {
+      searchRefs.current.watchlistAdUpdate = '';
+      setSearchStates(prev => ({
+        ...prev,
+        watchlistAdUpdate: { searchTerm: '', isSearching: false }
+      }));
+      const sortBy = searchParams.get('watchlistAdUpdateSortBy') || 'normal';
+      const sortOrder = searchParams.get('watchlistAdUpdateSortOrder') || 'desc';
+      fetchWatchlistAdUpdateQueue(1, 10, sortBy, sortOrder, null);
+      return;
+    }
+
+    if (value.trim().length >= 3) {
+      setSearchStates(prev => ({
+        ...prev,
+        watchlistAdUpdate: { ...prev.watchlistAdUpdate, isSearching: true }
+      }));
+
+      debounceTimers.current.watchlistAdUpdate = setTimeout(async () => {
+        searchRefs.current.watchlistAdUpdate = value;
+        const sortBy = searchParams.get('watchlistAdUpdateSortBy') || 'normal';
+        const sortOrder = searchParams.get('watchlistAdUpdateSortOrder') || 'desc';
+        
+        try {
+          await fetchWatchlistAdUpdateQueue(1, 10, sortBy, sortOrder, value);
+          
+          if (searchRefs.current.watchlistAdUpdate === value) {
+            setSearchStates(prev => ({
+              ...prev,
+              watchlistAdUpdate: { ...prev.watchlistAdUpdate, isSearching: false }
+            }));
+          }
+        } catch (error) {
+          if (searchRefs.current.watchlistAdUpdate === value) {
+            setSearchStates(prev => ({
+              ...prev,
+              watchlistAdUpdate: { ...prev.watchlistAdUpdate, isSearching: false }
+            }));
+          }
+        }
+      }, 300);
+    }
+  };
+
+  // Clear search handlers
+  const clearRegularBrandsSearch = () => {
+    searchRefs.current.regularBrands = '';
+    setSearchStates(prev => ({
+      ...prev,
+      regularBrands: { searchTerm: '', isSearching: false }
+    }));
+    
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('regularBrandsSearch');
+    newParams.set('regularPage', '1');
+    setSearchParams(newParams, { replace: true });
+    
+    const sortBy = searchParams.get('regularSortBy') || 'normal';
+    const sortOrder = searchParams.get('regularSortOrder') || 'desc';
+    fetchBrandProcessingQueue(1, 10, sortBy, sortOrder, null);
+  };
+
+  const clearWatchlistBrandsSearch = () => {
+    searchRefs.current.watchlistBrands = '';
+    setSearchStates(prev => ({
+      ...prev,
+      watchlistBrands: { searchTerm: '', isSearching: false }
+    }));
+    
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('watchlistBrandsSearch');
+    newParams.set('watchlistPage', '1');
+    setSearchParams(newParams, { replace: true });
+    
+    const sortBy = searchParams.get('watchlistSortBy') || 'normal';
+    const sortOrder = searchParams.get('watchlistSortOrder') || 'desc';
+    fetchWatchlistBrandsQueue(1, 10, sortBy, sortOrder, null);
+  };
+
+  const clearRegularAdUpdateSearch = () => {
+    searchRefs.current.regularAdUpdate = '';
+    setSearchStates(prev => ({
+      ...prev,
+      regularAdUpdate: { searchTerm: '', isSearching: false }
+    }));
+    
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('regularAdSearch');
+    newParams.set('regularAdUpdatePage', '1');
+    setSearchParams(newParams, { replace: true });
+    
+    const sortBy = searchParams.get('regularAdUpdateSortBy') || 'normal';
+    const sortOrder = searchParams.get('regularAdUpdateSortOrder') || 'desc';
+    fetchAdUpdateQueue(1, 10, sortBy, sortOrder, null);
+  };
+
+  const clearWatchlistAdUpdateSearch = () => {
+    searchRefs.current.watchlistAdUpdate = '';
+    setSearchStates(prev => ({
+      ...prev,
+      watchlistAdUpdate: { searchTerm: '', isSearching: false }
+    }));
+    
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('watchlistAdSearch');
+    newParams.set('watchlistAdUpdatePage', '1');
+    setSearchParams(newParams, { replace: true });
+    
+    const sortBy = searchParams.get('watchlistAdUpdateSortBy') || 'normal';
+    const sortOrder = searchParams.get('watchlistAdUpdateSortOrder') || 'desc';
+    fetchWatchlistAdUpdateQueue(1, 10, sortBy, sortOrder, null);
   };
 
   const handleWatchlistPageChange = async (newPage, sortBy = 'normal', sortOrder = 'desc') => {
@@ -222,7 +638,8 @@ const Dashboard = () => {
       newParams.set('watchlistSortOrder', sortOrder);
       setSearchParams(newParams);
       
-      await fetchWatchlistBrandsQueue(newPage, 10, sortBy, sortOrder);
+      const searchTerm = searchStates.watchlistBrands.searchTerm;
+      await fetchWatchlistBrandsQueue(newPage, 10, sortBy, sortOrder, searchTerm || null);
     } catch (error) {
       toast.error(`Failed to load watchlist page ${newPage}: ${error.message || error}`);
     }
@@ -237,7 +654,8 @@ const Dashboard = () => {
       newParams.set('regularSortOrder', sortOrder);
       setSearchParams(newParams);
       
-      await fetchBrandProcessingQueue(1, 10, sortBy, sortOrder);
+      const searchTerm = searchStates.regularBrands.searchTerm;
+      await fetchBrandProcessingQueue(1, 10, sortBy, sortOrder, searchTerm || null);
     } catch (error) {
       toast.error(`Failed to sort queue: ${error.message || error}`);
     }
@@ -252,9 +670,75 @@ const Dashboard = () => {
       newParams.set('watchlistSortOrder', sortOrder);
       setSearchParams(newParams);
       
-      await fetchWatchlistBrandsQueue(1, 10, sortBy, sortOrder);
+      const searchTerm = searchStates.watchlistBrands.searchTerm;
+      await fetchWatchlistBrandsQueue(1, 10, sortBy, sortOrder, searchTerm || null);
     } catch (error) {
       toast.error(`Failed to sort watchlist queue: ${error.message || error}`);
+    }
+  };
+
+  // Ad-update queue handlers
+  const handleAdUpdatePageChange = async (newPage, sortBy = 'normal', sortOrder = 'desc') => {
+    try {
+      // Update URL params
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('regularAdUpdatePage', newPage.toString());
+      newParams.set('regularAdUpdateSortBy', sortBy);
+      newParams.set('regularAdUpdateSortOrder', sortOrder);
+      setSearchParams(newParams);
+      
+      const searchTerm = searchStates.regularAdUpdate.searchTerm;
+      await fetchAdUpdateQueue(newPage, 10, sortBy, sortOrder, searchTerm || null);
+    } catch (error) {
+      toast.error(`Failed to load ad-update page ${newPage}: ${error.message || error}`);
+    }
+  };
+
+  const handleWatchlistAdUpdatePageChange = async (newPage, sortBy = 'normal', sortOrder = 'desc') => {
+    try {
+      // Update URL params
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('watchlistAdUpdatePage', newPage.toString());
+      newParams.set('watchlistAdUpdateSortBy', sortBy);
+      newParams.set('watchlistAdUpdateSortOrder', sortOrder);
+      setSearchParams(newParams);
+      
+      const searchTerm = searchStates.watchlistAdUpdate.searchTerm;
+      await fetchWatchlistAdUpdateQueue(newPage, 10, sortBy, sortOrder, searchTerm || null);
+    } catch (error) {
+      toast.error(`Failed to load watchlist ad-update page ${newPage}: ${error.message || error}`);
+    }
+  };
+
+  const handleAdUpdateSortChange = async (sortBy, sortOrder) => {
+    try {
+      // Update URL params
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('regularAdUpdatePage', '1'); // Reset to page 1 when sorting
+      newParams.set('regularAdUpdateSortBy', sortBy);
+      newParams.set('regularAdUpdateSortOrder', sortOrder);
+      setSearchParams(newParams);
+      
+      const searchTerm = searchStates.regularAdUpdate.searchTerm;
+      await fetchAdUpdateQueue(1, 10, sortBy, sortOrder, searchTerm || null);
+    } catch (error) {
+      toast.error(`Failed to sort ad-update queue: ${error.message || error}`);
+    }
+  };
+
+  const handleWatchlistAdUpdateSortChange = async (sortBy, sortOrder) => {
+    try {
+      // Update URL params
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('watchlistAdUpdatePage', '1'); // Reset to page 1 when sorting
+      newParams.set('watchlistAdUpdateSortBy', sortBy);
+      newParams.set('watchlistAdUpdateSortOrder', sortOrder);
+      setSearchParams(newParams);
+      
+      const searchTerm = searchStates.watchlistAdUpdate.searchTerm;
+      await fetchWatchlistAdUpdateQueue(1, 10, sortBy, sortOrder, searchTerm || null);
+    } catch (error) {
+      toast.error(`Failed to sort watchlist ad-update queue: ${error.message || error}`);
     }
   };
 
@@ -310,6 +794,13 @@ const Dashboard = () => {
   // Updated: Manage full initial load with initialLoading
   useEffect(() => {
     let mounted = true;
+    
+    // Initialize search refs from URL params on mount
+    searchRefs.current.regularBrands = searchParams.get('regularBrandsSearch') || '';
+    searchRefs.current.watchlistBrands = searchParams.get('watchlistBrandsSearch') || '';
+    searchRefs.current.regularAdUpdate = searchParams.get('regularAdSearch') || '';
+    searchRefs.current.watchlistAdUpdate = searchParams.get('watchlistAdSearch') || '';
+    
     const timer = setTimeout(async () => {
       if (!mounted) return;
       // initialLoading is already true from useState; no need to set again
@@ -328,15 +819,55 @@ const Dashboard = () => {
     };
   }, []);
 
+  // Reload data when environment changes
+  useEffect(() => {
+    if (!initialLoading && !environmentLoading) {
+      // Add a small delay to ensure backend environment switch is complete
+      const timeoutId = setTimeout(() => {
+        loadData().then(() => {
+          // Wait a moment for state to update
+          setTimeout(() => {
+          }, 100);
+        });
+      }, 500); // 500ms delay to ensure backend switch is complete
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [currentEnvironment, environmentLoading]);
+
   useEffect(() => {
     return () => {
       updateState({ originalStartTime: null });
+      // Cleanup debounce timers on unmount
+      Object.values(debounceTimers.current).forEach(timer => {
+        if (timer) clearTimeout(timer);
+      });
     };
   }, []);
 
   // Updated: Use initialLoading for the full initial gate
   if (initialLoading) {
     return <LoadingSpinner />;
+  }
+
+  // Show loading overlay when environment is changing
+  if (environmentLoading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-6">
+          <div className="mb-6">
+            <LoadingSpinner size="lg" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Switching Environment</h2>
+          <p className="text-lg text-gray-600 mb-4">Please wait while we load the new environment data</p>
+          <div className="bg-gray-100 rounded-lg p-4">
+            <p className="text-sm text-gray-500">
+              This may take a few moments as we reconnect to the new environment's database and services.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (error) {
@@ -360,8 +891,8 @@ const Dashboard = () => {
         isRefreshing={isRefreshing}
         onManualRefresh={handleManualRefresh}
         onIntervalChange={changeRefreshInterval}
-        regularCooldown={pendingCount === 0 && failedCount === 0}
-        watchlistCooldown={watchlistPendingCount === 0 && watchlistFailedCount === 0}
+        scraperStatus={scraperStatus}
+        scraperStatusData={scraperStatusData}
       />
 
       <DashboardStats
@@ -378,7 +909,10 @@ const Dashboard = () => {
       <WatchlistProcessingStatus
         currentlyProcessing={currentlyProcessing}
         watchlistPendingCount={watchlistPendingCount}
+        watchlistFailedCount={watchlistFailedCount}
         nextWatchlistBrand={nextWatchlistBrand}
+        scraperStatus={scraperStatus}
+        scraperStatusLoading={scraperStatusLoading}
       />
 
       <ProcessingStatus
@@ -388,7 +922,32 @@ const Dashboard = () => {
         scraperStatusLoading={scraperStatusLoading}
         formattedStartTime={formattedStartTime}
         pendingCount={pendingCount}
+        failedCount={failedCount}
       />
+
+        <RegularBrandProcessing
+          allBrandProcessingData={allRegularBrandProcessingJobs}
+          loading={loading}
+          error={error}
+        />
+
+        <WatchlistBrandProcessing
+          allBrandProcessingData={allWatchlistBrandProcessingJobs}
+          loading={loading}
+          error={error}
+        />
+
+        <RegularAdUpdateProcessing
+          allAdUpdateData={allRegularAdUpdateJobs}
+          loading={loading}
+          error={error}
+        />
+
+        <WatchlistAdUpdateProcessing
+          allAdUpdateData={allWatchlistAdUpdateJobs}
+          loading={loading}
+          error={error}
+        />
 
       <QuickActions
         pendingCount={pendingCount}
@@ -403,6 +962,10 @@ const Dashboard = () => {
         error={error}
         onPageChange={handleWatchlistPageChange}
         onSortChange={handleWatchlistSortChange}
+        onSearch={handleWatchlistBrandsSearch}
+        searchTerm={searchStates.watchlistBrands.searchTerm}
+        onClearSearch={clearWatchlistBrandsSearch}
+        isSearching={searchStates.watchlistBrands.isSearching}
       />
 
       <BrandProcessingQueue 
@@ -411,6 +974,34 @@ const Dashboard = () => {
         error={error}
         onPageChange={handleQueuePageChange}
         onSortChange={handleQueueSortChange}
+        onSearch={handleRegularBrandsSearch}
+        searchTerm={searchStates.regularBrands.searchTerm}
+        onClearSearch={clearRegularBrandsSearch}
+        isSearching={searchStates.regularBrands.isSearching}
+      />
+
+      <WatchlistAdUpdateQueue 
+        watchlistAdUpdateQueue={watchlistAdUpdateQueue}
+        loading={loading}
+        error={error}
+        onPageChange={handleWatchlistAdUpdatePageChange}
+        onSortChange={handleWatchlistAdUpdateSortChange}
+        onSearch={handleWatchlistAdUpdateSearch}
+        searchTerm={searchStates.watchlistAdUpdate.searchTerm}
+        onClearSearch={clearWatchlistAdUpdateSearch}
+        isSearching={searchStates.watchlistAdUpdate.isSearching}
+      />
+
+      <RegularAdUpdateQueue 
+        adUpdateQueue={adUpdateQueue}
+        loading={loading}
+        error={error}
+        onPageChange={handleAdUpdatePageChange}
+        onSortChange={handleAdUpdateSortChange}
+        onSearch={handleRegularAdUpdateSearch}
+        searchTerm={searchStates.regularAdUpdate.searchTerm}
+        onClearSearch={clearRegularAdUpdateSearch}
+        isSearching={searchStates.regularAdUpdate.isSearching}
       />
 
       <SeparateScrapedStats />

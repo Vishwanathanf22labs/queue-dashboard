@@ -4,7 +4,7 @@ import Input from '../ui/Input';
 import CustomDropdown from '../ui/CustomDropdown';
 import { queueAPI } from '../../services/api';
 
-const PriorityQueueManager = () => {
+const PriorityQueueManager = ({ disabled = false }) => {
   const [state, setState] = useState({
     formData: {
       queueType: 'pending',
@@ -163,6 +163,7 @@ const PriorityQueueManager = () => {
               label="Queue Type"
               value={state.formData.queueType}
               onChange={handleQueueTypeChange}
+              disabled={disabled}
               options={[
                 { value: 'pending', label: 'Brands Pending Queue' },
                 { value: 'failed', label: 'Brands Failed Queue' },
@@ -183,6 +184,7 @@ const PriorityQueueManager = () => {
               onChange={(value) => handleInputChange('brandName', value)}
               placeholder="Enter brand name to search"
               className="w-full"
+              disabled={disabled}
             />
           </div>
 
@@ -196,6 +198,7 @@ const PriorityQueueManager = () => {
               onChange={(value) => handleInputChange('newScore', value)}
               placeholder={scorePlaceholder}
               className="w-full"
+              disabled={disabled}
             />
           </div>
         </div>
@@ -204,7 +207,7 @@ const PriorityQueueManager = () => {
           <Button
             type="submit"
             variant="primary"
-            disabled={state.loading}
+            disabled={disabled || state.loading}
             className="min-w-[120px]"
           >
             {state.loading ? 'Updating...' : isListQueueSelected ? 'Update Position' : 'Update Score'}

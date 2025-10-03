@@ -1,5 +1,4 @@
 const { Op } = require('sequelize');
-const { Brand, BrandsDailyStatus, WatchList } = require('../models');
 
 class ScrapedBrandsService {
   /**
@@ -11,6 +10,9 @@ class ScrapedBrandsService {
    */
   static async getScrapedBrands(page = 1, limit = 10, date = null, sortBy = 'normal', sortOrder = 'desc') {
     try {
+      // Require models dynamically to get the latest version
+      const { Brand, BrandsDailyStatus, WatchList } = require('../models');
+      
       // Use provided date if given, otherwise use current date
       let targetDate;
       if (date) {
@@ -224,6 +226,9 @@ class ScrapedBrandsService {
    */
   static async searchScrapedBrands(query, date = null) {
     try {
+      // Require models dynamically to get the latest version
+      const { Brand, BrandsDailyStatus, WatchList } = require('../models');
+      
       // Use provided date if given, otherwise use current date
       let targetDate;
       if (date) {
@@ -256,11 +261,6 @@ class ScrapedBrandsService {
         }
       };
       
-      // If query is numeric, search by brand_id
-      if (isNumericQuery) {
-        whereClause.brand_id = parseInt(query);
-      }
-
       // Search across all pages using Sequelize ORM with flexible matching
       const searchResults = await BrandsDailyStatus.findAll({
         where: whereClause,
@@ -275,7 +275,12 @@ class ScrapedBrandsService {
               'page_id'
             ],
             required: true,
-            where: isNumericQuery ? {} : {
+            where: isNumericQuery ? {
+              [Op.or]: [
+                { page_id: query }, // Search by page_id as string (handles leading zeros like '0004')
+                { id: parseInt(query) } // Also search by brand_id as integer
+              ]
+            } : {
               [Op.or]: [
                 // 🔍 Exact match with spaces
                 {
@@ -369,6 +374,9 @@ class ScrapedBrandsService {
    */
   static async getScrapedBrandsStats(date = null) {
     try {
+      // Require models dynamically to get the latest version
+      const { Brand, BrandsDailyStatus, WatchList } = require('../models');
+      
       // Use provided date if given, otherwise use current date
       let targetDate;
       if (date) {

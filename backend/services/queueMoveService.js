@@ -1,9 +1,16 @@
 const { getQueueRedis, getGlobalRedis } = require("../utils/redisSelector");
 const logger = require("../utils/logger");
-const { QUEUES, REDIS_KEYS } = require("../config/constants");
+const { QUEUES } = require("../config/constants");
+
+// Function to get dynamic Redis keys
+function getRedisKeys() {
+  return require("../config/constants").REDIS_KEYS;
+}
 
 async function movePendingToFailed(queueId, queueType = "regular") {
   try {
+    const REDIS_KEYS = getRedisKeys();
+    
     logger.info(
       `Moving brand with queue ID ${queueId} from ${queueType} pending to failed queue`
     );
@@ -78,6 +85,8 @@ async function movePendingToFailed(queueId, queueType = "regular") {
 
 async function moveFailedToPending(brandId, queueType = "regular") {
   try {
+    const REDIS_KEYS = getRedisKeys();
+    
     logger.info(
       `Moving brand with ID ${brandId} from ${queueType} failed to pending queue`
     );
@@ -151,6 +160,8 @@ async function moveFailedToPending(brandId, queueType = "regular") {
 
 async function moveAllPendingToFailed() {
   try {
+    const REDIS_KEYS = getRedisKeys();
+    
     logger.info("Moving ALL regular pending brands to failed queue");
 
     // Get only regular Redis instance
@@ -224,6 +235,8 @@ async function moveAllPendingToFailed() {
 
 async function moveAllFailedToPending() {
   try {
+    const REDIS_KEYS = getRedisKeys();
+    
     logger.info("Moving ALL regular failed brands to pending queue");
 
     // Get only regular Redis instance
@@ -291,6 +304,8 @@ async function moveAllFailedToPending() {
 // NEW FUNCTION: Move only watchlist failed brands to pending queue
 async function moveWatchlistFailedToPending() {
   try {
+    const REDIS_KEYS = getRedisKeys();
+    
     logger.info("Moving watchlist failed brands to pending queue");
 
     // Get watchlist Redis instance
@@ -311,8 +326,7 @@ async function moveWatchlistFailedToPending() {
     }
 
     // Get watchlist brands to identify which failed brands are in watchlist
-    const WatchList = require("../models/WatchList");
-    const Brand = require("../models/Brand");
+    const { Brand, WatchList } = require("../models");
 
     // First get all watchlist brand_ids
     const watchlistItems = await WatchList.findAll({
@@ -421,13 +435,14 @@ async function moveWatchlistFailedToPending() {
 // NEW FUNCTION: Move all watchlist brands from database to pending queue with score 1
 async function moveWatchlistToPending() {
   try {
+    const REDIS_KEYS = getRedisKeys();
+    
     logger.info(
       "Moving all watchlist brands from database to pending queue with score 1"
     );
 
     // Get all watchlist brands from database
-    const WatchList = require("../models/WatchList");
-    const Brand = require("../models/Brand");
+    const { Brand, WatchList } = require("../models");
 
     const watchlistItems = await WatchList.findAll({
       attributes: ["brand_id"],
@@ -529,6 +544,8 @@ async function moveWatchlistToPending() {
 // NEW FUNCTION: Move individual watchlist failed brand to pending queue
 async function moveIndividualWatchlistFailedToPending(brandIdentifier) {
   try {
+    const REDIS_KEYS = getRedisKeys();
+    
     logger.info(
       `Moving individual watchlist failed brand ${brandIdentifier} to watchlist pending queue`
     );
@@ -618,6 +635,8 @@ async function moveIndividualWatchlistFailedToPending(brandIdentifier) {
 
 async function moveAllWatchlistPendingToFailed() {
   try {
+    const REDIS_KEYS = getRedisKeys();
+    
     logger.info("Moving ALL watchlist pending brands to failed queue");
 
     const watchlistRedis = getQueueRedis("watchlist");
@@ -690,6 +709,8 @@ async function moveAllWatchlistPendingToFailed() {
 
 async function moveAllWatchlistFailedToPending() {
   try {
+    const REDIS_KEYS = getRedisKeys();
+    
     logger.info("Moving ALL watchlist failed brands to pending queue");
 
     const watchlistRedis = getQueueRedis("watchlist");

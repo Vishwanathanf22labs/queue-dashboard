@@ -1,6 +1,10 @@
-const { watchlistRedis } = require('../config/redis');
+const { getWatchlistRedisInstance } = require('../utils/redisSelector');
 const logger = require('../utils/logger');
-const { REDIS_KEYS } = require('../config/constants');
+
+// Function to get dynamic Redis keys
+function getRedisKeys() {
+  return require('../config/constants').REDIS_KEYS;
+}
 
 /**
  * Get count of watchlist pending brands from Redis sorted set
@@ -8,8 +12,9 @@ const { REDIS_KEYS } = require('../config/constants');
  */
 async function getWatchlistPendingCount() {
   try {
+    const REDIS_KEYS = getRedisKeys();
     const key = REDIS_KEYS.WATCHLIST.PENDING_BRANDS;
-    const count = await watchlistRedis.zcard(key);
+    const count = await getWatchlistRedisInstance().zcard(key);
     logger.info(`Watchlist pending count: ${count}`);
     return count;
   } catch (error) {
@@ -24,8 +29,9 @@ async function getWatchlistPendingCount() {
  */
 async function getWatchlistFailedCount() {
   try {
+    const REDIS_KEYS = getRedisKeys();
     const key = REDIS_KEYS.WATCHLIST.FAILED_BRANDS;
-    const count = await watchlistRedis.llen(key);
+    const count = await getWatchlistRedisInstance().llen(key);
     logger.info(`Watchlist failed count: ${count}`);
     return count;
   } catch (error) {
@@ -40,10 +46,11 @@ async function getWatchlistFailedCount() {
  */
 async function getWatchlistCompletedCount() {
   try {
+    const REDIS_KEYS = getRedisKeys();
     // Get current pending and failed page_ids from Redis
     const [pendingItems, failedItems] = await Promise.all([
-      watchlistRedis.zrange(REDIS_KEYS.WATCHLIST.PENDING_BRANDS, 0, -1),
-      watchlistRedis.lrange(REDIS_KEYS.WATCHLIST.FAILED_BRANDS, 0, -1)
+      getWatchlistRedisInstance().zrange(REDIS_KEYS.WATCHLIST.PENDING_BRANDS, 0, -1),
+      getWatchlistRedisInstance().lrange(REDIS_KEYS.WATCHLIST.FAILED_BRANDS, 0, -1)
     ]);
     
     // If both queues are empty, completed count is 0
@@ -53,8 +60,7 @@ async function getWatchlistCompletedCount() {
     }
     
     // Get all watchlist brands from database
-    const Brand = require('../models/Brand');
-    const WatchList = require('../models/WatchList');
+    const { Brand, WatchList } = require('../models');
     
     // Get all watchlist brand_ids
     const watchlistItems = await WatchList.findAll({

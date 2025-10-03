@@ -1,4 +1,15 @@
-const { globalRedis, watchlistRedis, regularRedis } = require("../config/redis");
+// Dynamic Redis instance getters to ensure we always get the latest connections
+function getGlobalRedisInstance() {
+  return require("../config/redis").globalRedis;
+}
+
+function getWatchlistRedisInstance() {
+  return require("../config/redis").watchlistRedis;
+}
+
+function getRegularRedisInstance() {
+  return require("../config/redis").regularRedis;
+}
 
 /**
  * Redis Instance Selector Utility
@@ -13,11 +24,11 @@ const { globalRedis, watchlistRedis, regularRedis } = require("../config/redis")
 function getRedisInstance(type) {
   switch (type) {
     case 'global':
-      return globalRedis;
+      return getGlobalRedisInstance();
     case 'watchlist':
-      return watchlistRedis;
+      return getWatchlistRedisInstance();
     case 'regular':
-      return regularRedis;
+      return getRegularRedisInstance();
     default:
       throw new Error(`Invalid Redis type: ${type}. Must be 'global', 'watchlist', or 'regular'`);
   }
@@ -29,9 +40,9 @@ function getRedisInstance(type) {
  */
 function getAllRedisInstances() {
   return {
-    global: globalRedis,
-    watchlist: watchlistRedis,
-    regular: regularRedis
+    global: getGlobalRedisInstance(),
+    watchlist: getWatchlistRedisInstance(),
+    regular: getRegularRedisInstance()
   };
 }
 
@@ -57,9 +68,9 @@ async function executeOnMultipleRedis(types, operation) {
  */
 function getQueueRedis(queueType) {
   if (queueType === 'watchlist') {
-    return watchlistRedis;
+    return getWatchlistRedisInstance();
   } else if (queueType === 'regular') {
-    return regularRedis;
+    return getRegularRedisInstance();
   } else {
     throw new Error(`Invalid queue type: ${queueType}. Must be 'regular' or 'watchlist'`);
   }
@@ -70,7 +81,7 @@ function getQueueRedis(queueType) {
  * @returns {Redis} Global Redis instance
  */
 function getGlobalRedis() {
-  return globalRedis;
+  return getGlobalRedisInstance();
 }
 
 module.exports = {
@@ -78,5 +89,8 @@ module.exports = {
   getAllRedisInstances,
   executeOnMultipleRedis,
   getQueueRedis,
-  getGlobalRedis
+  getGlobalRedis,
+  getGlobalRedisInstance,
+  getWatchlistRedisInstance,
+  getRegularRedisInstance
 };

@@ -1,7 +1,7 @@
 const Sequelize = require('sequelize');
-const db = require('../config/database');
+const { getDatabaseConnection } = require('../config/database');
 
-const BrandsDailyStatus = db.define(
+const BrandsDailyStatus = getDatabaseConnection().define(
   'brand_daily_statuses',
   {
     id: {

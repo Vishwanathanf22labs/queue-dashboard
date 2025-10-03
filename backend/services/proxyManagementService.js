@@ -6,8 +6,8 @@ const proxySwitch = require("./proxy/proxySwitchService");
 
 module.exports = {
   // CRUD Operations
-  addProxy: (ip, port, country, username, password, type, namespace) => 
-    proxyCRUD.addProxy(ip, port, country, username, password, type, namespace),
+  addProxy: (ip, port, country, username, password, type, namespace, userAgent, viewport, version) => 
+    proxyCRUD.addProxy(ip, port, country, username, password, type, namespace, userAgent, viewport, version),
   removeProxy: proxyCRUD.removeProxy,
   updateProxy: proxyCRUD.updateProxy,
   clearAllProxies: proxyCRUD.clearAllProxies,
@@ -34,6 +34,7 @@ module.exports = {
   getNextWorkingProxy: proxyHealth.getNextWorkingProxy,  // ← Scraper calls this
   
   // NEW: Proxy Lock Functions
+  lockProxy: proxyHealth.lockProxy,                       // ← Lock proxy functionality
   unlockProxy: proxyHealth.unlockProxy,                   // ← Unlock proxy functionality
   
   // Switch Operations

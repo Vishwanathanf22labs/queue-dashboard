@@ -1,15 +1,19 @@
-const { globalRedis } = require("../../config/redis");
+const { getGlobalRedis } = require("../../utils/redisSelector");
 const logger = require("../../utils/logger");
-const { REDIS_KEYS } = require("../../config/constants");
 
-const PROXY_IPS_KEY = REDIS_KEYS.GLOBAL.PROXY_IPS;
-const PROXY_STATS_KEY = REDIS_KEYS.GLOBAL.PROXY_STATS;
+// Function to get dynamic Redis keys
+function getRedisKeys() {
+  return require("../../config/constants").REDIS_KEYS;
+}
 
 /**
  * Add a new proxy to the system using Redis hash storage
  */
-async function addProxy(ip, port = null, country = null, username = null, password = null, type = "http", namespace = null) {
+async function addProxy(ip, port = null, country = null, username = null, password = null, type = "http", namespace = null, userAgent = null, viewport = null, version = "ipv4") {
   try {
+    const REDIS_KEYS = getRedisKeys();
+    const PROXY_IPS_KEY = REDIS_KEYS.GLOBAL.PROXY_IPS;
+    
     // Validate IP format
     if (!isValidIP(ip)) {
       throw new Error("Invalid IP address format");
@@ -19,7 +23,7 @@ async function addProxy(ip, port = null, country = null, username = null, passwo
     const proxyKey = `${PROXY_IPS_KEY}:${ip}:${port}:${username}:${password}`;
     
     // Check if proxy already exists
-    const existingProxy = await globalRedis.hgetall(proxyKey);
+    const existingProxy = await getGlobalRedis().hgetall(proxyKey);
     if (Object.keys(existingProxy).length > 0) {
       return {
         success: false,
@@ -39,6 +43,9 @@ async function addProxy(ip, port = null, country = null, username = null, passwo
       country: country || "Unknown",
       type: type || "http",
       namespace: namespace || "",
+      userAgent: userAgent || "",
+      viewport: viewport || "",
+      version: version || "ipv4",
       created_at: now.toISOString(),
       added_date: now.toLocaleDateString('en-US', { 
         year: 'numeric', 
@@ -54,7 +61,7 @@ async function addProxy(ip, port = null, country = null, username = null, passwo
     };
 
     // Add to Redis hash
-    await globalRedis.hset(proxyKey, proxyData);
+    await getGlobalRedis().hset(proxyKey, proxyData);
     
     // Update stats
     await updateProxyStats("add");
@@ -72,6 +79,10 @@ async function addProxy(ip, port = null, country = null, username = null, passwo
         username: username,
         password: password,
         type: type,
+        namespace: namespace || "",
+        userAgent: userAgent || "",
+        viewport: viewport || "",
+        version: version || "ipv4",
         added_at: now.toISOString(),
         added_date: now.toLocaleDateString('en-US', { 
           year: 'numeric', 
@@ -107,8 +118,10 @@ async function addProxy(ip, port = null, country = null, username = null, passwo
  */
 async function removeProxy(proxyKey) {
   try {
+    const REDIS_KEYS = getRedisKeys();
+    
     // Check if proxy exists
-    const existingProxy = await globalRedis.hgetall(proxyKey);
+    const existingProxy = await getGlobalRedis().hgetall(proxyKey);
     if (Object.keys(existingProxy).length === 0) {
       return {
         success: false,
@@ -118,7 +131,7 @@ async function removeProxy(proxyKey) {
     }
 
     // Remove from Redis hash
-    await globalRedis.del(proxyKey);
+    await getGlobalRedis().del(proxyKey);
     
     // Update stats
     await updateProxyStats("remove");
@@ -146,7 +159,7 @@ async function removeProxy(proxyKey) {
 async function updateProxy(proxyKey, updates) {
   try {
     // Check if proxy exists
-    const existingProxy = await globalRedis.hgetall(proxyKey);
+    const existingProxy = await getGlobalRedis().hgetall(proxyKey);
     if (Object.keys(existingProxy).length === 0) {
       return {
         success: false,
@@ -156,7 +169,7 @@ async function updateProxy(proxyKey, updates) {
     }
 
     // Only allow updating certain fields
-    const allowedUpdates = ['country', 'type', 'username', 'password'];
+    const allowedUpdates = ['country', 'type', 'username', 'password', 'namespace', 'userAgent', 'viewport', 'version'];
     const updatedFields = {};
     
     allowedUpdates.forEach(field => {
@@ -166,10 +179,10 @@ async function updateProxy(proxyKey, updates) {
     });
     
     // Update in Redis hash
-    await globalRedis.hset(proxyKey, updatedFields);
+    await getGlobalRedis().hset(proxyKey, updatedFields);
     
     // Get updated proxy data
-    const updatedProxy = await globalRedis.hgetall(proxyKey);
+    const updatedProxy = await getGlobalRedis().hgetall(proxyKey);
     
     return {
       success: true,
@@ -192,7 +205,7 @@ async function updateProxy(proxyKey, updates) {
 async function clearAllProxies() {
   try {
     // Get all proxy keys
-    const proxyKeys = await globalRedis.keys(`${PROXY_IPS_KEY}:*`);
+    const proxyKeys = await getGlobalRedis().keys(`${PROXY_IPS_KEY}:*`);
     
     if (proxyKeys.length === 0) {
       return {
@@ -203,10 +216,10 @@ async function clearAllProxies() {
     }
 
     // Delete all proxy keys
-    await globalRedis.del(proxyKeys);
+    await getGlobalRedis().del(proxyKeys);
     
     // Reset stats
-    await globalRedis.del(PROXY_STATS_KEY);
+    await getGlobalRedis().del(PROXY_STATS_KEY);
 
     logger.info(`All ${proxyKeys.length} proxies cleared successfully`);
 
@@ -227,17 +240,17 @@ async function clearAllProxies() {
  */
 async function updateProxyStats(action) {
   try {
-    const stats = await globalRedis.hgetall(PROXY_STATS_KEY);
+    const stats = await getGlobalRedis().hgetall(PROXY_STATS_KEY);
     
     if (action === "add") {
       const added = parseInt(stats.added || 0) + 1;
-      await globalRedis.hset(PROXY_STATS_KEY, "added", added.toString());
+      await getGlobalRedis().hset(PROXY_STATS_KEY, "added", added.toString());
     } else if (action === "remove") {
       const removed = parseInt(stats.removed || 0) + 1;
-      await globalRedis.hset(PROXY_STATS_KEY, "removed", removed.toString());
+      await getGlobalRedis().hset(PROXY_STATS_KEY, "removed", removed.toString());
     }
     
-    await globalRedis.hset(PROXY_STATS_KEY, "last_updated", new Date().toISOString());
+    await getGlobalRedis().hset(PROXY_STATS_KEY, "last_updated", new Date().toISOString());
   } catch (error) {
     logger.error("Error updating proxy stats:", error);
   }

@@ -19,6 +19,27 @@ export const queueAPI = {
     return api.get(`/queue/failed?${params.toString()}`);
   },
 
+  getReenqueueData: (page = 1, limit = 100, search = null, namespace = null) => {
+    const params = new URLSearchParams();
+    params.append("page", page);
+    params.append("limit", limit);
+    if (search && search.trim()) params.append("search", search);
+    if (namespace) params.append("namespace", namespace);
+    return api.get(`/queue/reenqueue-data?${params.toString()}`);
+  },
+
+  requeueSingleBrand: (itemId, namespace) =>
+    api.post("/queue/reenqueue/single", { itemId, namespace }),
+  
+  requeueAllBrands: (namespace) =>
+    api.post("/queue/reenqueue/all", { namespace }),
+  
+  deleteReenqueueBrand: (itemId, namespace) =>
+    api.delete("/queue/reenqueue/single", { data: { itemId, namespace } }),
+  
+  deleteAllReenqueueBrands: (namespace) =>
+    api.delete("/queue/reenqueue/all", { data: { namespace } }),
+
   getWatchlistBrands: (page = 1, limit = 100, search = null) => {
     const params = new URLSearchParams();
     params.append("page", page);
@@ -32,7 +53,7 @@ export const queueAPI = {
     params.append("page", page);
     params.append("limit", limit);
     if (search && search.trim()) params.append("search", search);
-    return api.get(`/queue/watchlist-pending-brands-prod?${params.toString()}`);
+    return api.get(`/queue/watchlist-pending-brands?${params.toString()}`);
   },
 
   getWatchlistFailedBrands: (page = 1, limit = 100, search = null) => {
@@ -40,7 +61,7 @@ export const queueAPI = {
     params.append("page", page);
     params.append("limit", limit);
     if (search && search.trim()) params.append("search", search);
-    return api.get(`/queue/watchlist-failed-brands-prod?${params.toString()}`);
+    return api.get(`/queue/watchlist-failed-brands?${params.toString()}`);
   },
 
   getCurrentlyProcessing: () => api.get("/queue/currently-processing"),
@@ -50,22 +71,57 @@ export const queueAPI = {
 
   getStats: () => api.get("/queue/stats"),
 
-  getBrandProcessingQueue: (page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc') => {
+  getBrandProcessingQueue: (page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc', search = null) => {
     const params = new URLSearchParams();
     params.append("page", page);
     params.append("limit", limit);
     params.append("sortBy", sortBy);
     params.append("sortOrder", sortOrder);
+    if (search && search.trim()) params.append("search", search);
     return api.get(`/queue/brand-processing?${params.toString()}`);
   },
 
-  getWatchlistBrandsQueue: (page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc') => {
+  getWatchlistBrandsQueue: (page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc', search = null) => {
     const params = new URLSearchParams();
     params.append("page", page);
     params.append("limit", limit);
     params.append("sortBy", sortBy);
     params.append("sortOrder", sortOrder);
+    if (search && search.trim()) params.append("search", search);
     return api.get(`/queue/watchlist-brands?${params.toString()}`);
+  },
+
+  getAllBrandProcessingJobs: (queueType = 'regular') => {
+    const params = new URLSearchParams();
+    params.append("queueType", queueType);
+    return api.get(`/queue/all-brand-processing-jobs?${params.toString()}`);
+  },
+
+  // Ad-update processing APIs
+  getAdUpdateQueue: (page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc', search = null) => {
+    const params = new URLSearchParams();
+    params.append("page", page);
+    params.append("limit", limit);
+    params.append("sortBy", sortBy);
+    params.append("sortOrder", sortOrder);
+    if (search && search.trim()) params.append("search", search);
+    return api.get(`/queue/ad-update-processing?${params.toString()}`);
+  },
+
+  getWatchlistAdUpdateQueue: (page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc', search = null) => {
+    const params = new URLSearchParams();
+    params.append("page", page);
+    params.append("limit", limit);
+    params.append("sortBy", sortBy);
+    params.append("sortOrder", sortOrder);
+    if (search && search.trim()) params.append("search", search);
+    return api.get(`/queue/watchlist-ad-update?${params.toString()}`);
+  },
+
+  getAllAdUpdateJobs: (queueType = 'regular') => {
+    const params = new URLSearchParams();
+    params.append("queueType", queueType);
+    return api.get(`/queue/all-ad-update-jobs?${params.toString()}`);
   },
 
   getScrapedStats: (date = null, days = null) => {
@@ -82,21 +138,27 @@ export const queueAPI = {
     return api.get(`/queue/scraped-stats/separate?${params.toString()}`);
   },
 
+  invalidateQueueCache: () => api.post("/queue/invalidate-cache"),
+
   addSingleBrand: (data) => api.post("/queue/add-single", data),
 
-  addBulkBrandsFromCSV: (file) => {
+  addBulkBrandsFromCSV: (file, queueType = 'regular') => {
     const formData = new FormData();
     formData.append("csv", file);
-    return api.post("/queue/add-bulk-csv", formData, {
+    const params = new URLSearchParams();
+    params.append("queueType", queueType);
+    return api.post(`/queue/add-bulk-csv?${params.toString()}`, formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
     });
   },
 
-  addAllBrands: (status = null) => {
-    const params = status ? `?status=${status}` : "";
-    return api.post(`/queue/add-all${params}`);
+  addAllBrands: (status = null, queueType = 'regular') => {
+    const params = new URLSearchParams();
+    if (status) params.append("status", status);
+    params.append("queueType", queueType);
+    return api.post(`/queue/add-all?${params.toString()}`);
   },
 
   searchBrands: (query, limit = 8) => {
@@ -105,6 +167,20 @@ export const queueAPI = {
     params.append("limit", limit);
     return api.get(`/queue/search-brands?${params.toString()}`);
   },
+
+  // Brand status read/update (Edit Brands tab)
+  getBrandStatus: ({ brand_id, page_id }) => {
+    const params = new URLSearchParams();
+    if (brand_id) params.append("brand_id", brand_id);
+    if (page_id) params.append("page_id", page_id);
+    return api.get(`/queue/brand/status?${params.toString()}`);
+  },
+  updateBrandStatus: ({ brand_id, page_id, status }) =>
+    api.put(`/queue/brand/status`, { brand_id, page_id, status }),
+
+  // Bulk operations
+  bulkPreviewBrands: ({ ids, page_ids }) => api.post('/queue/brand/status/bulk/preview', { ids, page_ids }),
+  bulkApplyStatusUpdates: ({ updates }) => api.put('/queue/brand/status/bulk/apply', { updates }),
 
   getBrandCounts: () => api.get("/queue/brand-counts"),
 
@@ -152,15 +228,26 @@ export const queueAPI = {
   getScraperStatus: () => api.get("/queue/scraper/status"),
   startScraper: () => api.post("/queue/scraper/start"),
   stopScraper: () => api.post("/queue/scraper/stop"),
+  getBrandTiming: () => api.get("/queue/scraper/brand-timing"),
 
   changeBrandScore: (queueType, brandName, newScore) =>
     api.put(`/queue/change-score`, { queueType, brandName, newScore }),
+
+  // Settings API
+  getConfigSettings: () => api.get("/queue/settings/config"),
+  updateConfigSettings: (updates) => api.put("/queue/settings/config", { updates }),
 };
 
 export const adminAPI = {
   login: (credentials) => api.post("/admin/login", credentials),
   logout: () => api.post("/admin/logout"),
   checkStatus: () => api.get("/admin/status"),
+};
+
+export const environmentAPI = {
+  getCurrent: () => api.get("/environment/current"),
+  getAvailable: () => api.get("/environment"),
+  switch: (environment) => api.post("/environment/switch", { environment }),
 };
 
 export const scrapedBrandsAPI = {
@@ -200,6 +287,12 @@ export const pipelineAPI = {
     params.append("sortBy", sortBy);
     params.append("sortOrder", sortOrder);
     return api.get(`/pipeline-status/all?${params.toString()}`);
+  },
+
+  getOverallStats: (date = null) => {
+    const params = new URLSearchParams();
+    if (date) params.append("date", date);
+    return api.get(`/pipeline-status/overall-stats?${params.toString()}`);
   },
   
   searchBrandsStatus: (query, date = null) => {
@@ -252,6 +345,7 @@ export const proxyAPI = {
       )}&criteria=${criteria}`
     ),
   unlockProxy: (lockKey) => api.post("/queue/proxy/unlock", { lockKey }),
+  lockProxy: (proxyId, identifier, namespace) => api.post("/queue/proxy/lock", { proxyId, identifier, namespace }),
 };
 
 export default api;

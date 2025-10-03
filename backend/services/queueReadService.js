@@ -1,11 +1,16 @@
 const { getQueueRedis, getGlobalRedis } = require("../utils/redisSelector");
-const Brand = require("../models/Brand");
-const WatchList = require("../models/WatchList");
-const db = require("../config/database");
 const logger = require("../utils/logger");
-const { QUEUES, PAGINATION, REDIS_KEYS } = require("../config/constants");
+const { QUEUES, PAGINATION } = require("../config/constants");
+
+// Function to get dynamic Redis keys
+function getRedisKeys() {
+  return require("../config/constants").REDIS_KEYS;
+}
 
 async function enrichBrandsWithDBInfo(brandItems, isSortedSet = false) {
+  // Require Brand model dynamically to get the latest version
+  const { Brand } = require("../models");
+  
   const results = [];
   const pageIds = [];
 
@@ -163,6 +168,7 @@ async function getPendingBrands(
   queueType = 'regular' // 'regular' or 'watchlist'
 ) {
   try {
+    const REDIS_KEYS = getRedisKeys();
     const validPage = Math.max(1, parseInt(page));
     const validLimit = Math.min(
       Math.max(1, parseInt(limit)),
@@ -272,6 +278,7 @@ async function getFailedBrands(
   queueType = 'regular' // 'regular' or 'watchlist'
 ) {
   try {
+    const REDIS_KEYS = getRedisKeys();
     const validPage = Math.max(1, parseInt(page));
     const validLimit = Math.min(
       Math.max(1, parseInt(limit)),
@@ -377,6 +384,11 @@ async function getWatchlistBrands(
   userId = null
 ) {
   try {
+    // Require models dynamically to get the latest version
+    const { Brand, WatchList } = require("../models");
+    const { getDatabaseConnection } = require("../config/database");
+    const db = getDatabaseConnection();
+    
     const validPage = Math.max(1, parseInt(page));
     const validLimit = Math.max(1, parseInt(limit));
 
@@ -416,6 +428,7 @@ async function getWatchlistBrands(
     logger.info(`Found ${watchlistBrands.length} brands with details`);
 
     // Get all brands from watchlist_pending_brands_prod queue with scores
+    const REDIS_KEYS = getRedisKeys();
     const watchlistRedis = getQueueRedis('watchlist');
     const allPendingItems = await watchlistRedis.zrange(REDIS_KEYS.WATCHLIST.PENDING_BRANDS, 0, -1, 'WITHSCORES');
     const pendingPageIds = new Set();
@@ -543,6 +556,7 @@ async function getWatchlistPendingBrands(
   search = null
 ) {
   try {
+    const REDIS_KEYS = getRedisKeys();
     const validPage = Math.max(1, parseInt(page));
     const validLimit = Math.max(1, parseInt(limit));
 
@@ -575,11 +589,24 @@ async function getWatchlistPendingBrands(
     let filteredBrands = pendingBrands;
     if (search && search.trim()) {
       const searchTerm = search.toLowerCase().trim();
-      filteredBrands = pendingBrands.filter(brand => 
-        brand.brand_name?.toLowerCase().includes(searchTerm) ||
-        brand.page_id?.toString().includes(searchTerm) ||
-        brand.brand_id?.toString().includes(searchTerm)
-      );
+      
+      // Filter brands based on search term (flexible search)
+      const normalizedSearchTerm = searchTerm.replace(/\s+/g, '');
+      
+      filteredBrands = pendingBrands.filter(brand => {
+        const brandName = brand.brand_name?.toLowerCase() || '';
+        const normalizedBrandName = brandName.replace(/\s+/g, '');
+        
+        return (
+          // Original search (with spaces)
+          brandName.includes(searchTerm) ||
+          // Space-insensitive search
+          normalizedBrandName.includes(normalizedSearchTerm) ||
+          // ID searches
+          brand.queue_id?.toString().includes(searchTerm) ||
+          brand.page_id?.toString().includes(searchTerm)
+        );
+      });
     }
 
     const totalCount = filteredBrands.length;
@@ -622,6 +649,7 @@ async function getWatchlistFailedBrands(
   search = null
 ) {
   try {
+    const REDIS_KEYS = getRedisKeys();
     const validPage = Math.max(1, parseInt(page));
     const validLimit = Math.max(1, parseInt(limit));
 
@@ -649,11 +677,24 @@ async function getWatchlistFailedBrands(
     let filteredBrands = failedBrands;
     if (search && search.trim()) {
       const searchTerm = search.toLowerCase().trim();
-      filteredBrands = failedBrands.filter(brand => 
-        brand.brand_name?.toLowerCase().includes(searchTerm) ||
-        brand.page_id?.toString().includes(searchTerm) ||
-        brand.brand_id?.toString().includes(searchTerm)
-      );
+      
+      // Filter brands based on search term (flexible search)
+      const normalizedSearchTerm = searchTerm.replace(/\s+/g, '');
+      
+      filteredBrands = failedBrands.filter(brand => {
+        const brandName = brand.brand_name?.toLowerCase() || '';
+        const normalizedBrandName = brandName.replace(/\s+/g, '');
+        
+        return (
+          // Original search (with spaces)
+          brandName.includes(searchTerm) ||
+          // Space-insensitive search
+          normalizedBrandName.includes(normalizedSearchTerm) ||
+          // ID searches
+          brand.queue_id?.toString().includes(searchTerm) ||
+          brand.page_id?.toString().includes(searchTerm)
+        );
+      });
     }
 
     const totalCount = filteredBrands.length;
@@ -692,6 +733,7 @@ async function getWatchlistFailedBrands(
 
 async function getNextBrand(queueType = 'regular') {
   try {
+    const REDIS_KEYS = getRedisKeys();
     // Priority Queue Logic: Score 1 = Priority, Score 0 = Regular
     // Return next 4 brands in order of processing
     

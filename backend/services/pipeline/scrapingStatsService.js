@@ -1,4 +1,4 @@
-const { Brand, BrandsDailyStatus } = require("../../models");
+// Models will be required dynamically
 const { Op } = require("sequelize");
 const { getCacheKey, getCachedData, setCachedData } = require("../utils/cacheUtils");
 
@@ -7,6 +7,9 @@ const { getCacheKey, getCachedData, setCachedData } = require("../utils/cacheUti
  */
 async function getScrapingStats(date = null) {
   try {
+    // Require models dynamically to get the latest version
+    const { Brand, BrandsDailyStatus } = require("../../models");
+    
     const targetDate = date || new Date().toISOString().split("T")[0];
     const cacheKey = getCacheKey("stats", targetDate);
     const cached = getCachedData(cacheKey);

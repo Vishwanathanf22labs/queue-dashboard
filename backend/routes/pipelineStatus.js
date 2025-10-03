@@ -4,6 +4,7 @@ const {
   getBrandScrapingStatus,
   getAllBrandsScrapingStatus,
   getAllBrandsScrapingStatusSeparate,
+  getOverallPipelineStats,
   searchBrandsPipelineStatus,
 } = require("../services/pipeline");
 
@@ -118,6 +119,39 @@ router.get("/all/separate", async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error("Error getting all brands scraping status (separate):", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get overall pipeline statistics - separate endpoint with caching
+router.get("/overall-stats", async (req, res) => {
+  try {
+    const { date } = req.query;
+    
+    // Validate date format if provided
+    if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ error: "Date must be in YYYY-MM-DD format" });
+    }
+    
+    // Check for ETag support
+    const clientETag = req.headers['if-none-match'];
+    
+    const result = await getOverallPipelineStats(date);
+    
+    // Set ETag header if available
+    if (result.etag) {
+      res.set('ETag', result.etag);
+      
+      // Check if client has same ETag
+      if (clientETag === result.etag) {
+        return res.status(304).end();
+      }
+    }
+    
+    // Return the result directly
+    res.json({ data: result });
+  } catch (error) {
+    console.error("Error getting overall pipeline stats:", error);
     res.status(500).json({ error: error.message });
   }
 });

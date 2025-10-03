@@ -1,4 +1,7 @@
 const queueService = require("../services/queueService");
+const queueReenqueueService = require("../services/queueReenqueueService");
+const cacheUtils = require("../services/utils/cacheUtils");
+const adUpdateProcessingService = require("../services/adUpdateProcessingService");
 const logger = require("../utils/logger");
 
 async function getQueueOverview(req, res) {
@@ -142,7 +145,7 @@ async function getQueueStats(req, res) {
 
 async function getBrandProcessingQueue(req, res) {
   try {
-    const { page = 1, limit = 10, queueType = 'regular', sortBy = 'normal', sortOrder = 'desc' } = req.query;
+    const { page = 1, limit = 10, queueType = 'regular', sortBy = 'normal', sortOrder = 'desc', search = null } = req.query;
     const ifNoneMatch = req.headers['if-none-match'];
     
     const processingData = await queueService.getBrandProcessingQueue(
@@ -151,7 +154,8 @@ async function getBrandProcessingQueue(req, res) {
       queueType,
       sortBy,
       sortOrder,
-      ifNoneMatch
+      ifNoneMatch,
+      search
     );
 
     // Handle ETag caching
@@ -178,7 +182,7 @@ async function getBrandProcessingQueue(req, res) {
 
 async function getWatchlistBrandsQueue(req, res) {
   try {
-    const { page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc' } = req.query;
+    const { page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc', search = null } = req.query;
     const ifNoneMatch = req.headers['if-none-match'];
     
     const watchlistData = await queueService.getWatchlistBrandsQueue(
@@ -186,7 +190,8 @@ async function getWatchlistBrandsQueue(req, res) {
       parseInt(limit),
       sortBy,
       sortOrder,
-      ifNoneMatch
+      ifNoneMatch,
+      search
     );
 
     // Handle ETag caching
@@ -405,6 +410,63 @@ async function changeBrandScore(req, res) {
   }
 }
 
+async function getReenqueueData(req, res) {
+  try {
+    const { page = 1, limit = 10, search = null, namespace = null } = req.query;
+    const reenqueueData = await queueReenqueueService.getReenqueueData(
+      parseInt(page),
+      parseInt(limit),
+      search,
+      namespace
+    );
+
+    res.status(200).json({
+      success: true,
+      data: reenqueueData,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error("Error in getReenqueueData:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch reenqueue data",
+      error: error.message,
+    });
+  }
+}
+
+async function getAllBrandProcessingJobs(req, res) {
+  try {
+    const { queueType = 'regular' } = req.query;
+    const ifNoneMatch = req.headers['if-none-match'];
+    
+    const processingData = await queueService.getAllBrandProcessingJobs(
+      queueType,
+      ifNoneMatch
+    );
+
+    // Handle ETag caching
+    if (processingData.status === 304) {
+      res.set('ETag', processingData.etag);
+      return res.status(304).end();
+    }
+
+    // Set ETag header for future requests
+    if (processingData.etag) {
+      res.set('ETag', processingData.etag);
+    }
+
+    res.status(200).json(processingData);
+  } catch (error) {
+    logger.error("Error in getAllBrandProcessingJobs:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch all brand processing jobs",
+      error: error.message,
+    });
+  }
+}
+
 module.exports = {
   getQueueOverview,
   getPendingBrands,
@@ -415,6 +477,7 @@ module.exports = {
   getQueueStats,
   getBrandProcessingQueue,
   getWatchlistBrandsQueue,
+  getAllBrandProcessingJobs,
   getBrandsScrapedStats,
   getSeparateBrandsScrapedStats,
   searchBrands,
@@ -422,4 +485,136 @@ module.exports = {
   getWatchlistPendingBrands,
   getWatchlistFailedBrands,
   changeBrandScore,
+  getReenqueueData,
+  invalidateQueueCache,
+  getAdUpdateQueue,
+  getWatchlistAdUpdateQueue,
+  getAllAdUpdateJobs,
 };
+
+async function getAdUpdateQueue(req, res) {
+  try {
+    const { page = 1, limit = 10, queueType = 'regular', sortBy = 'normal', sortOrder = 'desc', search = null } = req.query;
+    const ifNoneMatch = req.headers['if-none-match'];
+    
+    const processingData = await adUpdateProcessingService.getAdUpdateQueue(
+      parseInt(page),
+      parseInt(limit),
+      queueType,
+      sortBy,
+      sortOrder,
+      ifNoneMatch,
+      search
+    );
+
+    // Handle ETag caching
+    if (processingData.status === 304) {
+      res.set('ETag', processingData.etag);
+      return res.status(304).end();
+    }
+
+    // Set ETag header for future requests
+    if (processingData.etag) {
+      res.set('ETag', processingData.etag);
+    }
+
+    res.status(200).json(processingData);
+  } catch (error) {
+    logger.error("Error in getAdUpdateQueue:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch ad-update processing queue",
+      error: error.message,
+    });
+  }
+}
+
+async function getWatchlistAdUpdateQueue(req, res) {
+  try {
+    const { page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc', search = null } = req.query;
+    const ifNoneMatch = req.headers['if-none-match'];
+    
+    const watchlistData = await adUpdateProcessingService.getWatchlistAdUpdateQueue(
+      parseInt(page),
+      parseInt(limit),
+      sortBy,
+      sortOrder,
+      ifNoneMatch,
+      search
+    );
+
+    // Handle ETag caching
+    if (watchlistData.status === 304) {
+      res.set('ETag', watchlistData.etag);
+      return res.status(304).end();
+    }
+
+    // Set ETag header for future requests
+    if (watchlistData.etag) {
+      res.set('ETag', watchlistData.etag);
+    }
+
+    res.status(200).json(watchlistData);
+  } catch (error) {
+    logger.error("Error in getWatchlistAdUpdateQueue:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch watchlist ad-update queue",
+      error: error.message,
+    });
+  }
+}
+
+async function getAllAdUpdateJobs(req, res) {
+  try {
+    const { queueType = 'regular' } = req.query;
+    const ifNoneMatch = req.headers['if-none-match'];
+    
+    const allJobsData = await adUpdateProcessingService.getAllAdUpdateJobs(
+      queueType,
+      ifNoneMatch
+    );
+
+    // Handle ETag caching
+    if (allJobsData.status === 304) {
+      res.set('ETag', allJobsData.etag);
+      return res.status(304).end();
+    }
+
+    // Set ETag header for future requests
+    if (allJobsData.etag) {
+      res.set('ETag', allJobsData.etag);
+    }
+
+    res.status(200).json(allJobsData);
+  } catch (error) {
+    logger.error("Error in getAllAdUpdateJobs:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch all ad-update jobs",
+      error: error.message,
+    });
+  }
+}
+
+async function invalidateQueueCache(req, res) {
+  try {
+    logger.info("Cache invalidation request received");
+    
+    // Invalidate all queue caches
+    await cacheUtils.invalidateQueueCache();
+    
+    res.status(200).json({
+      success: true,
+      message: "Queue cache invalidated successfully",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error("Error in invalidateQueueCache:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to invalidate cache",
+      error: error.message,
+    });
+  }
+}

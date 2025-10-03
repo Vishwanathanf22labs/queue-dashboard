@@ -5,12 +5,15 @@ import StopScraperButton from '../scraper/StopScraperButton';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import ErrorDisplay from '../ui/ErrorDisplay';
 
-const ScraperControls = () => {
+const ScraperControls = ({ disabled = false }) => {
   const [scraperStatus, setScraperStatus] = useState('unknown');
   const [startTime, setStartTime] = useState(null);
   const [stopTime, setStopTime] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [brandTiming, setBrandTiming] = useState(null);
+  const [brandTimingError, setBrandTimingError] = useState(null);
+  const [brandTimingLoading, setBrandTimingLoading] = useState(false);
 
   const fetchScraperStatus = async () => {
     try {
@@ -33,6 +36,24 @@ const ScraperControls = () => {
 
   useEffect(() => {
     fetchScraperStatus();
+  }, []);
+
+  const fetchBrandTiming = async () => {
+    try {
+      setBrandTimingLoading(true);
+      setBrandTimingError(null);
+      const res = await queueAPI.getBrandTiming();
+      setBrandTiming(res.data?.data || {});
+    } catch (e) {
+      setBrandTimingError('Failed to fetch brand timing');
+      setBrandTiming(null);
+    } finally {
+      setBrandTimingLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBrandTiming();
   }, []);
 
   const handleScraperStart = (result) => {
@@ -123,6 +144,31 @@ const ScraperControls = () => {
   const statusInfo = getStatusInfo(scraperStatus);
   const isRunning = scraperStatus === 'running';
 
+  function parseTimingValue(raw) {
+    if (!raw) return null;
+    try {
+      if (typeof raw === 'string') {
+        return JSON.parse(raw);
+      }
+      return raw;
+    } catch (_) {
+      return { date: raw };
+    }
+  }
+
+  function formatTimingDate(raw) {
+    const obj = parseTimingValue(raw);
+    const ts = obj?.date;
+    if (!ts) return 'Not set';
+    return formatTimestamp(ts);
+  }
+
+  function renderTimingMeta(raw) {
+    const obj = parseTimingValue(raw);
+    if (!obj || obj.brandCount == null) return null;
+    return <span className="ml-2 text-sm font-medium text-blue-600">({obj.brandCount} brands)</span>;
+  }
+
   if (isLoading) {
     return <LoadingSpinner />;
   }
@@ -183,18 +229,84 @@ const ScraperControls = () => {
         </div>
       </div>
 
+      {/* Brand Timing Card */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium text-gray-900">Brand Timing</h3>
+          <button
+            onClick={fetchBrandTiming}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+            title="Refresh timing"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        </div>
+
+        {brandTimingLoading ? (
+          <LoadingSpinner />
+        ) : brandTimingError ? (
+          <ErrorDisplay message={brandTimingError} onRetry={fetchBrandTiming} />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Watchlist */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-800 mb-2">Watchlist</h4>
+              <div className="space-y-2 text-sm">
+                <div>
+                  <span className="text-gray-600">Loaded:</span>{' '}
+                  <span className="font-mono text-gray-800">
+                    {formatTimingDate(brandTiming?.watchlist_loaded)}
+                  </span>
+                  {renderTimingMeta(brandTiming?.watchlist_loaded)}
+                </div>
+                <div>
+                  <span className="text-gray-600">Completed:</span>{' '}
+                  <span className="font-mono text-gray-800">
+                    {formatTimingDate(brandTiming?.watchlist_dequeue)}
+                  </span>
+                  {renderTimingMeta(brandTiming?.watchlist_dequeue)}
+                </div>
+              </div>
+            </div>
+
+            {/* Non‑watchlist */}
+            <div>
+              <h4 className="text-sm font-semibold text-gray-800 mb-2">Non‑watchlist</h4>
+              <div className="space-y-2 text-sm">
+                <div>
+                  <span className="text-gray-600">Loaded:</span>{' '}
+                  <span className="font-mono text-gray-800">
+                    {formatTimingDate(brandTiming?.regular_loaded)}
+                  </span>
+                  {renderTimingMeta(brandTiming?.regular_loaded)}
+                </div>
+                <div>
+                  <span className="text-gray-600">Completed:</span>{' '}
+                  <span className="font-mono text-gray-800">
+                    {formatTimingDate(brandTiming?.regular_dequeue)}
+                  </span>
+                  {renderTimingMeta(brandTiming?.regular_dequeue)}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Control Buttons */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Scraper Controls</h3>
         <div className="flex items-center space-x-4">
           <StartScraperButton
             onScraperStart={handleScraperStart}
-            isDisabled={isRunning}
+            isDisabled={disabled || isRunning}
             size="lg"
           />
           <StopScraperButton
             onScraperStop={handleScraperStop}
-            isDisabled={!isRunning}
+            isDisabled={disabled || !isRunning}
             size="lg"
           />
         </div>

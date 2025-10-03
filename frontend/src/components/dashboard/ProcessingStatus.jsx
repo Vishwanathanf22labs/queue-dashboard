@@ -9,7 +9,8 @@ const ProcessingStatus = ({
   scraperStatus, 
   scraperStatusLoading, 
   formattedStartTime,
-  pendingCount = 0
+  pendingCount = 0,
+  failedCount = 0
 }) => {
   const getScraperStatusInfo = (status) => {
     // Handle specific stopped reasons
@@ -64,13 +65,41 @@ const ProcessingStatus = ({
   const nonWatchlistProcessingBrands = getNonWatchlistCurrentlyProcessing();
 
   // Check if we should show waiting message (when scraper is running but no brand processing)
-  // Only show waiting when there are NO pending brands in queue
-  const shouldShowWaiting = scraperStatus === 'running' && (!currentlyProcessing || currentlyProcessing.length === 0) && pendingCount === 0;
+  // Show waiting when scraper is running and card is empty, regardless of queue count
+  const shouldShowWaiting = scraperStatus === 'running' && (!currentlyProcessing || currentlyProcessing.length === 0);
+
+  // Determine if status badge should be visible based on scraper status
+  const shouldShowStatusBadge = () => {
+    // Hide badge only when status is cooldown(WL) 
+    if (scraperStatus === 'cooldown(WL)' || scraperStatus === 'cooldown (WL)') {
+      return false;
+    }
+    
+    // Show badge for all other statuses including cooldown(NWL)
+    return true;
+  };
 
   return (
     <div className="grid gap-4 sm:gap-6 grid-cols-1">
       <Card>
-        <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Regular Currently Scraping</h3>
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+            Regular Currently Scraping
+          </h3>
+          {shouldShowStatusBadge() && !scraperStatusLoading && (
+            (() => {
+              // Show the actual API status instead of overriding it
+              const statusInfo = getScraperStatusInfo(scraperStatus);
+              const StatusIcon = statusInfo.icon;
+              return (
+                <Badge variant={statusInfo.variant} className="flex items-center space-x-1">
+                  <StatusIcon className="h-3 w-3" />
+                  <span>{statusInfo.label}</span>
+                </Badge>
+              );
+            })()
+          )}
+        </div>
         {nonWatchlistProcessingBrands.length > 0 ? (
           <div className="space-y-4">
             {/* Header with count */}
@@ -78,20 +107,6 @@ const ProcessingStatus = ({
               <span className="text-sm font-medium text-gray-600">
                 {Array.isArray(currentlyProcessing) ? currentlyProcessing.length : 1} brand{(Array.isArray(currentlyProcessing) ? currentlyProcessing.length : 1) !== 1 ? 's' : ''} processing
               </span>
-              {!scraperStatusLoading && (
-                (() => {
-                  // If there's a currently processing brand, show 'running' status
-                  const effectiveStatus = currentlyProcessing ? 'running' : scraperStatus;
-                  const statusInfo = getScraperStatusInfo(effectiveStatus);
-                  const StatusIcon = statusInfo.icon;
-                  return (
-                    <Badge variant={statusInfo.variant} className="flex items-center space-x-1">
-                      <StatusIcon className="h-3 w-3" />
-                      <span>{statusInfo.label}</span>
-                    </Badge>
-                  );
-                })()
-              )}
             </div>
 
             {/* List of processing brands */}
@@ -159,7 +174,6 @@ const ProcessingStatus = ({
                         : brand.status === 'failed' 
                           ? 'error' 
                           : 'info';
-                      console.log(`Regular Brand ${brand.brand_id}: status="${brand.status}", variant="${badgeVariant}"`);
                       return (
                         <Badge 
                           variant={badgeVariant} 
@@ -196,26 +210,12 @@ const ProcessingStatus = ({
               </>
             )}
 
-            {!scraperStatusLoading && (
-              <div className="mt-3">
-                {(() => {
-                  const statusInfo = getScraperStatusInfo(scraperStatus);
-                  const StatusIcon = statusInfo.icon;
-                  return (
-                    <Badge variant={statusInfo.variant} className="inline-flex items-center space-x-1">
-                      <StatusIcon className="h-3 w-3" />
-                      <span>{statusInfo.label}</span>
-                    </Badge>
-                  );
-                })()}
-              </div>
-            )}
           </div>
         )}
       </Card>
 
-      {/* Only show Next in Line card when there are NO pending brands */}
-      {pendingCount === 0 && (
+      {/* Only show Next in Line card when there are NO pending brands AND there are failed brands */}
+      {pendingCount === 0 && failedCount > 0 && (
         <Card>
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h3 className="text-base sm:text-lg font-semibold text-gray-900">Next in Line</h3>

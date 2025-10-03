@@ -1,11 +1,16 @@
 const { getQueueRedis, getGlobalRedis } = require("../utils/redisSelector");
-const Brand = require("../models/Brand");
 const logger = require("../utils/logger");
-const { QUEUES, BATCH_SIZE, REDIS_KEYS } = require("../config/constants");
+const { QUEUES, BATCH_SIZE } = require("../config/constants");
 const { Op } = require("sequelize");
+
+// Function to get dynamic Redis keys
+function getRedisKeys() {
+  return require("../config/constants").REDIS_KEYS;
+}
 
 async function getExistingPageIds(queueType = 'regular') {
   const redis = getQueueRedis(queueType);
+  const REDIS_KEYS = getRedisKeys();
   const queueKey = REDIS_KEYS[queueType.toUpperCase()].PENDING_BRANDS;
   const existingItems = await redis.zrange(queueKey, 0, -1, 'WITHSCORES');
   const existingPageIds = new Set();
@@ -28,6 +33,10 @@ async function getExistingPageIds(queueType = 'regular') {
 
 async function addSingleBrandToQueue(brandData, queueType = 'regular') {
   try {
+    // Require Brand model dynamically to get the latest version
+    const { Brand } = require("../models");
+    const REDIS_KEYS = getRedisKeys();
+    
     const { id, page_id, score } = brandData;
 
     if (!id || !page_id) {
@@ -83,6 +92,10 @@ async function addSingleBrandToQueue(brandData, queueType = 'regular') {
 
 async function addBulkBrandsFromCSVToQueue(brandsData, queueType = 'regular') {
   try {
+    // Require Brand model dynamically to get the latest version
+    const { Brand } = require("../models");
+    const REDIS_KEYS = getRedisKeys();
+    
     if (!Array.isArray(brandsData) || brandsData.length === 0) {
       throw new Error("brandsData must be a non-empty array");
     }
@@ -185,6 +198,9 @@ async function addBulkBrandsFromCSVToQueue(brandsData, queueType = 'regular') {
 
 async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular') {
   try {
+    // Require Brand model dynamically to get the latest version
+    const { Brand } = require("../models");
+    
     // Build where clause
     const whereClause = {
       page_id: {
@@ -192,21 +208,112 @@ async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular') {
       },
     };
 
-    // Add status filter if provided
-    if (statusFilter && ['Active', 'Inactive'].includes(statusFilter)) {
-      whereClause.status = statusFilter;
-    }
+    let allBrands;
+    let filterMessage = '';
 
-    const allBrands = await Brand.findAll({
-      where: whereClause,
-      attributes: ["id", "page_id"],
-      raw: true,
-    });
+    // Handle different filter types
+    if (statusFilter === 'watchlist_active') {
+      // Optimized query using EXISTS subquery for better performance
+      allBrands = await Brand.findAll({
+        where: {
+          ...whereClause,
+          status: 'Active',
+          id: {
+            [Op.in]: Brand.sequelize.literal(`(SELECT DISTINCT brand_id FROM watch_lists)`)
+          }
+        },
+        attributes: ["id", "page_id"],
+        raw: true,
+      });
+      filterMessage = 'watchlist active';
+    } else if (statusFilter === 'watchlist_inactive') {
+      // Optimized query using EXISTS subquery for better performance
+      allBrands = await Brand.findAll({
+        where: {
+          ...whereClause,
+          status: 'Inactive',
+          id: {
+            [Op.in]: Brand.sequelize.literal(`(SELECT DISTINCT brand_id FROM watch_lists)`)
+          }
+        },
+        attributes: ["id", "page_id"],
+        raw: true,
+      });
+      filterMessage = 'watchlist inactive';
+    } else if (statusFilter === 'watchlist_all') {
+      // All watchlist brands (both active and inactive)
+      allBrands = await Brand.findAll({
+        where: {
+          ...whereClause,
+          id: {
+            [Op.in]: Brand.sequelize.literal(`(SELECT DISTINCT brand_id FROM watch_lists)`)
+          }
+        },
+        attributes: ["id", "page_id"],
+        raw: true,
+      });
+      filterMessage = 'all watchlist brands';
+    } else if (statusFilter === 'regular_active') {
+      // Regular active brands (not in watchlist)
+      allBrands = await Brand.findAll({
+        where: {
+          ...whereClause,
+          status: 'Active',
+          id: {
+            [Op.notIn]: Brand.sequelize.literal(`(SELECT DISTINCT brand_id FROM watch_lists)`)
+          }
+        },
+        attributes: ["id", "page_id"],
+        raw: true,
+      });
+      filterMessage = 'regular active brands';
+    } else if (statusFilter === 'regular_inactive') {
+      // Regular inactive brands (not in watchlist)
+      allBrands = await Brand.findAll({
+        where: {
+          ...whereClause,
+          status: 'Inactive',
+          id: {
+            [Op.notIn]: Brand.sequelize.literal(`(SELECT DISTINCT brand_id FROM watch_lists)`)
+          }
+        },
+        attributes: ["id", "page_id"],
+        raw: true,
+      });
+      filterMessage = 'regular inactive brands';
+    } else if (statusFilter === 'regular_all') {
+      // All regular brands (both active and inactive, not in watchlist)
+      allBrands = await Brand.findAll({
+        where: {
+          ...whereClause,
+          id: {
+            [Op.notIn]: Brand.sequelize.literal(`(SELECT DISTINCT brand_id FROM watch_lists)`)
+          }
+        },
+        attributes: ["id", "page_id"],
+        raw: true,
+      });
+      filterMessage = 'all regular brands';
+    } else {
+      // Original logic for 'Active', 'Inactive', or null
+      if (statusFilter && ['Active', 'Inactive'].includes(statusFilter)) {
+        whereClause.status = statusFilter;
+        filterMessage = statusFilter.toLowerCase();
+      } else {
+        filterMessage = '';
+      }
+
+      allBrands = await Brand.findAll({
+        where: whereClause,
+        attributes: ["id", "page_id"],
+        raw: true,
+      });
+    }
 
     if (allBrands.length === 0) {
       return {
         success: true,
-        message: `No ${statusFilter ? statusFilter.toLowerCase() : ''} brands found in database`,
+        message: `No ${filterMessage ? filterMessage : 'all'} brands found in database`,
         results: {
           total_brands: 0,
           added_count: 0,
@@ -217,6 +324,7 @@ async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular') {
     }
 
     const existingPageIds = await getExistingPageIds(queueType);
+    const REDIS_KEYS = getRedisKeys();
 
     let addedCount = 0;
     let skippedCount = 0;
@@ -236,9 +344,12 @@ async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular') {
             id: brand.id,
             page_id: brand.page_id
           });
-          // Add to sorted set with default score 0 (normal priority)
-          const defaultScore = 0;
-          pipeline.zadd(queueKey, defaultScore, queueItem);
+          // Add to sorted set with priority score based on filter type
+          let priorityScore = 0; // Default score for regular operations
+          if (statusFilter === 'watchlist_active' || statusFilter === 'watchlist_inactive' || queueType === 'watchlist') {
+            priorityScore = 1; // Higher priority for all watchlist operations
+          }
+          pipeline.zadd(queueKey, priorityScore, queueItem);
           existingPageIds.add(brand.page_id);
           addedCount++;
         } else {
@@ -250,12 +361,12 @@ async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular') {
     }
 
     logger.info(
-      `Added ${statusFilter ? statusFilter.toLowerCase() : 'all'} brands to ${queueType} queue: ${addedCount} added, ${skippedCount} skipped`
+      `Added ${filterMessage ? filterMessage : 'all'} brands to ${queueType} queue: ${addedCount} added, ${skippedCount} skipped`
     );
 
     return {
       success: true,
-      message: `${statusFilter ? statusFilter : 'All'} brands operation completed for ${queueType} queue`,
+      message: `${filterMessage ? filterMessage.charAt(0).toUpperCase() + filterMessage.slice(1) : 'All'} brands operation completed for ${queueType} queue`,
       results: {
         total_brands: totalBrands,
         added_count: addedCount,
@@ -271,6 +382,9 @@ async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular') {
 
 async function searchBrands(query, limit = 8) {
   try {
+    // Require models dynamically to get the latest version
+    const { Brand, WatchList } = require("../models");
+    
     if (!query || query.trim().length === 0) {
       return [];
     }
@@ -423,6 +537,31 @@ async function searchBrands(query, limit = 8) {
       // Create search conditions for all variations
       const searchConditions = [];
       
+      // Check if query is numeric (for page_id or brand_id search)
+      const isNumericQuery = /^\d+$/.test(searchQuery);
+      
+      if (isNumericQuery) {
+        // If query is numeric, search by page_id and brand_id
+        searchConditions.push(
+          { page_id: searchQuery }, // Keep as string for page_id
+          { id: parseInt(searchQuery) }
+        );
+        
+        // Also search by the numeric query in name and actual_name columns
+        searchConditions.push(
+          {
+            name: {
+              [Op.iLike]: `%${searchQuery}%`
+            },
+          },
+          {
+            actual_name: {
+              [Op.iLike]: `%${searchQuery}%`
+            },
+          }
+        );
+      }
+      
       uniqueVariations.forEach(variation => {
         searchConditions.push(
           {
@@ -490,6 +629,16 @@ async function searchBrands(query, limit = 8) {
       // Fallback to simple search with variations
       const simpleSearchConditions = [];
       
+      // For numeric queries, add numeric search conditions to fallback too
+      if (isNumericQuery) {
+        simpleSearchConditions.push(
+          { page_id: searchQuery }, // Keep as string for page_id
+          { id: parseInt(searchQuery) },
+          { name: { [Op.iLike]: `%${searchQuery}%` } },
+          { actual_name: { [Op.iLike]: `%${searchQuery}%` } }
+        );
+      }
+      
       uniqueVariations.forEach(variation => {
         simpleSearchConditions.push(
           { name: { [Op.iLike]: `%${variation}%` } },
@@ -525,42 +674,354 @@ async function searchBrands(query, limit = 8) {
 
 async function getBrandCountsByStatus() {
   try {
-    const [totalCount, activeCount, inactiveCount] = await Promise.all([
-      Brand.count({
-        where: {
-          page_id: {
-            [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: "" }],
-          },
-        },
-      }),
-      Brand.count({
-        where: {
-          page_id: {
-            [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: "" }],
-          },
-          status: 'Active',
-        },
-      }),
-      Brand.count({
-        where: {
-          page_id: {
-            [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: "" }],
-          },
-          status: 'Inactive',
-        },
-      }),
-    ]);
+    // Require Brand model dynamically to get the latest version
+    const { Brand } = require("../models");
+    
+    // Single optimized query using conditional aggregation for maximum performance
+    const result = await Brand.sequelize.query(`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(CASE WHEN status = 'Active' THEN 1 END) as active,
+        COUNT(CASE WHEN status = 'Inactive' THEN 1 END) as inactive,
+        COUNT(CASE WHEN status = 'Active' AND id IN (SELECT DISTINCT brand_id FROM watch_lists) THEN 1 END) as watchlist_active,
+        COUNT(CASE WHEN status = 'Inactive' AND id IN (SELECT DISTINCT brand_id FROM watch_lists) THEN 1 END) as watchlist_inactive,
+        COUNT(CASE WHEN status = 'Active' AND id NOT IN (SELECT DISTINCT brand_id FROM watch_lists) THEN 1 END) as regular_active,
+        COUNT(CASE WHEN status = 'Inactive' AND id NOT IN (SELECT DISTINCT brand_id FROM watch_lists) THEN 1 END) as regular_inactive,
+        COUNT(CASE WHEN id IN (SELECT DISTINCT brand_id FROM watch_lists) THEN 1 END) as watchlist_all,
+        COUNT(CASE WHEN id NOT IN (SELECT DISTINCT brand_id FROM watch_lists) THEN 1 END) as regular_all
+      FROM brands 
+      WHERE page_id IS NOT NULL AND page_id != ''
+    `, {
+      type: Brand.sequelize.QueryTypes.SELECT,
+      raw: true
+    });
+
+    const counts = result[0];
 
     return {
       success: true,
       data: {
-        total: totalCount,
-        active: activeCount,
-        inactive: inactiveCount,
+        total: parseInt(counts.total),
+        active: parseInt(counts.active),
+        inactive: parseInt(counts.inactive),
+        watchlist_active: parseInt(counts.watchlist_active),
+        watchlist_inactive: parseInt(counts.watchlist_inactive),
+        regular_active: parseInt(counts.regular_active),
+        regular_inactive: parseInt(counts.regular_inactive),
+        watchlist_all: parseInt(counts.watchlist_all),
+        regular_all: parseInt(counts.regular_all),
       },
     };
   } catch (error) {
     logger.error("Error in getBrandCountsByStatus:", error);
+    throw error;
+  }
+}
+
+async function getBrandByIdentifier(identifier) {
+  try {
+    // Require Brand model dynamically to get the latest version
+    const { Brand } = require("../models");
+    
+    const { brand_id, page_id } = identifier;
+    
+    if (!brand_id && !page_id) {
+      throw new Error("Either brand_id or page_id is required");
+    }
+    
+    if (brand_id && page_id) {
+      throw new Error("Only one identifier (brand_id or page_id) should be provided");
+    }
+    
+    let whereClause = {};
+    if (brand_id) {
+      whereClause.id = brand_id;
+    } else {
+      whereClause.page_id = page_id;
+    }
+    
+    const brand = await Brand.findOne({
+      where: whereClause,
+      attributes: ["id", "page_id", "name", "status"],
+      raw: true
+    });
+    
+    if (!brand) {
+      throw new Error("Brand not found");
+    }
+    
+    return {
+      success: true,
+      data: {
+        id: brand.id,
+        page_id: brand.page_id,
+        name: brand.name,
+        status: brand.status
+      }
+    };
+  } catch (error) {
+    logger.error("Error in getBrandByIdentifier:", error);
+    throw error;
+  }
+}
+
+async function updateBrandStatus(identifier, status) {
+  try {
+    // Require Brand model dynamically to get the latest version
+    const { Brand } = require("../models");
+    
+    const { brand_id, page_id } = identifier;
+    
+    if (!brand_id && !page_id) {
+      throw new Error("Either brand_id or page_id is required");
+    }
+    
+    if (brand_id && page_id) {
+      throw new Error("Only one identifier (brand_id or page_id) should be provided");
+    }
+    
+    if (!['Active', 'Inactive'].includes(status)) {
+      throw new Error("Status must be either 'Active' or 'Inactive'");
+    }
+    
+    let whereClause = {};
+    if (brand_id) {
+      whereClause.id = brand_id;
+    } else {
+      whereClause.page_id = page_id;
+    }
+    
+    // First, get the current brand to check its status
+    const currentBrand = await Brand.findOne({
+      where: whereClause,
+      attributes: ["id", "page_id", "name", "status"],
+      raw: true
+    });
+    
+    if (!currentBrand) {
+      throw new Error("Brand not found");
+    }
+    
+    if (currentBrand.status === 'Incomplete') {
+      throw new Error("Status changes are only allowed for Active/Inactive brands");
+    }
+    
+    if (currentBrand.status === status) {
+      throw new Error(`Brand is already ${status}`);
+    }
+    
+    // Update the brand status
+    const [updatedRowsCount] = await Brand.update(
+      { status: status },
+      { where: whereClause }
+    );
+    
+    if (updatedRowsCount === 0) {
+      throw new Error("Failed to update brand status");
+    }
+    
+    return {
+      success: true,
+      message: `Brand status updated to ${status} successfully`,
+      data: {
+        id: currentBrand.id,
+        page_id: currentBrand.page_id,
+        name: currentBrand.name,
+        old_status: currentBrand.status,
+        new_status: status
+      }
+    };
+  } catch (error) {
+    logger.error("Error in updateBrandStatus:", error);
+    throw error;
+  }
+}
+
+async function bulkPreviewBrands(ids, pageIds = []) {
+  try {
+    // Require Brand model dynamically to get the latest version
+    const { Brand } = require("../models");
+    
+    if (!ids || ids.length === 0) {
+      throw new Error("At least one brand ID is required");
+    }
+    
+    // Remove duplicates
+    const uniqueIds = [...new Set(ids)];
+    const uniquePageIds = [...new Set(pageIds)];
+    
+    const results = {
+      items: [],
+      notFound: [],
+      duplicates: {
+        ids: ids.length - uniqueIds.length,
+        pageIds: pageIds.length - uniquePageIds.length
+      }
+    };
+    
+    // Fetch brands by IDs
+    if (uniqueIds.length > 0) {
+      const brandsById = await Brand.findAll({
+        where: { id: uniqueIds },
+        attributes: ["id", "page_id", "name", "actual_name", "status"],
+        raw: true
+      });
+      
+      const foundIds = new Set(brandsById.map(b => b.id));
+      
+      // Add found brands
+      brandsById.forEach(brand => {
+        results.items.push({
+          id: brand.id,
+          page_id: brand.page_id,
+          name: brand.name,
+          currentStatus: brand.status,
+          identifier: 'id'
+        });
+      });
+      
+      // Track not found IDs
+      uniqueIds.forEach(id => {
+        if (!foundIds.has(id)) {
+          results.notFound.push({ type: 'id', value: id });
+        }
+      });
+    }
+    
+    // Fetch brands by page IDs (if any)
+    if (uniquePageIds.length > 0) {
+      const brandsByPageId = await Brand.findAll({
+        where: { page_id: uniquePageIds },
+        attributes: ["id", "page_id", "name", "actual_name", "status"],
+        raw: true
+      });
+      
+      const foundPageIds = new Set(brandsByPageId.map(b => b.page_id));
+      
+      // Add found brands (avoid duplicates if same brand found by both ID and page_id)
+      brandsByPageId.forEach(brand => {
+        const existingItem = results.items.find(item => item.id === brand.id);
+        if (!existingItem) {
+          results.items.push({
+            id: brand.id,
+            page_id: brand.page_id,
+            name: brand.name,
+            currentStatus: brand.status,
+            identifier: 'page_id'
+          });
+        }
+      });
+      
+      // Track not found page IDs
+      uniquePageIds.forEach(pageId => {
+        if (!foundPageIds.has(pageId)) {
+          results.notFound.push({ type: 'page_id', value: pageId });
+        }
+      });
+    }
+    
+    return {
+      success: true,
+      data: results
+    };
+  } catch (error) {
+    logger.error("Error in bulkPreviewBrands:", error);
+    throw error;
+  }
+}
+
+async function bulkApplyStatusUpdates(updates) {
+  try {
+    if (!updates || updates.length === 0) {
+      throw new Error("No updates provided");
+    }
+    
+    const results = {
+      updated: [],
+      skipped: [],
+      errors: [],
+      totals: {
+        attempted: updates.length,
+        updated: 0,
+        skipped: 0,
+        errors: 0
+      }
+    };
+    
+    // Process updates in chunks to avoid overwhelming the database
+    const chunkSize = 200;
+    for (let i = 0; i < updates.length; i += chunkSize) {
+      const chunk = updates.slice(i, i + chunkSize);
+      
+      for (const update of chunk) {
+        try {
+          const { id, page_id, status } = update;
+          
+          if (!id && !page_id) {
+            results.errors.push({
+              update,
+              error: "Either id or page_id is required"
+            });
+            results.totals.errors++;
+            continue;
+          }
+          
+          if (id && page_id) {
+            results.errors.push({
+              update,
+              error: "Only one identifier (id or page_id) should be provided"
+            });
+            results.totals.errors++;
+            continue;
+          }
+          
+          if (!['Active', 'Inactive'].includes(status)) {
+            results.errors.push({
+              update,
+              error: "Status must be either 'Active' or 'Inactive'"
+            });
+            results.totals.errors++;
+            continue;
+          }
+          
+          // Use existing updateBrandStatus function
+          const identifier = id ? { brand_id: id } : { page_id };
+          const result = await updateBrandStatus(identifier, status);
+          
+          results.updated.push({
+            id: result.data.id,
+            page_id: result.data.page_id,
+            name: result.data.name,
+            old_status: result.data.old_status,
+            new_status: result.data.new_status
+          });
+          results.totals.updated++;
+          
+        } catch (error) {
+          if (error.message.includes('already') || error.message.includes('Incomplete')) {
+            results.skipped.push({
+              update,
+              reason: error.message
+            });
+            results.totals.skipped++;
+          } else {
+            results.errors.push({
+              update,
+              error: error.message
+            });
+            results.totals.errors++;
+          }
+        }
+      }
+    }
+    
+    return {
+      success: true,
+      message: `Bulk update completed: ${results.totals.updated} updated, ${results.totals.skipped} skipped, ${results.totals.errors} errors`,
+      data: results
+    };
+  } catch (error) {
+    logger.error("Error in bulkApplyStatusUpdates:", error);
     throw error;
   }
 }
@@ -570,5 +1031,9 @@ module.exports = {
   addAllBrandsToQueue,
   addBulkBrandsToQueue: addBulkBrandsFromCSVToQueue,
   searchBrands,
-  getBrandCountsByStatus
+  getBrandCountsByStatus,
+  getBrandByIdentifier,
+  updateBrandStatus,
+  bulkPreviewBrands,
+  bulkApplyStatusUpdates
 };

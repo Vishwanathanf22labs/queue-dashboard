@@ -1,4 +1,4 @@
-const { Brand, Ad, AdMediaItem, BrandsDailyStatus } = require("../../models");
+// Models will be required dynamically
 const { Op } = require("sequelize");
 const { getCacheKey, getCachedData, setCachedData } = require("../utils/cacheUtils");
 const { getFileUploadBullQueueData } = require("../utils/redisUtils");
@@ -17,6 +17,9 @@ async function getFileUploadStatus(
   queueType = 'regular'
 ) {
   try {
+    // Require models dynamically to get the latest version
+    const { Brand, Ad, AdMediaItem, BrandsDailyStatus } = require("../../models");
+    
     const cacheKey = getCacheKey("fileupload", brandId, targetDate);
     const cached = getCachedData(cacheKey);
     if (cached) return cached;

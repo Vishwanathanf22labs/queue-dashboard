@@ -1,4 +1,4 @@
-const { globalRedis, watchlistRedis, regularRedis } = require("../config/redis");
+const { getGlobalRedis, getWatchlistRedisInstance, getRegularRedisInstance } = require("../utils/redisSelector");
 const logger = require("../utils/logger");
 const { REDIS_KEYS, MILLISECONDS_PER_DAY } = require("../config/constants");
 
@@ -10,7 +10,7 @@ async function getBrandsScrapedStats(date = null) {
 
     logger.info(`Looking for stats key: ${statsKey}`);
 
-    const allStats = await globalRedis.hgetall(statsKey);
+    const allStats = await getGlobalRedis().hgetall(statsKey);
 
     logger.info(`Stats data for ${statsKey}:`, allStats);
 
@@ -42,7 +42,7 @@ async function getBrandsScrapedStatsForDays(days = 7) {
     }
 
     // 🚀 OPTIMIZATION 2: Use Redis pipeline for batch operations
-    const pipeline = globalRedis.pipeline();
+    const pipeline = getGlobalRedis().pipeline();
     dateStrings.forEach((dateString) => {
       const statsKey = `${REDIS_KEYS.GLOBAL.STATS_PREFIX}${dateString}`;
       pipeline.hgetall(statsKey);
@@ -81,8 +81,8 @@ async function getSeparateBrandsScrapedStats(date = null) {
     
     // Get stats from both Redis instances
     const [watchlistStats, regularStats] = await Promise.all([
-      getStatsFromRedis(watchlistRedis, targetDate, 'watchlist'),
-      getStatsFromRedis(regularRedis, targetDate, 'regular')
+      getStatsFromRedis(getWatchlistRedisInstance(), targetDate, 'watchlist'),
+      getStatsFromRedis(getRegularRedisInstance(), targetDate, 'regular')
     ]);
 
     return {
@@ -109,8 +109,8 @@ async function getSeparateBrandsScrapedStatsForDays(days = 7) {
 
     // Get stats for all dates from both Redis instances
     const [watchlistStats, regularStats] = await Promise.all([
-      getStatsForDaysFromRedis(watchlistRedis, dateStrings, 'watchlist'),
-      getStatsForDaysFromRedis(regularRedis, dateStrings, 'regular')
+      getStatsForDaysFromRedis(getWatchlistRedisInstance(), dateStrings, 'watchlist'),
+      getStatsForDaysFromRedis(getRegularRedisInstance(), dateStrings, 'regular')
     ]);
 
     return {

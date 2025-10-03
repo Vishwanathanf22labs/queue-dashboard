@@ -189,20 +189,27 @@ const ScrapedBrands = () => {
   const handleSearch = useCallback((query) => {
     setSearchTerm(query);
 
+    // Auto-add leading zeros for numeric searches (1-2 digits)
+    let processedQuery = query;
+    if (query && /^\d{1,2}$/.test(query.trim())) {
+      // If it's 1-2 digits, add leading zeros to make it 3 digits
+      processedQuery = query.trim().padStart(3, '0');
+    }
+
     // Update current search reference immediately
-    currentSearchRef.current = query;
+    currentSearchRef.current = processedQuery;
 
     // Update URL parameters to persist search
     const newSearchParams = new URLSearchParams(searchParams);
-    if (query && query.trim().length >= 3) {
-      newSearchParams.set('search', query);
+    if (processedQuery && processedQuery.trim().length >= 3) {
+      newSearchParams.set('search', processedQuery);
     } else {
       newSearchParams.delete('search');
     }
     setSearchParams(newSearchParams, { replace: true });
 
     // Clear results immediately if empty or too short
-    if (!query.trim() || query.trim().length < 3) {
+    if (!processedQuery.trim() || processedQuery.trim().length < 3) {
       setShowSearchResults(false);
       setSearchResults([]);
       setIsSearching(false);
@@ -225,8 +232,8 @@ const ScrapedBrands = () => {
 
     debounceTimerRef.current = setTimeout(() => {
       // Double-check current search term before making API call
-      if (currentSearchRef.current === query) {
-        searchBrands(query);
+      if (currentSearchRef.current === processedQuery) {
+        searchBrands(processedQuery);
       }
     }, 300);
   }, [searchBrands, searchParams, setSearchParams]);
@@ -450,7 +457,7 @@ const ScrapedBrands = () => {
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           {/* Date Picker */}
           <div className="flex items-center space-x-2">
-            <Calendar className="h-5 w-5 text-gray-500" />
+            <Calendar className="h-5 w-5 text-gray-500 sm:hidden" />
             <div className="relative w-full sm:w-auto min-w-0">
               <input
                 type="date"
@@ -462,7 +469,7 @@ const ScrapedBrands = () => {
                   MozAppearance: 'textfield'
                 }}
               />
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none sm:hidden">
                 <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>

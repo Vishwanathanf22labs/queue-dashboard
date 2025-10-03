@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { proxyAPI } from '../services/api';
 import ProxyManager from '../components/proxy/ProxyManager';
 import ProxyList from '../components/proxy/ProxyList';
@@ -6,28 +7,35 @@ import ProxyStats from '../components/proxy/ProxyStats';
 import SearchInput from '../components/ui/SearchInput';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import Pagination from '../components/ui/Pagination';
 import toast from 'react-hot-toast';
 import useAdminStore from '../stores/adminStore';
-import AdminAccessRequired from '../components/ui/AdminAccessRequired';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
-import { Search } from 'lucide-react';
+import { Search, Shield } from 'lucide-react';
 import CustomDropdown from '../components/ui/CustomDropdown';
 
 const Proxies = () => {
   const { isAdmin, isLoading: adminLoading } = useAdminStore();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Refs for managing state
+  const isInitialMountRef = useRef(true);
+  const prevParamsRef = useRef({ page: null, search: null, filter: null });
+
+  // Initialize state from URL parameters
   const [dataState, setDataState] = useState({
     proxies: [],
     stats: null,
-    managementStats: null, // ✅ NEW: Added management stats
-    currentPage: 1,
+    managementStats: null,
     totalPages: 1,
-    filter: 'all'
+    totalItems: 0,
+    isSearching: false
   });
 
-
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
+  const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get('page')) || 1);
+  const [filter, setFilter] = useState(searchParams.get('filter') || 'all');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
 
@@ -35,34 +43,49 @@ const Proxies = () => {
     setDataState(prev => ({ ...prev, ...updates }));
   }, []);
 
-  const loadProxies = useCallback(async (page = 1, filterType = 'all', search = '') => {
+
+  const loadProxies = useCallback(async (page = 1, filterType = 'all', search = null, showLoading = true) => {
     try {
-      const response = await proxyAPI.getProxies(page, 10, filterType, search);
+      if (search && search.trim()) {
+        setDataState(prev => ({ ...prev, isSearching: true }));
+      } else if (showLoading) {
+        setIsLoading(true);
+      }
+
+      const response = await proxyAPI.getProxies(page, 10, filterType, search || '');
 
       if (response.data.success) {
         const proxies = response.data.data.proxies || [];
         const totalPages = response.data.data.pagination?.pages || 1;
         const currentPage = response.data.data.pagination?.page || 1;
+        const totalItems = response.data.data.pagination?.total || 0;
 
-
-        updateDataState({
+        setDataState(prev => ({
+          ...prev,
           proxies,
           totalPages,
-          currentPage
-        });
+          totalItems,
+          isSearching: false
+        }));
 
         if (search && search.trim() && proxies.length === 0) {
-          toast(`Not available "${search}"`, {
+          toast(`No proxies found for "${search}"`, {
             icon: 'ℹ️',
             duration: 3000,
           });
         }
       } else {
         toast.error(response.data.message || 'Failed to load proxies');
+        setDataState(prev => ({ ...prev, isSearching: false }));
       }
     } catch (error) {
       console.error('Error loading proxies:', error);
       toast.error('Error loading proxies');
+      setDataState(prev => ({ ...prev, isSearching: false }));
+    } finally {
+      if (showLoading) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
@@ -72,45 +95,49 @@ const Proxies = () => {
       const response = await proxyAPI.getProxyStats();
       if (response.data.success) {
         updateDataState({ stats: response.data.data });
-      } else {
-        toast.error('Failed to load proxy statistics');
       }
     } catch (error) {
       console.error('Error loading stats:', error);
-      toast.error('Error loading proxy statistics');
     }
-  }, []);
+  }, [updateDataState]);
 
   const loadManagementStats = useCallback(async () => {
     try {
       const response = await proxyAPI.getProxyManagementStats();
       if (response.data.success) {
         updateDataState({ managementStats: response.data.data });
-      } else {
-        toast.error('Failed to load proxy management statistics');
       }
     } catch (error) {
       console.error('Error loading management stats:', error);
-      toast.error('Error loading proxy management statistics');
     }
-  }, []);
+  }, [updateDataState]);
 
+  // Single useEffect to handle ALL URL parameter changes
   useEffect(() => {
-    if (!isAdmin) return;
+    const urlPage = parseInt(searchParams.get('page')) || 1;
+    const urlSearch = searchParams.get('search') || '';
+    const urlFilter = searchParams.get('filter') || 'all';
 
-    const initializeData = async () => {
-      setIsLoading(true);
-      await Promise.all([
-        loadProxies(),
-        loadStats(),
-        loadManagementStats() // ✅ NEW: Load management stats
-      ]);
-      setIsLoading(false);
-    };
+    // Update local state to match URL
+    setCurrentPage(urlPage);
+    setSearchTerm(urlSearch);
+    setFilter(urlFilter);
 
-    initializeData();
-  }, [loadProxies, loadStats, loadManagementStats, isAdmin]);
+    // Update previous params reference
+    prevParamsRef.current = { page: urlPage, search: urlSearch, filter: urlFilter };
 
+    // Load data based on current URL params
+    if (isInitialMountRef.current) {
+      // Initial load
+      loadProxies(urlPage, urlFilter, urlSearch || null, true);
+      loadStats();
+      loadManagementStats();
+      isInitialMountRef.current = false;
+    } else {
+      // Subsequent loads
+      loadProxies(urlPage, urlFilter, urlSearch || null, false);
+    }
+  }, [searchParams, loadProxies, loadStats, loadManagementStats]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -126,75 +153,61 @@ const Proxies = () => {
   }, [showFilterDropdown]);
 
 
+
   const handleProxyAdded = useCallback((newProxy) => {
-    updateDataState(prev => ({
-      ...prev,
-      proxies: [newProxy, ...prev.proxies]
-    }));
     loadStats();
-    loadManagementStats(); // ✅ NEW: Reload management stats
-    loadProxies(dataState.currentPage, dataState.filter, searchTerm);
-  }, [loadStats, loadManagementStats, dataState.currentPage, dataState.filter, searchTerm, loadProxies, updateDataState]);
+    loadManagementStats();
+    loadProxies(currentPage, filter, searchTerm);
+  }, [loadStats, loadManagementStats, currentPage, filter, searchTerm, loadProxies]);
 
 
   const handleProxyRemoved = useCallback((proxyId) => {
-    updateDataState(prev => ({
-      ...prev,
-      proxies: prev.proxies.filter(proxy => proxy.id !== proxyId)
-    }));
     loadStats();
-    loadManagementStats(); // ✅ NEW: Reload management stats
-    loadProxies(dataState.currentPage, dataState.filter, searchTerm);
-  }, [loadStats, loadManagementStats, dataState.currentPage, dataState.filter, searchTerm, loadProxies, updateDataState]);
+    loadManagementStats();
+    loadProxies(currentPage, filter, searchTerm);
+  }, [loadStats, loadManagementStats, currentPage, filter, searchTerm, loadProxies]);
 
 
   const handleProxyUpdated = useCallback((proxyId, updates) => {
-    updateDataState(prev => ({
-      ...prev,
-      proxies: prev.proxies.map(proxy =>
-        proxy.id === proxyId ? { ...proxy, ...updates } : proxy
-      )
-    }));
     loadStats();
-    loadManagementStats(); // ✅ NEW: Reload management stats
-    loadProxies(dataState.currentPage, dataState.filter, searchTerm);
-  }, [loadStats, loadManagementStats, dataState.currentPage, dataState.filter, searchTerm, loadProxies, updateDataState]);
+    loadManagementStats();
+    loadProxies(currentPage, filter, searchTerm);
+  }, [loadStats, loadManagementStats, currentPage, filter, searchTerm, loadProxies]);
 
-  const handleSearch = useCallback(async (value) => {
-    setSearchTerm(value);
-
-    if (!value.trim()) {
-      loadProxies(1, dataState.filter, '');
-      return;
+  const handleSearch = useCallback((searchValue) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (searchValue && searchValue.trim()) {
+      newParams.set('search', searchValue);
+      newParams.set('page', '1');
+    } else {
+      newParams.delete('search');
+      newParams.set('page', '1');
     }
-
-    setIsSearching(true);
-    try {
-      await loadProxies(1, dataState.filter, value);
-    } finally {
-      setIsSearching(false);
-    }
-  }, [dataState.filter, loadProxies]);
+    setSearchParams(newParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const clearSearch = useCallback(() => {
-    setSearchTerm('');
-    loadProxies(1, dataState.filter, '');
-  }, [dataState.filter, loadProxies]);
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('search');
+    newParams.set('page', '1');
+    setSearchParams(newParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const handleFilterChange = useCallback((newFilter) => {
-    updateDataState({
-      filter: newFilter,
-      currentPage: 1
-    });
     setShowFilterDropdown(false);
-    loadProxies(1, newFilter, searchTerm);
-  }, [searchTerm, loadProxies, updateDataState]);
+
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('filter', newFilter);
+    newParams.set('page', '1');
+    setSearchParams(newParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
 
   const handlePageChange = useCallback((page) => {
-    updateDataState({ currentPage: page });
-    loadProxies(page, dataState.filter, searchTerm);
-  }, [dataState.filter, searchTerm, loadProxies, updateDataState]);
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('page', page.toString());
+    setSearchParams(newParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
 
 
@@ -205,18 +218,6 @@ const Proxies = () => {
   }
 
 
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <AdminAccessRequired
-            title="Admin Access Required"
-            description="This page requires administrator privileges. Please log in with your admin credentials to access proxy management features."
-          />
-        </div>
-      </div>
-    );
-  }
 
   if (isLoading) {
     return <LoadingSpinner />;
@@ -227,10 +228,21 @@ const Proxies = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Proxy Management</h1>
-          <p className="mt-2 text-gray-600">
-            Manage your proxy configurations, monitor health, and control proxy rotation
-          </p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Proxy Management</h1>
+              <p className="mt-2 text-gray-600">
+                Manage your proxy configurations, monitor health, and control proxy rotation
+              </p>
+            </div>
+
+            {!isAdmin && (
+              <div className="flex items-center px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-red-600 bg-red-100 rounded-lg">
+                <Shield className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+                Admin Access Required
+              </div>
+            )}
+          </div>
         </div>
 
 
@@ -263,7 +275,7 @@ const Proxies = () => {
                   { value: 'failed', label: 'Failed Only' },
                   { value: 'last_month', label: 'Last Month' }
                 ]}
-                value={dataState.filter}
+                value={filter}
                 onChange={handleFilterChange}
                 placeholder="Select filter"
                 className="w-full"
@@ -272,11 +284,11 @@ const Proxies = () => {
 
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0 sm:space-x-4 text-sm text-gray-600">
               <div className="flex items-center justify-between sm:justify-start">
-                <span className="font-medium">Total: {dataState.proxies.length}</span>
+                <span className="font-medium">Total: {dataState.totalItems}</span>
               </div>
               {searchTerm && (
                 <div className="text-blue-600 text-center sm:text-left">
-                  {isSearching ? (
+                  {dataState.isSearching ? (
                     <span className="flex items-center justify-center sm:justify-start">
                       <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-1"></div>
                       Searching: "{searchTerm}"
@@ -294,7 +306,8 @@ const Proxies = () => {
         <div className="mb-6">
           <ProxyManager
             onProxyAdded={handleProxyAdded}
-            onRefreshProxies={() => loadProxies(dataState.currentPage, dataState.filter, searchTerm)}
+            onRefreshProxies={() => loadProxies(currentPage, filter, searchTerm)}
+            disabled={!isAdmin}
           />
         </div>
 
@@ -304,34 +317,20 @@ const Proxies = () => {
             proxies={dataState.proxies}
             onProxyRemoved={handleProxyRemoved}
             onProxyUpdated={handleProxyUpdated}
+            disabled={!isAdmin}
           />
         </div>
 
         {dataState.totalPages > 1 && (
           <Card>
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-700">
-                Page {dataState.currentPage} of {dataState.totalPages}
-              </div>
-              <div className="flex space-x-2">
-                <Button
-                  onClick={() => handlePageChange(dataState.currentPage - 1)}
-                  disabled={dataState.currentPage === 1}
-                  variant="outline"
-                  size="sm"
-                >
-                  Previous
-                </Button>
-                <Button
-                  onClick={() => handlePageChange(dataState.currentPage + 1)}
-                  disabled={dataState.currentPage === dataState.totalPages}
-                  variant="outline"
-                  size="sm"
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={dataState.totalPages}
+              onPageChange={handlePageChange}
+              totalItems={dataState.totalItems}
+              itemsPerPage={10}
+              showPageInfo={true}
+            />
           </Card>
         )}
       </div>

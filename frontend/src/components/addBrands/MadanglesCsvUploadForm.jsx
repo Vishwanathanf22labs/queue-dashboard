@@ -4,7 +4,7 @@ import Button from '../ui/Button';
 import { uploadCsvToMadangles, checkScrapingStatus, addScrapedBrandsToQueue } from '../../services/madanglesApi';
 import { Upload, FileText, X, CheckCircle, AlertCircle, Eye, Plus, Clock, Users } from 'lucide-react';
 
-const MadanglesCsvUploadForm = () => {
+const MadanglesCsvUploadForm = ({ disabled = false }) => {
   const [csvState, setCsvState] = useState({
     file: null,
     uploadStatus: null,
@@ -423,6 +423,7 @@ const MadanglesCsvUploadForm = () => {
                     size="sm"
                     onClick={() => document.getElementById('madangles-csv-file-input').click()}
                     className="text-blue-600 hover:text-blue-700 font-medium p-0 h-auto"
+                    disabled={disabled}
                   >
                     browse files
                   </Button>
@@ -455,6 +456,7 @@ const MadanglesCsvUploadForm = () => {
                     size="sm"
                     onClick={togglePreview}
                     className="text-gray-600 hover:text-gray-700"
+                    disabled={disabled}
                   >
                     <Eye className="h-4 w-4 mr-1" />
                     {showPreview ? 'Hide' : 'Preview'}
@@ -465,6 +467,7 @@ const MadanglesCsvUploadForm = () => {
                   size="sm"
                   onClick={() => setCsvState(prev => ({ ...prev, file: null, csvPreview: null }))}
                   className="text-red-600 hover:text-red-700"
+                  disabled={disabled}
                 >
                   <X className="h-4 w-4" />
                   Remove
@@ -487,6 +490,7 @@ const MadanglesCsvUploadForm = () => {
           }}
           className="hidden"
           ref={fileInputRef}
+          disabled={disabled}
         />
 
         {/* CSV Preview */}
@@ -611,7 +615,7 @@ const MadanglesCsvUploadForm = () => {
               <Button
                 onClick={() => handleAddToQueue('regular')}
                 variant="outline"
-                disabled={queueAdditionStatus?.type === 'adding'}
+                disabled={disabled || queueAdditionStatus?.type === 'adding'}
                 className="h-16 flex items-center justify-center space-x-3 border-2 border-blue-200 hover:border-blue-300 hover:bg-blue-50"
               >
                 <Users className="h-6 w-6 text-blue-600" />
@@ -624,7 +628,7 @@ const MadanglesCsvUploadForm = () => {
               <Button
                 onClick={() => handleAddToQueue('watchlist')}
                 variant="outline"
-                disabled={queueAdditionStatus?.type === 'adding'}
+                disabled={disabled || queueAdditionStatus?.type === 'adding'}
                 className="h-16 flex items-center justify-center space-x-3 border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
               >
                 <Clock className="h-6 w-6 text-gray-600" />
@@ -666,7 +670,7 @@ const MadanglesCsvUploadForm = () => {
             <Button
               onClick={handleCsvUpload}
               variant="primary"
-              disabled={csvUploadStatus?.type === 'uploading'}
+              disabled={disabled || csvUploadStatus?.type === 'uploading'}
               className="flex-1"
             >
               <Upload className="h-4 w-4 mr-2" />
@@ -675,7 +679,7 @@ const MadanglesCsvUploadForm = () => {
             <Button
               onClick={clearUpload}
               variant="outline"
-              disabled={csvUploadStatus?.type === 'uploading'}
+              disabled={disabled || csvUploadStatus?.type === 'uploading'}
             >
               <X className="h-4 w-4 mr-2" />
               Clear

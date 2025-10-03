@@ -7,14 +7,41 @@ const redisCache = new Map();
 const CACHE_TTL = 30000; // 30 seconds
 
 // Redis client setup - using dedicated cache Redis instance
-const redisClient = new Redis({
-  host: process.env.CACHE_REDIS_HOST,
-  port: process.env.CACHE_REDIS_PORT,
-  password: process.env.CACHE_REDIS_PASSWORD,
-  maxRetriesPerRequest: 3,
-  retryDelayOnFailover: 100,
-  enableReadyCheck: false,
-});
+const { getRedisConfig } = require("../../config/environmentConfig");
+
+// Dynamic Redis client getter to ensure we always get the latest connection
+function getCacheRedisClient() {
+  const cacheRedisConfig = getRedisConfig('cache');
+  return new Redis({
+    host: cacheRedisConfig.host,
+    port: cacheRedisConfig.port,
+    password: cacheRedisConfig.password,
+    maxRetriesPerRequest: 3,
+    retryDelayOnFailover: 100,
+    enableReadyCheck: false,
+  });
+}
+
+// Fallback static client for backward compatibility
+let redisClient = getCacheRedisClient();
+
+// Function to reinitialize cache Redis client for environment switching
+function reinitializeCacheRedisClient() {
+  try {
+    // Close existing client if it exists
+    if (redisClient) {
+      redisClient.disconnect();
+    }
+    
+    // Create new client with current environment settings
+    redisClient = getCacheRedisClient();
+    
+    return redisClient;
+  } catch (error) {
+    console.error('Error reinitializing cache Redis client:', error);
+    throw error;
+  }
+}
 
 // Cache helper functions
 function getCacheKey(prefix, ...args) {
@@ -23,8 +50,9 @@ function getCacheKey(prefix, ...args) {
 
 async function getCachedData(key) {
   try {
-    // Try Redis first
-    const redisData = await redisClient.get(key);
+    // Try Redis first with dynamic client
+    const client = getCacheRedisClient();
+    const redisData = await client.get(key);
     if (redisData) {
       return JSON.parse(redisData);
     }
@@ -44,7 +72,8 @@ async function getCachedData(key) {
 async function setCachedData(key, data, ttl = 180) {
   try {
     const serialized = JSON.stringify(data);
-    await redisClient.setex(key, ttl, serialized);
+    const client = getCacheRedisClient();
+    await client.setex(key, ttl, serialized);
     return true;
   } catch (error) {
     console.error('Cache set error:', error);
@@ -117,11 +146,11 @@ async function invalidatePipelineCache(date) {
   try {
     // Get all keys matching the pattern
     const pattern = `pipeline:${date}:*`;
-    const keys = await redisClient.keys(pattern);
+    const client = getCacheRedisClient();
+    const keys = await client.keys(pattern);
     
     if (keys.length > 0) {
-      await redisClient.del(keys);
-      console.log(`🗑️ Invalidated ${keys.length} cache entries for date ${date}`);
+      await client.del(keys);
     }
   } catch (error) {
     console.error('Cache invalidation error:', error);
@@ -132,11 +161,11 @@ async function invalidateQueueCache(queueType = null) {
   try {
     // Get all keys matching the pattern
     const pattern = queueType ? `queue:${queueType}:*` : `queue:*`;
-    const keys = await redisClient.keys(pattern);
+    const client = getCacheRedisClient();
+    const keys = await client.keys(pattern);
     
     if (keys.length > 0) {
-      await redisClient.del(keys);
-      console.log(`🗑️ Invalidated ${keys.length} queue cache entries for ${queueType || 'all queues'}`);
+      await client.del(keys);
     }
   } catch (error) {
     console.error('Queue cache invalidation error:', error);
@@ -158,4 +187,5 @@ module.exports = {
   getQueueETag,
   setQueueETag,
   invalidateQueueCache,
+  reinitializeCacheRedisClient,
 };
