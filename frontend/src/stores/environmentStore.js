@@ -55,6 +55,20 @@ const useEnvironmentStore = create(
           // Clear queue store data
           useQueueStore.getState().clearAllData();
           
+          // Clear localStorage cache for ad-update queues (fixes stale data issue)
+          try {
+            const keysToRemove = [
+              'regularAdUpdateQueue_state',
+              'watchlistAdUpdateQueue_state',
+              'dashboard_regularAdUpdate_state',
+              'dashboard_watchlistAdUpdate_state'
+            ];
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+            console.log('LocalStorage ad-update cache cleared for environment switch');
+          } catch (storageError) {
+            console.warn('Failed to clear localStorage ad-update cache:', storageError);
+          }
+          
           // Don't clear admin store data - admin login should persist across environments
           // useAdminStore.getState().reset();
 

@@ -33,7 +33,7 @@ const Toggle = ({
       className={`
         relative inline-flex items-center rounded-full transition-colors duration-200 ease-in-out
         ${sizeClasses[size]}
-        ${isOn ? 'bg-blue-600' : 'bg-gray-300'}
+        ${isOn ? 'bg-red-500' : 'bg-blue-600'}
         ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
         ${className}
       `}
