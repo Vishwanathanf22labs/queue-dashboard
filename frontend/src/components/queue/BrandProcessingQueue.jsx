@@ -5,12 +5,13 @@ import LoadingSpinner from '../ui/LoadingSpinner';
 import ErrorDisplay from '../ui/ErrorDisplay';
 import Table from '../ui/Table';
 import Pagination from '../ui/Pagination';
-import { ChevronUp, ChevronDown } from 'lucide-react';
+import SearchInput from '../ui/SearchInput';
+import { ChevronUp, ChevronDown, Search } from 'lucide-react';
 import useQueueStore from '../../stores/queueStore';
 import { Users, Eye, ExternalLink, Circle } from 'lucide-react';
 import { openFacebookAdLibrary } from '../../utils/facebookAdLibrary';
 
-const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
+const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm, onClearSearch, isSearching }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { brandProcessingQueue, loading, error } = useQueueStore();
 
@@ -19,23 +20,78 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
   const sortBy = searchParams.get('regularSortBy') || 'normal';
   const sortOrder = searchParams.get('regularSortOrder') || 'desc';
   
+  // Store original totals (for static display - don't change during search)
+  const [originalTotals, setOriginalTotals] = useState({
+    total_items: 0,
+    total_ads: 0
+  });
+
+  // Update original totals only when NOT searching
+  useEffect(() => {
+    if (brandProcessingQueue) {
+      const isSearchActive = searchTerm && searchTerm.trim().length > 0;
+      
+      // Only update original totals when NOT searching
+      if (!isSearchActive) {
+        setOriginalTotals({
+          total_items: brandProcessingQueue.pagination?.total_items || 0,
+          total_ads: brandProcessingQueue.total_ads_regular || 0
+        });
+      }
+    }
+  }, [brandProcessingQueue, searchTerm]);
 
   // Don't make API calls on mount - let the parent Dashboard handle initial loading
   // The parent will load data with the correct saved state from localStorage
   // No useEffect needed here as Dashboard already handles the initial API calls
 
-  // Status indicator component - only show green dot for active
+  // Status indicator component - show colored dot for all statuses
   const StatusIndicator = ({ status }) => {
-    if (status === 'active') {
-      return (
-        <Circle 
-          className="h-2 w-2 text-green-500" 
-          fill="currentColor"
-          title="Active"
-        />
-      );
-    }
-    return null; // No dot for other statuses
+    const getStatusColor = (status) => {
+      switch (status) {
+        case 'active':
+          return 'text-green-500';
+        case 'waiting':
+          return 'text-yellow-500';
+        case 'delayed':
+          return 'text-orange-500';
+        case 'completed':
+          return 'text-blue-500';
+        case 'failed':
+          return 'text-red-500';
+        case 'prioritized':
+          return 'text-purple-500';
+        default:
+          return 'text-gray-400';
+      }
+    };
+
+    const getStatusTitle = (status) => {
+      switch (status) {
+        case 'active':
+          return 'Active';
+        case 'waiting':
+          return 'Waiting';
+        case 'delayed':
+          return 'Delayed';
+        case 'completed':
+          return 'Completed';
+        case 'failed':
+          return 'Failed';
+        case 'prioritized':
+          return 'Prioritized';
+        default:
+          return 'Unknown';
+      }
+    };
+
+    return (
+      <Circle 
+        className={`h-2 w-2 ${getStatusColor(status)}`}
+        fill="currentColor"
+        title={getStatusTitle(status)}
+      />
+    );
   };
 
 
@@ -205,6 +261,7 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
         <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">All Brands Scrapped Queue</h2>
       </div>
 
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
         <Card>
           <div className="flex items-center">
@@ -213,7 +270,7 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
             </div>
             <div className="ml-2 sm:ml-3">
               <p className="text-xs sm:text-sm font-medium text-gray-600">Regular Brands</p>
-              <p className="text-lg sm:text-xl lg:text-2xl font-bold text-blue-900">{totalItems || 0}</p>
+              <p className="text-lg sm:text-xl lg:text-2xl font-bold text-blue-900">{originalTotals.total_items || totalItems || 0}</p>
             </div>
           </div>
         </Card>
@@ -226,7 +283,7 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
             <div className="ml-2 sm:ml-3">
               <p className="text-xs sm:text-sm font-medium text-gray-600">Total Ads Found</p>
               <p className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-900">
-                {brandProcessingQueue?.total_ads_regular || 0}
+                {originalTotals.total_ads || brandProcessingQueue?.total_ads_regular || 0}
               </p>
             </div>
           </div>
@@ -247,16 +304,84 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
         </Card>
       </div>
 
+      {/* Search Input */}
+      <Card>
+        <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 sm:gap-4">
+          <div className="flex-1 max-w-md">
+            <SearchInput
+              value={searchTerm || ''}
+              onChange={onSearch}
+              placeholder="Search regular brands by name, ID, or page ID..."
+              leftIcon={<Search className="h-4 w-4 text-gray-400" />}
+              size="md"
+              variant="default"
+              showClearButton={true}
+              onClear={onClearSearch}
+            />
+          </div>
+          <div className="flex items-center space-x-3 sm:space-x-4 text-xs sm:text-sm text-gray-600">
+            <span>Total: {originalTotals.total_items || totalItems}</span>
+            <span>Showing: {currentPageBrands.length}</span>
+          </div>
+        </div>
+      </Card>
+
       <Card id="brands-table-section">
         <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mb-3 sm:mb-4">
           <div>
             <h3 className="text-base sm:text-lg font-semibold text-gray-900">Regular Brands in Queue</h3>
-            <div className="flex items-center space-x-2 mt-1">
+            <div className="flex flex-wrap items-center gap-3 mt-1">
+              {/* Active */}
               <div className="flex items-center space-x-1">
                 <Circle className="h-3 w-3 text-green-500" fill="currentColor" />
                 <span className="text-sm font-medium text-gray-700">Active:</span>
                 <span className="text-sm font-bold text-gray-900">
                   {brandProcessingQueue?.analytics?.pre_computed_counters?.active || 0}
+                </span>
+              </div>
+              
+              {/* Waiting */}
+              <div className="flex items-center space-x-1">
+                <Circle className="h-3 w-3 text-yellow-500" fill="currentColor" />
+                <span className="text-sm font-medium text-gray-700">Waiting:</span>
+                <span className="text-sm font-bold text-gray-900">
+                  {brandProcessingQueue?.analytics?.pre_computed_counters?.waiting || 0}
+                </span>
+              </div>
+              
+              {/* Delayed */}
+              <div className="flex items-center space-x-1">
+                <Circle className="h-3 w-3 text-orange-500" fill="currentColor" />
+                <span className="text-sm font-medium text-gray-700">Delayed:</span>
+                <span className="text-sm font-bold text-gray-900">
+                  {brandProcessingQueue?.analytics?.pre_computed_counters?.delayed || 0}
+                </span>
+              </div>
+              
+              {/* Completed */}
+              <div className="flex items-center space-x-1">
+                <Circle className="h-3 w-3 text-blue-500" fill="currentColor" />
+                <span className="text-sm font-medium text-gray-700">Completed:</span>
+                <span className="text-sm font-bold text-gray-900">
+                  {brandProcessingQueue?.analytics?.pre_computed_counters?.completed || 0}
+                </span>
+              </div>
+              
+              {/* Failed */}
+              <div className="flex items-center space-x-1">
+                <Circle className="h-3 w-3 text-red-500" fill="currentColor" />
+                <span className="text-sm font-medium text-gray-700">Failed:</span>
+                <span className="text-sm font-bold text-gray-900">
+                  {brandProcessingQueue?.analytics?.pre_computed_counters?.failed || 0}
+                </span>
+              </div>
+              
+              {/* Prioritized */}
+              <div className="flex items-center space-x-1">
+                <Circle className="h-3 w-3 text-purple-500" fill="currentColor" />
+                <span className="text-sm font-medium text-gray-700">Prioritized:</span>
+                <span className="text-sm font-bold text-gray-900">
+                  {brandProcessingQueue?.analytics?.pre_computed_counters?.prioritized || 0}
                 </span>
               </div>
             </div>
@@ -269,7 +394,19 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
         </div>
 
 
-        {loading ? (
+        {isSearching ? (
+          <div className="text-center py-12 sm:py-16">
+            <div className="flex flex-col items-center space-y-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              <div className="text-center">
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Searching...</h3>
+                <p className="text-sm text-gray-500">
+                  Searching for "{searchTerm}" in regular brands queue
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : loading ? (
           <LoadingSpinner />
         ) : !loading && currentPageBrands && currentPageBrands.length > 0 ? (
           <>
@@ -432,7 +569,12 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange }) => {
         ) : !loading ? (
           <div className="text-center py-6 sm:py-8">
             <Users className="h-8 w-8 sm:h-12 sm:w-12 text-gray-300 mx-auto mb-2 sm:mb-3" />
-            <p className="text-sm sm:text-base text-gray-500">No brands in queue</p>
+            <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">
+              {searchTerm ? 'No brands found' : 'No brands in queue'}
+            </h3>
+            <p className="text-sm sm:text-base text-gray-500">
+              {searchTerm ? 'Try adjusting your search terms' : 'All brands processed'}
+            </p>
           </div>
         ) : null}
 

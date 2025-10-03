@@ -206,5 +206,16 @@ async function stopScraper() {
 module.exports = {
   getScraperStatus,
   startScraper,
-  stopScraper
+  stopScraper,
+  // Read-only helper to fetch brand timing hash from Redis
+  async getBrandTiming() {
+    try {
+      // Read all fields from the brand_timing hash (strings returned)
+      const data = await getGlobalRedis().hgetall('brand_timing');
+      return data || {};
+    } catch (error) {
+      logger.error('Error fetching brand_timing hash:', error);
+      return {};
+    }
+  }
 };

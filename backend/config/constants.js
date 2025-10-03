@@ -12,6 +12,7 @@ function getRedisKeys() {
     // Global Redis Keys (Common)
     GLOBAL: {
       CURRENTLY_PROCESSING: queueConfig.CURRENTLY_PROCESSING,
+      REENQUEUE_KEY: queueConfig.REENQUEUE_KEY,
       PROXY_IPS: "ips",
       PROXY_STATS: "proxy:stats",
       SCRAPER_STATUS: "scraper:status",

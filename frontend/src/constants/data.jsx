@@ -1,4 +1,4 @@
-import { AlertTriangle, Clock, Home, Plus, RefreshCw, Settings, FileText, Building2, Play, Globe, Eye, List, XCircle, Activity, Upload, ExternalLink } from "lucide-react";
+import { AlertTriangle, Clock, Home, Plus, RefreshCw, Settings, FileText, Building2, Play, Globe, Eye, List, XCircle, Activity, Upload, ExternalLink, Cog } from "lucide-react";
 
 export const navItems = [
   { to: "/", icon: Home, label: "Dashboard" },
@@ -11,7 +11,8 @@ export const navItems = [
   { to: "/scraper-controls", icon: Play, label: "Scraper Controls" },
   { to: "/proxies", icon: Globe, label: "Proxy Controls" },
   { to: "/scraped-brands", icon: FileText, label: "Scraped Brands" },
-  { to: "/pipeline-status", icon: Activity, label: "Pipeline Status" }
+  { to: "/pipeline-status", icon: Activity, label: "Pipeline Status" },
+  { to: "/settings", icon: Cog, label: "Settings" }
 ];
 
 export const columns = [
@@ -130,5 +131,6 @@ export const tabs = [
   { id: 'single', label: 'Single Brand', icon: Plus },
   { id: 'csv', label: 'CSV Upload', icon: FileText },
   { id: 'all', label: 'Add All Brands', icon: RefreshCw },
-  { id: 'madangles', label: 'Initial Scraping', icon: Upload }
+  { id: 'madangles', label: 'Initial Scraping', icon: Upload },
+  { id: 'edit', label: 'Edit Brands', icon: Settings }
 ];

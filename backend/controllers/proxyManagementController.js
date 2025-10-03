@@ -5,7 +5,7 @@ const scraperControlService = require("../services/scraperControlService");
 
 async function addProxy(req, res) {
   try {
-    const { ip, port, country, username, password, type, namespace, userAgent, viewport } = req.body;
+    const { ip, port, country, username, password, type, namespace, userAgent, viewport, version } = req.body;
 
     // Validate required fields
     if (!ip) {
@@ -84,6 +84,22 @@ async function addProxy(req, res) {
       });
     }
 
+    if (!version) {
+      return res.status(400).json({
+        success: false,
+        message: "Version is required"
+      });
+    }
+
+    // Validate version values
+    const validVersions = ["ipv4", "ipv6"];
+    if (!validVersions.includes(version)) {
+      return res.status(400).json({
+        success: false,
+        message: `Version must be one of: ${validVersions.join(", ")}`
+      });
+    }
+
     // Validate viewport format - accept width,height format
     const viewportRegex = /^\d+,\d+$/;
     if (!viewportRegex.test(viewport)) {
@@ -105,7 +121,7 @@ async function addProxy(req, res) {
       });
     }
 
-    const result = await proxyManagementService.addProxy(ip, port, country, username, password, type, namespace, userAgent, viewport);
+    const result = await proxyManagementService.addProxy(ip, port, country, username, password, type, namespace, userAgent, viewport, version);
     
     if (result.success) {
       res.status(201).json(result);
@@ -126,7 +142,7 @@ async function addProxy(req, res) {
 async function updateProxy(req, res) {
   try {
     const { proxyId } = req.params;
-    const { namespace, userAgent, viewport } = req.body;
+    const { namespace, userAgent, viewport, version } = req.body;
 
     // Validate required fields
     if (!namespace) {
@@ -147,6 +163,22 @@ async function updateProxy(req, res) {
       return res.status(400).json({
         success: false,
         message: "Viewport is required"
+      });
+    }
+
+    if (!version) {
+      return res.status(400).json({
+        success: false,
+        message: "Version is required"
+      });
+    }
+
+    // Validate version values
+    const validVersions = ["ipv4", "ipv6"];
+    if (!validVersions.includes(version)) {
+      return res.status(400).json({
+        success: false,
+        message: `Version must be one of: ${validVersions.join(", ")}`
       });
     }
 
@@ -183,7 +215,8 @@ async function updateProxy(req, res) {
     const result = await proxyManagementService.updateProxy(proxyId, {
       namespace,
       userAgent,
-      viewport
+      viewport,
+      version
     });
     
     if (result.success) {

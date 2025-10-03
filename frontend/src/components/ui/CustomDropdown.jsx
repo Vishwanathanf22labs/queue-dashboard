@@ -59,7 +59,7 @@ const CustomDropdown = ({
         </button>
 
         {isOpen && (
-          <div className="absolute right-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+          <div className="absolute right-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-50">
             {options.map((option) => (
               <button
                 key={option.value}

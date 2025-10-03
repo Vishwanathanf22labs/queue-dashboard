@@ -9,7 +9,7 @@ function getRedisKeys() {
 /**
  * Add a new proxy to the system using Redis hash storage
  */
-async function addProxy(ip, port = null, country = null, username = null, password = null, type = "http", namespace = null, userAgent = null, viewport = null) {
+async function addProxy(ip, port = null, country = null, username = null, password = null, type = "http", namespace = null, userAgent = null, viewport = null, version = "ipv4") {
   try {
     const REDIS_KEYS = getRedisKeys();
     const PROXY_IPS_KEY = REDIS_KEYS.GLOBAL.PROXY_IPS;
@@ -45,6 +45,7 @@ async function addProxy(ip, port = null, country = null, username = null, passwo
       namespace: namespace || "",
       userAgent: userAgent || "",
       viewport: viewport || "",
+      version: version || "ipv4",
       created_at: now.toISOString(),
       added_date: now.toLocaleDateString('en-US', { 
         year: 'numeric', 
@@ -81,6 +82,7 @@ async function addProxy(ip, port = null, country = null, username = null, passwo
         namespace: namespace || "",
         userAgent: userAgent || "",
         viewport: viewport || "",
+        version: version || "ipv4",
         added_at: now.toISOString(),
         added_date: now.toLocaleDateString('en-US', { 
           year: 'numeric', 
@@ -167,7 +169,7 @@ async function updateProxy(proxyKey, updates) {
     }
 
     // Only allow updating certain fields
-    const allowedUpdates = ['country', 'type', 'username', 'password', 'namespace', 'userAgent', 'viewport'];
+    const allowedUpdates = ['country', 'type', 'username', 'password', 'namespace', 'userAgent', 'viewport', 'version'];
     const updatedFields = {};
     
     allowedUpdates.forEach(field => {

@@ -7,6 +7,7 @@ const pipelineStatusRoutes = require("./routes/pipelineStatus");
 const madanglesRoutes = require("./routes/madanglesRoutes");
 const scrapedBrandsRoutes = require("./routes/scrapedBrandsRoutes");
 const environmentRoutes = require("./routes/environmentRoutes");
+const settingsRoutes = require("./routes/settingsRoutes");
 
 const { sequelize } = require("./config/database");
 const { globalRedis, watchlistRedis, regularRedis } = require("./config/redis");
@@ -41,6 +42,7 @@ app.use("/api/pipeline-status", pipelineStatusRoutes);
 app.use("/api/madangles", madanglesRoutes);
 app.use("/api/scraped-brands", scrapedBrandsRoutes);
 app.use("/api/environment", environmentRoutes);
+app.use("/api/queue/settings", settingsRoutes);
 
 
 const server = app.listen(PORT, () => {

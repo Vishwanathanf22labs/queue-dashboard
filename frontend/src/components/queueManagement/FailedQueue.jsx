@@ -14,7 +14,8 @@ const FailedQueue = ({
   onPageChange, 
   onMoveBrand, 
   onRemoveBrand, 
-  isProcessingAction 
+  isProcessingAction,
+  disabled = false
 }) => {
   const failedColumns = [
     {
@@ -142,7 +143,7 @@ const FailedQueue = ({
             size="sm"
             variant="info"
             onClick={() => onMoveBrand(row, 'pending')}
-            disabled={isProcessingAction}
+            disabled={disabled || isProcessingAction}
             className="text-xs px-1 sm:px-2 py-1"
             title="Move to Pending Queue"
           >
@@ -152,7 +153,7 @@ const FailedQueue = ({
             size="sm"
             variant="danger"
             onClick={() => onRemoveBrand(row, 'failed')}
-            disabled={isProcessingAction}
+            disabled={disabled || isProcessingAction}
             className="text-xs px-1 sm:px-2 py-1"
             title="Remove Brand"
           >
@@ -368,7 +369,7 @@ const FailedQueue = ({
                         size="sm"
                         variant="info"
                         onClick={() => onMoveBrand(brand, 'pending')}
-                        disabled={isProcessingAction}
+                        disabled={disabled || isProcessingAction}
                         className="flex-1 text-xs"
                         title="Move to Pending Queue"
                       >
@@ -379,7 +380,7 @@ const FailedQueue = ({
                         size="sm"
                         variant="danger"
                         onClick={() => onRemoveBrand(brand, 'failed')}
-                        disabled={isProcessingAction}
+                        disabled={disabled || isProcessingAction}
                         className="flex-1 text-xs"
                         title="Remove Brand"
                       >

@@ -89,8 +89,11 @@ async function reinitializeDatabase() {
     // Close existing connection if it exists
     if (sequelize) {
       try {
-        await sequelize.close();
-        console.log("Previous database connection closed");
+        // Check if connection is still active before closing
+        if (sequelize.connectionManager && sequelize.connectionManager.pool) {
+          await sequelize.close();
+          console.log("Previous database connection closed");
+        }
       } catch (closeError) {
         console.log(
           "Error closing previous connection (expected):",
@@ -102,14 +105,28 @@ async function reinitializeDatabase() {
     // Clear the sequelize instance
     sequelize = null;
 
-    // Wait a moment for the connection to fully close
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // Wait longer for the connection to fully close and cleanup
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Create new connection with current environment settings
     sequelize = getDatabaseConnection();
 
-    // Test the new connection
-    await sequelize.authenticate();
+    // Test the new connection with retry logic
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        await sequelize.authenticate();
+        break;
+      } catch (authError) {
+        retries--;
+        if (retries === 0) {
+          throw authError;
+        }
+        console.log(`Database authentication failed, retrying... (${retries} attempts left)`);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
+
     const config = getDatabaseConfig();
     console.log(
       `Database reconnected to: ${config.host}:${config.port}/${config.database}`

@@ -7,11 +7,18 @@ const useQueueStore = create((set, get) => ({
   nextWatchlistBrand: null,
   pendingBrands: null,
   failedBrands: null,
+  reenqueueData: null,
   watchlistBrands: null,
   watchlistPendingBrands: null,
   watchlistFailedBrands: null,
   brandProcessingQueue: null,
   watchlistBrandsQueue: null,
+  allRegularBrandProcessingJobs: null,
+  allWatchlistBrandProcessingJobs: null,
+  adUpdateQueue: null,
+  watchlistAdUpdateQueue: null,
+  allRegularAdUpdateJobs: null,
+  allWatchlistAdUpdateJobs: null,
   scrapedStats: null,
   scrapedStatsLoading: false,
   separateScrapedStats: null,
@@ -30,11 +37,18 @@ const useQueueStore = create((set, get) => ({
     nextWatchlistBrand: null,
     pendingBrands: null,
     failedBrands: null,
+    reenqueueData: null,
     watchlistBrands: null,
     watchlistPendingBrands: null,
     watchlistFailedBrands: null,
     brandProcessingQueue: null,
     watchlistBrandsQueue: null,
+    allRegularBrandProcessingJobs: null,
+    allWatchlistBrandProcessingJobs: null,
+    adUpdateQueue: null,
+    watchlistAdUpdateQueue: null,
+    allRegularAdUpdateJobs: null,
+    allWatchlistAdUpdateJobs: null,
     scrapedStats: null,
     separateScrapedStats: null,
     loading: false,
@@ -80,6 +94,83 @@ const useQueueStore = create((set, get) => ({
     }
   },
 
+  fetchReenqueueData: async (page = 1, limit = 100, search = null, namespace = null) => {
+    try {
+      set({ loading: true, error: null });
+      const response = await queueAPI.getReenqueueData(page, limit, search, namespace);
+      set({ reenqueueData: response.data.data, loading: false });
+      return response.data.data;
+    } catch (error) {
+      console.error("Reenqueue data API error:", error);
+      set({ error: error.message, loading: false });
+      throw error;
+    }
+  },
+
+  requeueSingleBrand: async (itemId, namespace) => {
+    try {
+      set({ loading: true, error: null });
+      const response = await queueAPI.requeueSingleBrand(itemId, namespace);
+      set({ loading: false });
+      return response.data;
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to requeue brand";
+      set({ error: errorMessage, loading: false });
+      throw error;
+    }
+  },
+
+  requeueAllBrands: async (namespace) => {
+    try {
+      set({ loading: true, error: null });
+      const response = await queueAPI.requeueAllBrands(namespace);
+      set({ loading: false });
+      return response.data;
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to requeue all brands";
+      set({ error: errorMessage, loading: false });
+      throw error;
+    }
+  },
+
+  deleteReenqueueBrand: async (itemId, namespace) => {
+    try {
+      set({ loading: true, error: null });
+      const response = await queueAPI.deleteReenqueueBrand(itemId, namespace);
+      set({ loading: false });
+      return response.data;
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to delete brand from reenqueue";
+      set({ error: errorMessage, loading: false });
+      throw error;
+    }
+  },
+
+  deleteAllReenqueueBrands: async (namespace) => {
+    try {
+      set({ loading: true, error: null });
+      const response = await queueAPI.deleteAllReenqueueBrands(namespace);
+      set({ loading: false });
+      return response.data;
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to delete all brands from reenqueue";
+      set({ error: errorMessage, loading: false });
+      throw error;
+    }
+  },
+
   fetchWatchlistBrands: async (page = 1, limit = 100, search = null) => {
     try {
       set({ loading: true, error: null });
@@ -119,10 +210,10 @@ const useQueueStore = create((set, get) => ({
     }
   },
 
-  fetchBrandProcessingQueue: async (page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc') => {
+  fetchBrandProcessingQueue: async (page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc', search = null) => {
     try {
       set({ loading: true, error: null });
-      const response = await queueAPI.getBrandProcessingQueue(page, limit, sortBy, sortOrder);
+      const response = await queueAPI.getBrandProcessingQueue(page, limit, sortBy, sortOrder, search);
       set({ brandProcessingQueue: response.data, loading: false });
       return response.data;
     } catch (error) {
@@ -132,14 +223,93 @@ const useQueueStore = create((set, get) => ({
     }
   },
 
-  fetchWatchlistBrandsQueue: async (page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc') => {
+  fetchWatchlistBrandsQueue: async (page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc', search = null) => {
     try {
       set({ loading: true, error: null });
-      const response = await queueAPI.getWatchlistBrandsQueue(page, limit, sortBy, sortOrder);
+      const response = await queueAPI.getWatchlistBrandsQueue(page, limit, sortBy, sortOrder, search);
       set({ watchlistBrandsQueue: response.data, loading: false });
       return response.data;
     } catch (error) {
       console.error("Watchlist Brands Queue API error:", error);
+      set({ error: error.message, loading: false });
+      throw error;
+    }
+  },
+
+  fetchAllRegularBrandProcessingJobs: async () => {
+    try {
+      set({ loading: true, error: null });
+      const response = await queueAPI.getAllBrandProcessingJobs('regular');
+      set({ allRegularBrandProcessingJobs: response.data, loading: false });
+      return response.data;
+    } catch (error) {
+      console.error("All Regular Brand Processing Jobs API error:", error);
+      set({ error: error.message, loading: false });
+      throw error;
+    }
+  },
+
+  fetchAllWatchlistBrandProcessingJobs: async () => {
+    try {
+      set({ loading: true, error: null });
+      const response = await queueAPI.getAllBrandProcessingJobs('watchlist');
+      set({ allWatchlistBrandProcessingJobs: response.data, loading: false });
+      return response.data;
+    } catch (error) {
+      console.error("All Watchlist Brand Processing Jobs API error:", error);
+      set({ error: error.message, loading: false });
+      throw error;
+    }
+  },
+
+  // Ad-update processing store actions
+  fetchAdUpdateQueue: async (page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc', search = null) => {
+    try {
+      set({ loading: true, error: null });
+      const response = await queueAPI.getAdUpdateQueue(page, limit, sortBy, sortOrder, search);
+      set({ adUpdateQueue: response.data, loading: false });
+      return response.data;
+    } catch (error) {
+      console.error("Ad Update Queue API error:", error);
+      set({ error: error.message, loading: false });
+      throw error;
+    }
+  },
+
+  fetchWatchlistAdUpdateQueue: async (page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc', search = null) => {
+    try {
+      set({ loading: true, error: null });
+      const response = await queueAPI.getWatchlistAdUpdateQueue(page, limit, sortBy, sortOrder, search);
+      set({ watchlistAdUpdateQueue: response.data, loading: false });
+      return response.data;
+    } catch (error) {
+      console.error("Watchlist Ad Update Queue API error:", error);
+      set({ error: error.message, loading: false });
+      throw error;
+    }
+  },
+
+  fetchAllRegularAdUpdateJobs: async () => {
+    try {
+      set({ loading: true, error: null });
+      const response = await queueAPI.getAllAdUpdateJobs('regular');
+      set({ allRegularAdUpdateJobs: response.data, loading: false });
+      return response.data;
+    } catch (error) {
+      console.error("All Regular Ad Update Jobs API error:", error);
+      set({ error: error.message, loading: false });
+      throw error;
+    }
+  },
+
+  fetchAllWatchlistAdUpdateJobs: async () => {
+    try {
+      set({ loading: true, error: null });
+      const response = await queueAPI.getAllAdUpdateJobs('watchlist');
+      set({ allWatchlistAdUpdateJobs: response.data, loading: false });
+      return response.data;
+    } catch (error) {
+      console.error("All Watchlist Ad Update Jobs API error:", error);
       set({ error: error.message, loading: false });
       throw error;
     }
@@ -227,6 +397,55 @@ const useQueueStore = create((set, get) => ({
         error.response?.data?.message ||
         error.message ||
         "Failed to search brands";
+      set({ error: errorMessage });
+      throw new Error(errorMessage);
+    }
+  },
+
+  // Edit Brands tab: brand status read/update
+  fetchBrandStatus: async (identifier) => {
+    try {
+      const response = await queueAPI.getBrandStatus(identifier);
+      return response.data.data;
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message || error.message || "Failed to fetch brand status";
+      set({ error: errorMessage });
+      throw new Error(errorMessage);
+    }
+  },
+  setBrandStatus: async (identifier, status) => {
+    try {
+      const response = await queueAPI.updateBrandStatus({ ...identifier, status });
+      return response.data;
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message || error.message || "Failed to update brand status";
+      set({ error: errorMessage });
+      throw new Error(errorMessage);
+    }
+  },
+
+  // Bulk operations
+  bulkPreviewBrands: async (ids, pageIds = []) => {
+    try {
+      const response = await queueAPI.bulkPreviewBrands({ ids, page_ids: pageIds });
+      return response.data;
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message || error.message || "Failed to preview brands";
+      set({ error: errorMessage });
+      throw new Error(errorMessage);
+    }
+  },
+
+  bulkApplyStatusUpdates: async (updates) => {
+    try {
+      const response = await queueAPI.bulkApplyStatusUpdates({ updates });
+      return response.data;
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message || error.message || "Failed to apply bulk updates";
       set({ error: errorMessage });
       throw new Error(errorMessage);
     }

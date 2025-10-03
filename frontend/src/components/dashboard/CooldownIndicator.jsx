@@ -87,13 +87,15 @@ const CooldownIndicator = ({
       <span className="text-sm font-medium text-gray-700">Status:</span>
       <div className={`flex items-center space-x-1 px-2 py-1 ${statusInfo.bgColor} ${statusInfo.textColor} rounded-full`}>
         <StatusIcon className="h-3 w-3" />
-        <span className="text-xs font-medium">{statusInfo.label}</span>
-      </div>
-      {scraperStatusData?.stopTime && scraperStatus !== 'running' && (
-        <span className="text-sm font-semibold text-gray-700">
-          Stopped: {new Date(scraperStatusData.stopTime).toLocaleTimeString()}
+        <span className="text-xs font-medium">
+          {statusInfo.label}
+          {scraperStatusData?.stopTime && scraperStatus !== 'running' && (
+            <span className="ml-1 opacity-75">
+              {new Date(scraperStatusData.stopTime).toLocaleTimeString()}
+            </span>
+          )}
         </span>
-      )}
+      </div>
     </div>
   );
 };

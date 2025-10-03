@@ -718,10 +718,322 @@ async function getBrandCountsByStatus() {
   }
 }
 
+async function getBrandByIdentifier(identifier) {
+  try {
+    // Require Brand model dynamically to get the latest version
+    const { Brand } = require("../models");
+    
+    const { brand_id, page_id } = identifier;
+    
+    if (!brand_id && !page_id) {
+      throw new Error("Either brand_id or page_id is required");
+    }
+    
+    if (brand_id && page_id) {
+      throw new Error("Only one identifier (brand_id or page_id) should be provided");
+    }
+    
+    let whereClause = {};
+    if (brand_id) {
+      whereClause.id = brand_id;
+    } else {
+      whereClause.page_id = page_id;
+    }
+    
+    const brand = await Brand.findOne({
+      where: whereClause,
+      attributes: ["id", "page_id", "name", "status"],
+      raw: true
+    });
+    
+    if (!brand) {
+      throw new Error("Brand not found");
+    }
+    
+    return {
+      success: true,
+      data: {
+        id: brand.id,
+        page_id: brand.page_id,
+        name: brand.name,
+        status: brand.status
+      }
+    };
+  } catch (error) {
+    logger.error("Error in getBrandByIdentifier:", error);
+    throw error;
+  }
+}
+
+async function updateBrandStatus(identifier, status) {
+  try {
+    // Require Brand model dynamically to get the latest version
+    const { Brand } = require("../models");
+    
+    const { brand_id, page_id } = identifier;
+    
+    if (!brand_id && !page_id) {
+      throw new Error("Either brand_id or page_id is required");
+    }
+    
+    if (brand_id && page_id) {
+      throw new Error("Only one identifier (brand_id or page_id) should be provided");
+    }
+    
+    if (!['Active', 'Inactive'].includes(status)) {
+      throw new Error("Status must be either 'Active' or 'Inactive'");
+    }
+    
+    let whereClause = {};
+    if (brand_id) {
+      whereClause.id = brand_id;
+    } else {
+      whereClause.page_id = page_id;
+    }
+    
+    // First, get the current brand to check its status
+    const currentBrand = await Brand.findOne({
+      where: whereClause,
+      attributes: ["id", "page_id", "name", "status"],
+      raw: true
+    });
+    
+    if (!currentBrand) {
+      throw new Error("Brand not found");
+    }
+    
+    if (currentBrand.status === 'Incomplete') {
+      throw new Error("Status changes are only allowed for Active/Inactive brands");
+    }
+    
+    if (currentBrand.status === status) {
+      throw new Error(`Brand is already ${status}`);
+    }
+    
+    // Update the brand status
+    const [updatedRowsCount] = await Brand.update(
+      { status: status },
+      { where: whereClause }
+    );
+    
+    if (updatedRowsCount === 0) {
+      throw new Error("Failed to update brand status");
+    }
+    
+    return {
+      success: true,
+      message: `Brand status updated to ${status} successfully`,
+      data: {
+        id: currentBrand.id,
+        page_id: currentBrand.page_id,
+        name: currentBrand.name,
+        old_status: currentBrand.status,
+        new_status: status
+      }
+    };
+  } catch (error) {
+    logger.error("Error in updateBrandStatus:", error);
+    throw error;
+  }
+}
+
+async function bulkPreviewBrands(ids, pageIds = []) {
+  try {
+    // Require Brand model dynamically to get the latest version
+    const { Brand } = require("../models");
+    
+    if (!ids || ids.length === 0) {
+      throw new Error("At least one brand ID is required");
+    }
+    
+    // Remove duplicates
+    const uniqueIds = [...new Set(ids)];
+    const uniquePageIds = [...new Set(pageIds)];
+    
+    const results = {
+      items: [],
+      notFound: [],
+      duplicates: {
+        ids: ids.length - uniqueIds.length,
+        pageIds: pageIds.length - uniquePageIds.length
+      }
+    };
+    
+    // Fetch brands by IDs
+    if (uniqueIds.length > 0) {
+      const brandsById = await Brand.findAll({
+        where: { id: uniqueIds },
+        attributes: ["id", "page_id", "name", "actual_name", "status"],
+        raw: true
+      });
+      
+      const foundIds = new Set(brandsById.map(b => b.id));
+      
+      // Add found brands
+      brandsById.forEach(brand => {
+        results.items.push({
+          id: brand.id,
+          page_id: brand.page_id,
+          name: brand.name,
+          currentStatus: brand.status,
+          identifier: 'id'
+        });
+      });
+      
+      // Track not found IDs
+      uniqueIds.forEach(id => {
+        if (!foundIds.has(id)) {
+          results.notFound.push({ type: 'id', value: id });
+        }
+      });
+    }
+    
+    // Fetch brands by page IDs (if any)
+    if (uniquePageIds.length > 0) {
+      const brandsByPageId = await Brand.findAll({
+        where: { page_id: uniquePageIds },
+        attributes: ["id", "page_id", "name", "actual_name", "status"],
+        raw: true
+      });
+      
+      const foundPageIds = new Set(brandsByPageId.map(b => b.page_id));
+      
+      // Add found brands (avoid duplicates if same brand found by both ID and page_id)
+      brandsByPageId.forEach(brand => {
+        const existingItem = results.items.find(item => item.id === brand.id);
+        if (!existingItem) {
+          results.items.push({
+            id: brand.id,
+            page_id: brand.page_id,
+            name: brand.name,
+            currentStatus: brand.status,
+            identifier: 'page_id'
+          });
+        }
+      });
+      
+      // Track not found page IDs
+      uniquePageIds.forEach(pageId => {
+        if (!foundPageIds.has(pageId)) {
+          results.notFound.push({ type: 'page_id', value: pageId });
+        }
+      });
+    }
+    
+    return {
+      success: true,
+      data: results
+    };
+  } catch (error) {
+    logger.error("Error in bulkPreviewBrands:", error);
+    throw error;
+  }
+}
+
+async function bulkApplyStatusUpdates(updates) {
+  try {
+    if (!updates || updates.length === 0) {
+      throw new Error("No updates provided");
+    }
+    
+    const results = {
+      updated: [],
+      skipped: [],
+      errors: [],
+      totals: {
+        attempted: updates.length,
+        updated: 0,
+        skipped: 0,
+        errors: 0
+      }
+    };
+    
+    // Process updates in chunks to avoid overwhelming the database
+    const chunkSize = 200;
+    for (let i = 0; i < updates.length; i += chunkSize) {
+      const chunk = updates.slice(i, i + chunkSize);
+      
+      for (const update of chunk) {
+        try {
+          const { id, page_id, status } = update;
+          
+          if (!id && !page_id) {
+            results.errors.push({
+              update,
+              error: "Either id or page_id is required"
+            });
+            results.totals.errors++;
+            continue;
+          }
+          
+          if (id && page_id) {
+            results.errors.push({
+              update,
+              error: "Only one identifier (id or page_id) should be provided"
+            });
+            results.totals.errors++;
+            continue;
+          }
+          
+          if (!['Active', 'Inactive'].includes(status)) {
+            results.errors.push({
+              update,
+              error: "Status must be either 'Active' or 'Inactive'"
+            });
+            results.totals.errors++;
+            continue;
+          }
+          
+          // Use existing updateBrandStatus function
+          const identifier = id ? { brand_id: id } : { page_id };
+          const result = await updateBrandStatus(identifier, status);
+          
+          results.updated.push({
+            id: result.data.id,
+            page_id: result.data.page_id,
+            name: result.data.name,
+            old_status: result.data.old_status,
+            new_status: result.data.new_status
+          });
+          results.totals.updated++;
+          
+        } catch (error) {
+          if (error.message.includes('already') || error.message.includes('Incomplete')) {
+            results.skipped.push({
+              update,
+              reason: error.message
+            });
+            results.totals.skipped++;
+          } else {
+            results.errors.push({
+              update,
+              error: error.message
+            });
+            results.totals.errors++;
+          }
+        }
+      }
+    }
+    
+    return {
+      success: true,
+      message: `Bulk update completed: ${results.totals.updated} updated, ${results.totals.skipped} skipped, ${results.totals.errors} errors`,
+      data: results
+    };
+  } catch (error) {
+    logger.error("Error in bulkApplyStatusUpdates:", error);
+    throw error;
+  }
+}
+
 module.exports = {
   addSingleBrandToQueue,
   addAllBrandsToQueue,
   addBulkBrandsToQueue: addBulkBrandsFromCSVToQueue,
   searchBrands,
-  getBrandCountsByStatus
+  getBrandCountsByStatus,
+  getBrandByIdentifier,
+  updateBrandStatus,
+  bulkPreviewBrands,
+  bulkApplyStatusUpdates
 };

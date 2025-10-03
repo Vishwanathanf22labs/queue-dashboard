@@ -16,17 +16,19 @@ const Proxies = lazy(() => import('./pages/Proxies'));
 const ScrapedBrands = lazy(() => import('./pages/ScrapedBrands'));
 const WatchlistBrands = lazy(() => import('./pages/WatchlistBrands'));
 const WatchlistQueues = lazy(() => import('./pages/WatchlistQueues'));
+const Settings = lazy(() => import('./pages/Settings'));
 
 function App() {
   const { checkAdminStatus } = useAdminStore();
   const location = useLocation();
 
   useEffect(() => {
-    // Define pages that don't require admin access (public pages)
-    const publicPages = ['/', '/pending-queue', '/failed-queue', '/watchlist-queues', '/pipeline-status', '/scraped-brands'];
+    // Define pages that don't need admin status check (pages without admin UI)
+    const pagesWithoutAdminUI = ['/pending-queue', '/failed-queue', '/watchlist-queues', '/pipeline-status', '/scraped-brands'];
     
-    // Only check admin status for admin-only pages, not for public pages
-    if (!publicPages.includes(location.pathname)) {
+    // Check admin status for all pages except those without admin UI
+    // Dashboard needs admin status for login/logout buttons
+    if (!pagesWithoutAdminUI.includes(location.pathname)) {
       checkAdminStatus();
     }
   }, [location.pathname, checkAdminStatus]);
@@ -87,6 +89,11 @@ function App() {
         <Route path="/pipeline-status" element={
           <Suspense fallback={<LoadingSpinner />}>
             <PipelineStatusPage />
+          </Suspense>
+        } />
+        <Route path="/settings" element={
+          <Suspense fallback={<LoadingSpinner />}>
+            <Settings />
           </Suspense>
         } />
       </Routes>

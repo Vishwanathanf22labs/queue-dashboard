@@ -7,11 +7,12 @@ import { proxyAPI } from '../../services/api';
 import { validateNamespace, validateViewport } from '../../utils/validation';
 import toast from 'react-hot-toast';
 
-const ProxyManager = ({ onProxyAdded, onRefreshProxies }) => {
+const ProxyManager = ({ onProxyAdded, onRefreshProxies, disabled = false }) => {
   const [state, setState] = useState({
     formData: {
       ip: '',
       port: '',
+      version: 'ipv4',
       country: '',
       type: 'http',
       username: '',
@@ -40,6 +41,13 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies }) => {
     setState(prev => ({
       ...prev,
       formData: { ...prev.formData, type }
+    }));
+  }, []);
+
+  const handleVersionChange = useCallback((version) => {
+    setState(prev => ({
+      ...prev,
+      formData: { ...prev.formData, version }
     }));
   }, []);
 
@@ -98,6 +106,7 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies }) => {
           formData: {
             ip: '',
             port: '',
+            version: 'ipv4',
             country: '',
             type: 'http',
             username: '',
@@ -127,6 +136,7 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies }) => {
   return (
     <Card title="Add New Proxy">
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Row 1: IP Address and Port */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
             label="IP Address"
@@ -136,6 +146,7 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies }) => {
             placeholder="192.168.1.100"
             required
             fullWidth
+            disabled={disabled}
           />
 
           <Input
@@ -146,10 +157,30 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies }) => {
             placeholder="8080"
             required
             fullWidth
+            disabled={disabled}
           />
         </div>
 
+        {/* Row 2: Version and Country */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Version <span className="text-red-500">*</span>
+            </label>
+            <CustomDropdown
+              options={[
+                { value: 'ipv4', label: 'IPv4' },
+                { value: 'ipv6', label: 'IPv6' }
+              ]}
+              value={state.formData.version}
+              onChange={handleVersionChange}
+              placeholder="Select version"
+              className="w-full"
+              required
+              disabled={disabled}
+            />
+          </div>
+
           <Input
             label="Country"
             name="country"
@@ -157,8 +188,12 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies }) => {
             onChange={(value) => handleInputChange('country', value)}
             placeholder="United States"
             fullWidth
+            disabled={disabled}
           />
+        </div>
 
+        {/* Row 3: Protocol and Namespace */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Protocol <span className="text-red-500">*</span>
@@ -175,35 +210,10 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies }) => {
               placeholder="Select protocol"
               className="w-full"
               required
+              disabled={disabled}
             />
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input
-            label="Username"
-            name="username"
-            value={state.formData.username}
-            onChange={(value) => handleInputChange('username', value)}
-            placeholder="proxyuser"
-            required
-            fullWidth
-          />
-
-          <Input
-            label="Password"
-            name="password"
-            type="password"
-            value={state.formData.password}
-            onChange={(value) => handleInputChange('password', value)}
-            placeholder="proxypass"
-            showPasswordToggle
-            required
-            fullWidth
-          />
-        </div>
-
-        <div className="grid grid-cols-1 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Namespace <span className="text-red-500">*</span>
@@ -218,10 +228,39 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies }) => {
               placeholder="Select namespace"
               className="w-full"
               required
+              disabled={disabled}
             />
           </div>
         </div>
 
+        {/* Row 4: Username and Password */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Input
+            label="Username"
+            name="username"
+            value={state.formData.username}
+            onChange={(value) => handleInputChange('username', value)}
+            placeholder="proxyuser"
+            required
+            fullWidth
+            disabled={disabled}
+          />
+
+          <Input
+            label="Password"
+            name="password"
+            type="password"
+            value={state.formData.password}
+            onChange={(value) => handleInputChange('password', value)}
+            placeholder="proxypass"
+            showPasswordToggle
+            required
+            fullWidth
+            disabled={disabled}
+          />
+        </div>
+
+        {/* Row 5: User Agent and Viewport */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
             label="User Agent"
@@ -231,6 +270,7 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies }) => {
             placeholder="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             required
             fullWidth
+            disabled={disabled}
           />
 
           <Input
@@ -241,13 +281,14 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies }) => {
             placeholder="1366,768"
             required
             fullWidth
+            disabled={disabled}
           />
         </div>
 
         <div className="flex justify-end">
           <Button
             type="submit"
-            disabled={state.isLoading}
+            disabled={disabled || state.isLoading}
             loading={state.isLoading}
             variant="primary"
             size="md"

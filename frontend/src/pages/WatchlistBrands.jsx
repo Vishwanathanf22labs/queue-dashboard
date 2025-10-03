@@ -8,7 +8,7 @@ import Table from '../components/ui/Table';
 import Pagination from '../components/ui/Pagination';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import ErrorDisplay from '../components/ui/ErrorDisplay';
-import { Eye, Clock, CheckCircle, XCircle, Search, ExternalLink, ChevronUp, ChevronDown } from 'lucide-react';
+import { Eye, Clock, CheckCircle, XCircle, Search, ExternalLink, ChevronUp, ChevronDown, Shield } from 'lucide-react';
 import useQueueStore from '../stores/queueStore';
 import useAdminStore from '../stores/adminStore';
 import { watchlistBrandsColumns } from '../constants/data';
@@ -448,8 +448,22 @@ const WatchlistBrands = () => {
           <h1 className="text-2xl font-bold text-gray-900">Watchlist Brands</h1>
           <p className="text-gray-600">Monitor all your watchlist brands and their scraping status</p>
         </div>
-        {/* Refresh Button */}
-        <Button
+        
+        <div className="flex items-center space-x-3">
+          {!isAdmin ? (
+            <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg">
+              <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="text-xs sm:text-sm font-medium">Admin Access Required</span>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-green-100 text-green-800 rounded-lg">
+              <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="text-xs sm:text-sm font-medium">Admin Mode</span>
+            </div>
+          )}
+
+          {/* Refresh Button */}
+          <Button
           variant="primary"
           size="sm"
           onClick={async () => {
@@ -469,6 +483,7 @@ const WatchlistBrands = () => {
         >
           Refresh
         </Button>
+        </div>
       </div>
 
 

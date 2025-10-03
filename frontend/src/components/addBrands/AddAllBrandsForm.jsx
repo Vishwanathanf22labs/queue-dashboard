@@ -6,7 +6,7 @@ import CustomDropdown from '../ui/CustomDropdown';
 import { queueAPI } from '../../services/api';
 import { RefreshCw } from 'lucide-react';
 
-const AddAllBrandsForm = ({ loading, isSubmitting, onSubmittingChange }) => {
+const AddAllBrandsForm = ({ loading, isSubmitting, onSubmittingChange, disabled = false }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   
   const [statusFilter, setStatusFilter] = useState('all');
@@ -116,7 +116,7 @@ const AddAllBrandsForm = ({ loading, isSubmitting, onSubmittingChange }) => {
                 checked={queueType === 'regular'}
                 onChange={(e) => updateQueueType(e.target.value)}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 accent-blue-600"
-                disabled={isSubmitting || loading}
+                disabled={disabled || isSubmitting || loading}
               />
               <span className="ml-2 text-base font-semibold text-gray-700">Regular Queue</span>
             </label>
@@ -128,7 +128,7 @@ const AddAllBrandsForm = ({ loading, isSubmitting, onSubmittingChange }) => {
                 checked={queueType === 'watchlist'}
                 onChange={(e) => updateQueueType(e.target.value)}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 accent-blue-600"
-                disabled={isSubmitting || loading}
+                disabled={disabled || isSubmitting || loading}
               />
               <span className="ml-2 text-base font-semibold text-gray-700">Watchlist Queue</span>
             </label>
@@ -174,7 +174,7 @@ const AddAllBrandsForm = ({ loading, isSubmitting, onSubmittingChange }) => {
         <Button
           onClick={handleAddAllBrands}
           variant="primary"
-          disabled={loading || isSubmitting}
+          disabled={disabled || loading || isSubmitting}
           className="w-full"
         >
           <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />

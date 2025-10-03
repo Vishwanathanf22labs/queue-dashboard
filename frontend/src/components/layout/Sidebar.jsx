@@ -3,12 +3,9 @@ import { NavLink } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { navItems } from '../../constants/data';
 import Button from '../ui/Button';
-import EnvironmentSelector from '../ui/EnvironmentSelector';
-import useEnvironmentStore from '../../stores/environmentStore';
 
 const Sidebar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { currentEnvironment, changeEnvironment } = useEnvironmentStore();
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -31,6 +28,40 @@ const Sidebar = () => {
       document.body.style.overflow = 'unset';
     };
   }, [isMobileMenuOpen]);
+
+  // Prevent scroll bubbling from sidebar to main content
+  const handleSidebarScroll = (e) => {
+    const sidebar = e.currentTarget;
+    const { scrollTop, scrollHeight, clientHeight } = sidebar;
+
+    // If at the top and trying to scroll up, prevent it
+    if (scrollTop === 0 && e.deltaY < 0) {
+      e.stopPropagation();
+      return false;
+    }
+
+    // If at the bottom and trying to scroll down, prevent it
+    if (scrollTop + clientHeight >= scrollHeight - 1 && e.deltaY > 0) {
+      e.stopPropagation();
+      return false;
+    }
+  };
+
+  // Handle touch events to prevent scroll chaining
+  const handleTouchMove = (e) => {
+    const sidebar = e.currentTarget;
+    const { scrollTop, scrollHeight, clientHeight } = sidebar;
+
+    // If at the top and trying to scroll up, prevent it
+    if (scrollTop === 0) {
+      e.preventDefault();
+    }
+
+    // If at the bottom and trying to scroll down, prevent it
+    if (scrollTop + clientHeight >= scrollHeight - 1) {
+      e.preventDefault();
+    }
+  };
 
   return (
     <>
@@ -55,7 +86,7 @@ const Sidebar = () => {
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-[9998] md:hidden touch-none"
           onClick={closeMobileMenu}
-          style={{ 
+          style={{
             position: 'fixed',
             top: 0,
             left: 0,
@@ -74,14 +105,12 @@ const Sidebar = () => {
           <h1 className="text-xl font-bold text-yellow-400">Queue Dashboard</h1>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 scrollbar-hide pb-8">
-          {/* Environment Selector */}
-          <div className="mb-6">
-            <EnvironmentSelector 
-              onEnvironmentChange={changeEnvironment}
-              currentEnvironment={currentEnvironment}
-            />
-          </div>
+        <div
+          className="flex-1 overflow-y-auto p-6 scrollbar-hide pb-8"
+          onWheel={handleSidebarScroll}
+          onTouchMove={handleTouchMove}
+          style={{ overscrollBehavior: 'contain' }}
+        >
 
           <nav className="space-y-2">
             {navItems.map((item) => {

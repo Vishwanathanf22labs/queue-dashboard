@@ -589,11 +589,24 @@ async function getWatchlistPendingBrands(
     let filteredBrands = pendingBrands;
     if (search && search.trim()) {
       const searchTerm = search.toLowerCase().trim();
-      filteredBrands = pendingBrands.filter(brand => 
-        brand.brand_name?.toLowerCase().includes(searchTerm) ||
-        brand.page_id?.toString().includes(searchTerm) ||
-        brand.brand_id?.toString().includes(searchTerm)
-      );
+      
+      // Filter brands based on search term (flexible search)
+      const normalizedSearchTerm = searchTerm.replace(/\s+/g, '');
+      
+      filteredBrands = pendingBrands.filter(brand => {
+        const brandName = brand.brand_name?.toLowerCase() || '';
+        const normalizedBrandName = brandName.replace(/\s+/g, '');
+        
+        return (
+          // Original search (with spaces)
+          brandName.includes(searchTerm) ||
+          // Space-insensitive search
+          normalizedBrandName.includes(normalizedSearchTerm) ||
+          // ID searches
+          brand.queue_id?.toString().includes(searchTerm) ||
+          brand.page_id?.toString().includes(searchTerm)
+        );
+      });
     }
 
     const totalCount = filteredBrands.length;
@@ -664,11 +677,24 @@ async function getWatchlistFailedBrands(
     let filteredBrands = failedBrands;
     if (search && search.trim()) {
       const searchTerm = search.toLowerCase().trim();
-      filteredBrands = failedBrands.filter(brand => 
-        brand.brand_name?.toLowerCase().includes(searchTerm) ||
-        brand.page_id?.toString().includes(searchTerm) ||
-        brand.brand_id?.toString().includes(searchTerm)
-      );
+      
+      // Filter brands based on search term (flexible search)
+      const normalizedSearchTerm = searchTerm.replace(/\s+/g, '');
+      
+      filteredBrands = failedBrands.filter(brand => {
+        const brandName = brand.brand_name?.toLowerCase() || '';
+        const normalizedBrandName = brandName.replace(/\s+/g, '');
+        
+        return (
+          // Original search (with spaces)
+          brandName.includes(searchTerm) ||
+          // Space-insensitive search
+          normalizedBrandName.includes(normalizedSearchTerm) ||
+          // ID searches
+          brand.queue_id?.toString().includes(searchTerm) ||
+          brand.page_id?.toString().includes(searchTerm)
+        );
+      });
     }
 
     const totalCount = filteredBrands.length;

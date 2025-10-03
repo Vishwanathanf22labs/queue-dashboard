@@ -5,7 +5,7 @@ import Button from '../ui/Button';
 import { queueAPI } from '../../services/api';
 import { Upload, FileText, X, CheckCircle, AlertCircle } from 'lucide-react';
 
-const CsvUploadForm = ({ loading, isSubmitting, onSubmittingChange }) => {
+const CsvUploadForm = ({ loading, isSubmitting, onSubmittingChange, disabled = false }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   
   const [csvState, setCsvState] = useState({
@@ -207,7 +207,7 @@ const CsvUploadForm = ({ loading, isSubmitting, onSubmittingChange }) => {
                 checked={queueType === 'regular'}
                 onChange={(e) => updateQueueType(e.target.value)}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 accent-blue-600"
-                disabled={isSubmitting || loading}
+                disabled={disabled || isSubmitting || loading}
               />
               <span className="ml-2 text-base font-semibold text-gray-700">Regular Queue</span>
             </label>
@@ -219,7 +219,7 @@ const CsvUploadForm = ({ loading, isSubmitting, onSubmittingChange }) => {
                 checked={queueType === 'watchlist'}
                 onChange={(e) => updateQueueType(e.target.value)}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 accent-blue-600"
-                disabled={isSubmitting || loading}
+                disabled={disabled || isSubmitting || loading}
               />
               <span className="ml-2 text-base font-semibold text-gray-700">Watchlist Queue</span>
             </label>
@@ -258,6 +258,7 @@ const CsvUploadForm = ({ loading, isSubmitting, onSubmittingChange }) => {
                     size="sm"
                     onClick={() => document.getElementById('csv-file-input').click()}
                     className="text-blue-600 hover:text-blue-700 font-medium p-0 h-auto"
+                    disabled={disabled}
                   >
                     browse files
                   </Button>
@@ -309,6 +310,7 @@ const CsvUploadForm = ({ loading, isSubmitting, onSubmittingChange }) => {
           }}
           className="hidden"
           ref={fileInputRef}
+          disabled={disabled}
         />
 
         {csvUploadStatus && (

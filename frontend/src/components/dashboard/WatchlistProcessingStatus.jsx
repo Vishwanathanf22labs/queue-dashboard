@@ -1,12 +1,15 @@
 import Card from '../ui/Card';
 import Badge from '../ui/Badge';
-import { Play, Clock, Eye, Hourglass, ExternalLink } from 'lucide-react';
+import { Play, Clock, Eye, Hourglass, ExternalLink, Pause, Square } from 'lucide-react';
 import { openFacebookAdLibrary } from '../../utils/facebookAdLibrary';
 
 const WatchlistProcessingStatus = ({ 
   currentlyProcessing, 
   watchlistPendingCount = 0,
-  nextWatchlistBrand = null
+  watchlistFailedCount = 0,
+  nextWatchlistBrand = null,
+  scraperStatus = 'unknown',
+  scraperStatusLoading = false
 }) => {
   // Filter brands that have is_watchlist: true
   const getWatchlistCurrentlyProcessing = () => {
@@ -26,15 +29,80 @@ const WatchlistProcessingStatus = ({
   const watchlistProcessingBrands = getWatchlistCurrentlyProcessing();
 
   // Check if we should show waiting message (when scraper is running but no watchlist brand processing)
-  // Only show waiting when there are NO pending watchlist brands in queue
-  const shouldShowWaiting = (!currentlyProcessing || currentlyProcessing.length === 0) && watchlistPendingCount === 0;
+  // Show waiting when scraper is running and card is empty, regardless of queue count
+  const shouldShowWaiting = scraperStatus === 'running' && (!currentlyProcessing || currentlyProcessing.length === 0);
+
+  // Determine if status badge should be visible based on scraper status
+  const shouldShowStatusBadge = () => {
+    // Hide badge only when status is cooldown(NWL)
+    if (scraperStatus === 'cooldown(NWL)' || scraperStatus === 'cooldown (NWL)') {
+      return false;
+    }
+    
+    // Show badge for all other statuses including cooldown(WL)
+    return true;
+  };
 
   return (
     <div className="grid gap-4 sm:gap-6 grid-cols-1">
       <Card>
-        <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">
-          Watchlist Currently Scraping
-        </h3>
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+            Watchlist Currently Scraping
+          </h3>
+          {shouldShowStatusBadge() && !scraperStatusLoading && (
+            (() => {
+              // Show the actual API status
+              const getScraperStatusInfo = (status) => {
+                if (status && status.startsWith('stopped(')) {
+                  const reason = status.replace('stopped(', '').replace(')', '');
+                  let label = status;
+                  
+                  switch (reason) {
+                    case 'cooldown NWL':
+                      label = 'Stopped (Cooldown NWL)';
+                      break;
+                    case 'cooldown WL':
+                      label = 'Stopped (Cooldown WL)';
+                      break;
+                    case 'Hold':
+                      label = 'Stopped (Hold)';
+                      break;
+                    default:
+                      label = status;
+                  }
+                  
+                  return { variant: 'warning', icon: 'Square', label: label };
+                }
+                
+                switch (status) {
+                  case 'running':
+                    return { variant: 'success', icon: 'Play', label: 'Running' };
+                  case 'paused':
+                    return { variant: 'warning', icon: 'Pause', label: 'Paused' };
+                  case 'stopped':
+                    return { variant: 'error', icon: 'Square', label: 'Stopped' };
+                  case 'not_running':
+                    return { variant: 'secondary', icon: 'Square', label: 'Not Running' };
+                  default:
+                    return { variant: 'secondary', icon: 'Clock', label: status || 'Unknown' };
+                }
+              };
+              
+              const statusInfo = getScraperStatusInfo(scraperStatus);
+              const StatusIcon = statusInfo.icon === 'Play' ? Play : 
+                                statusInfo.icon === 'Pause' ? Pause :
+                                statusInfo.icon === 'Square' ? Square : Clock;
+              
+              return (
+                <Badge variant={statusInfo.variant} className="flex items-center space-x-1">
+                  <StatusIcon className="h-3 w-3" />
+                  <span>{statusInfo.label}</span>
+                </Badge>
+              );
+            })()
+          )}
+        </div>
         
         {watchlistProcessingBrands.length > 0 ? (
           <div className="space-y-4">
@@ -114,7 +182,6 @@ const WatchlistProcessingStatus = ({
                         : brand.status === 'failed' 
                           ? 'error' 
                           : 'info';
-                      console.log(`Watchlist Brand ${brand.brand_id}: status="${brand.status}", variant="${badgeVariant}"`);
                       return (
                         <Badge 
                           variant={badgeVariant} 
@@ -154,7 +221,7 @@ const WatchlistProcessingStatus = ({
         )}
       </Card>
 
-      {watchlistPendingCount === 0 && (
+      {watchlistPendingCount === 0 && watchlistFailedCount > 0 && (
         <Card>
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h3 className="text-base sm:text-lg font-semibold text-gray-900">Next in Line</h3>

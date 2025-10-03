@@ -10,6 +10,7 @@ import { X } from 'lucide-react';
 const EditProxyModal = ({ isOpen, onClose, proxy, onProxyUpdated }) => {
   const [formData, setFormData] = useState({
     namespace: '',
+    version: 'ipv4',
     userAgent: '',
     viewport: ''
   });
@@ -19,6 +20,7 @@ const EditProxyModal = ({ isOpen, onClose, proxy, onProxyUpdated }) => {
     if (proxy && isOpen) {
       setFormData({
         namespace: proxy.namespace || '',
+        version: proxy.version || 'ipv4',
         userAgent: proxy.userAgent || '',
         viewport: proxy.viewport || ''
       });
@@ -71,10 +73,16 @@ const EditProxyModal = ({ isOpen, onClose, proxy, onProxyUpdated }) => {
       return;
     }
 
+    if (!formData.version) {
+      toast.error('Version is required');
+      return;
+    }
+
     setIsLoading(true);
     try {
       const response = await proxyAPI.updateProxy(proxy.id, {
         namespace: formData.namespace,
+        version: formData.version,
         userAgent: formData.userAgent,
         viewport: formData.viewport
       });
@@ -83,6 +91,7 @@ const EditProxyModal = ({ isOpen, onClose, proxy, onProxyUpdated }) => {
         toast.success('Proxy updated successfully');
         onProxyUpdated?.(proxy.id, {
           namespace: formData.namespace,
+          version: formData.version,
           userAgent: formData.userAgent,
           viewport: formData.viewport
         });
@@ -119,23 +128,43 @@ const EditProxyModal = ({ isOpen, onClose, proxy, onProxyUpdated }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Namespace <span className="text-red-500">*</span>
-            </label>
-            <CustomDropdown
-              options={[
-                { value: 'non-watchlist', label: 'Non-Watchlist' },
-                { value: 'watchlist', label: 'Watchlist' }
-              ]}
-              value={formData.namespace}
-              onChange={(value) => handleInputChange('namespace', value)}
-              placeholder="Select namespace"
-              className="w-full"
-              required
-            />
+          {/* Row 1: Namespace (small) and Version */}
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Namespace <span className="text-red-500">*</span>
+              </label>
+              <CustomDropdown
+                options={[
+                  { value: 'non-watchlist', label: 'Non-Watchlist' },
+                  { value: 'watchlist', label: 'Watchlist' }
+                ]}
+                value={formData.namespace}
+                onChange={(value) => handleInputChange('namespace', value)}
+                placeholder="Select namespace"
+                className="w-full"
+                required
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Version <span className="text-red-500">*</span>
+              </label>
+              <CustomDropdown
+                options={[
+                  { value: 'ipv4', label: 'IPv4' },
+                  { value: 'ipv6', label: 'IPv6' }
+                ]}
+                value={formData.version}
+                onChange={(value) => handleInputChange('version', value)}
+                placeholder="Select version"
+                className="w-full"
+                required
+              />
+            </div>
           </div>
 
+          {/* Row 2: User Agent (full width) */}
           <Input
             label="User Agent"
             name="userAgent"
@@ -146,6 +175,7 @@ const EditProxyModal = ({ isOpen, onClose, proxy, onProxyUpdated }) => {
             fullWidth
           />
 
+          {/* Row 3: Viewport (full width) */}
           <Input
             label="Viewport"
             name="viewport"

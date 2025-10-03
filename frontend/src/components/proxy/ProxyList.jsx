@@ -76,7 +76,7 @@ const getInitialLockInputState = () => {
   }
 };
 
-const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated }) => {
+const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }) => {
   const [updatingStatus, setUpdatingStatus] = useState(null);
   const [unlockingProxy, setUnlockingProxy] = useState(null);
   const [lockingProxy, setLockingProxy] = useState(getInitialLockingProxyState);
@@ -323,9 +323,13 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated }) => {
           <div key={proxy.id} className="relative bg-gray-50 rounded-lg p-4 border border-gray-200">
             {proxy.is_locked ? (
               <div
-                className="absolute top-1 left-1 cursor-pointer hover:bg-orange-100 px-1 py-0.5 rounded z-10 text-xs text-orange-600 font-medium bg-white border border-orange-200"
-                onClick={() => handleUnlockProxy(proxy.id, proxy.lock_key)}
-                title={`Click to unlock proxy locked by ${proxy.lock_worker}`}
+                className={`absolute top-1 left-1 px-1 py-0.5 rounded z-10 text-xs font-medium bg-white border ${
+                  disabled 
+                    ? 'cursor-not-allowed opacity-50 text-gray-400 border-gray-300' 
+                    : 'cursor-pointer hover:bg-orange-100 text-orange-600 border-orange-200'
+                }`}
+                onClick={disabled ? undefined : () => handleUnlockProxy(proxy.id, proxy.lock_key)}
+                title={disabled ? 'Admin access required' : `Click to unlock proxy locked by ${proxy.lock_worker}`}
               >
                 🔒 {(() => {
                   if (!proxy.lock_worker) return 'WL-1';
@@ -344,9 +348,13 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated }) => {
               </div>
             ) : (
               <div
-                className="absolute top-1 left-1 cursor-pointer hover:bg-blue-100 px-1 py-0.5 rounded z-10 text-xs text-blue-600 font-medium bg-white border border-blue-200"
-                onClick={() => handleLockIconClick(proxy)}
-                title="Click to lock proxy"
+                className={`absolute top-1 left-1 px-1 py-0.5 rounded z-10 text-xs font-medium bg-white border ${
+                  disabled 
+                    ? 'cursor-not-allowed opacity-50 text-gray-400 border-gray-300' 
+                    : 'cursor-pointer hover:bg-blue-100 text-blue-600 border-blue-200'
+                }`}
+                onClick={disabled ? undefined : () => handleLockIconClick(proxy)}
+                title={disabled ? 'Admin access required' : 'Click to lock proxy'}
               >
                 🔓 Lock
               </div>
@@ -425,22 +433,23 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated }) => {
 
               <div className="flex items-center justify-center space-x-2 pt-2 border-t border-gray-200">
                 <Button
-                  onClick={() => handleEditProxy(proxy)}
+                  onClick={disabled ? undefined : () => handleEditProxy(proxy)}
                   variant="outline"
                   size="sm"
                   className="p-2 min-w-0"
-                  title="Edit Proxy"
+                  title={disabled ? 'Admin access required' : 'Edit Proxy'}
+                  disabled={disabled}
                 >
                   <Edit className="h-4 w-4" />
                 </Button>
 
                 <Button
-                  onClick={() => handleStatusUpdate(proxy.id, !proxy.is_working)}
-                  disabled={updatingStatus === proxy.id}
+                  onClick={disabled ? undefined : () => handleStatusUpdate(proxy.id, !proxy.is_working)}
+                  disabled={disabled || updatingStatus === proxy.id}
                   variant={proxy.is_working ? 'outline' : 'success'}
                   size="sm"
                   className={`p-2 min-w-0 ${proxy.is_working ? 'border-red-500 text-red-500 hover:bg-red-50' : ''}`}
-                  title={proxy.is_working ? 'Mark as Failed' : 'Mark as Working'}
+                  title={disabled ? 'Admin access required' : (proxy.is_working ? 'Mark as Failed' : 'Mark as Working')}
                   loading={updatingStatus === proxy.id}
                 >
                   {proxy.is_working ? (
@@ -451,11 +460,12 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated }) => {
                 </Button>
 
                 <Button
-                  onClick={() => handleRemoveProxy(proxy.id)}
+                  onClick={disabled ? undefined : () => handleRemoveProxy(proxy.id)}
                   variant="outline"
                   size="sm"
                   className="p-2 min-w-0 border-red-500 text-red-500 hover:bg-red-50"
-                  title="Remove Proxy"
+                  title={disabled ? 'Admin access required' : 'Remove Proxy'}
+                  disabled={disabled}
                 >
                   <Trash2 className="h-4 w-4 text-red-500" />
                 </Button>
@@ -487,9 +497,13 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated }) => {
               <div key={proxy.id} className={`relative grid grid-cols-12 gap-1 px-4 py-3 text-xs hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
                 {proxy.is_locked ? (
                   <div
-                    className="absolute left-1 top-1 cursor-pointer hover:bg-orange-100 px-1 py-0.5 rounded z-10 text-xs text-orange-600 font-medium bg-white border border-orange-200"
-                    onClick={() => handleUnlockProxy(proxy.id, proxy.lock_key)}
-                    title={`Click to unlock proxy locked by ${proxy.lock_worker}`}
+                    className={`absolute left-1 top-1 px-1 py-0.5 rounded z-10 text-xs font-medium bg-white border ${
+                      disabled 
+                        ? 'cursor-not-allowed opacity-50 text-gray-400 border-gray-300' 
+                        : 'cursor-pointer hover:bg-orange-100 text-orange-600 border-orange-200'
+                    }`}
+                    onClick={disabled ? undefined : () => handleUnlockProxy(proxy.id, proxy.lock_key)}
+                    title={disabled ? 'Admin access required' : `Click to unlock proxy locked by ${proxy.lock_worker}`}
                   >
                     🔒 {(() => {
                       if (!proxy.lock_worker) return 'WL-1';
@@ -508,9 +522,13 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated }) => {
                   </div>
                 ) : (
                   <div
-                    className="absolute left-1 top-1 cursor-pointer hover:bg-blue-100 px-1 py-0.5 rounded z-10 text-xs text-blue-600 font-medium bg-white border border-blue-200"
-                    onClick={() => handleLockIconClick(proxy)}
-                    title="Click to lock proxy"
+                    className={`absolute left-1 top-1 px-1 py-0.5 rounded z-10 text-xs font-medium bg-white border ${
+                      disabled 
+                        ? 'cursor-not-allowed opacity-50 text-gray-400 border-gray-300' 
+                        : 'cursor-pointer hover:bg-blue-100 text-blue-600 border-blue-200'
+                    }`}
+                    onClick={disabled ? undefined : () => handleLockIconClick(proxy)}
+                    title={disabled ? 'Admin access required' : 'Click to lock proxy'}
                   >
                     🔓 Lock
                   </div>
@@ -584,21 +602,30 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated }) => {
 
                 <div className="col-span-1 flex items-center justify-center space-x-1">
                   <button
-                    onClick={() => handleEditProxy(proxy)}
-                    className="p-1 border border-gray-300 rounded hover:bg-gray-50 flex items-center justify-center"
-                    title="Edit Proxy"
+                    onClick={disabled ? undefined : () => handleEditProxy(proxy)}
+                    className={`p-1 border rounded flex items-center justify-center ${
+                      disabled 
+                        ? 'cursor-not-allowed opacity-50 border-gray-200 bg-gray-100' 
+                        : 'cursor-pointer border-gray-300 hover:bg-gray-50'
+                    }`}
+                    title={disabled ? 'Admin access required' : 'Edit Proxy'}
+                    disabled={disabled}
                   >
                     <Edit className="h-3 w-3 text-gray-600" />
                   </button>
 
                   <button
-                    onClick={() => handleStatusUpdate(proxy.id, !proxy.is_working)}
-                    disabled={updatingStatus === proxy.id}
-                    className={`p-1 border rounded hover:bg-gray-50 flex items-center justify-center ${proxy.is_working
-                      ? 'border-red-300 text-red-500 hover:bg-red-50'
-                      : 'border-green-300 text-green-500 hover:bg-green-50'
-                      }`}
-                    title={proxy.is_working ? 'Mark as Failed' : 'Mark as Working'}
+                    onClick={disabled ? undefined : () => handleStatusUpdate(proxy.id, !proxy.is_working)}
+                    disabled={disabled || updatingStatus === proxy.id}
+                    className={`p-1 border rounded flex items-center justify-center ${
+                      disabled 
+                        ? 'cursor-not-allowed opacity-50 border-gray-200 bg-gray-100' 
+                        : `cursor-pointer hover:bg-gray-50 ${proxy.is_working
+                          ? 'border-red-300 text-red-500 hover:bg-red-50'
+                          : 'border-green-300 text-green-500 hover:bg-green-50'
+                        }`
+                    }`}
+                    title={disabled ? 'Admin access required' : (proxy.is_working ? 'Mark as Failed' : 'Mark as Working')}
                   >
                     {proxy.is_working ? (
                       <XCircle className="h-3 w-3" />
@@ -608,9 +635,14 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated }) => {
                   </button>
 
                   <button
-                    onClick={() => handleRemoveProxy(proxy.id)}
-                    className="p-1 border border-red-300 text-red-500 rounded hover:bg-red-50 flex items-center justify-center"
-                    title="Remove Proxy"
+                    onClick={disabled ? undefined : () => handleRemoveProxy(proxy.id)}
+                    className={`p-1 border rounded flex items-center justify-center ${
+                      disabled 
+                        ? 'cursor-not-allowed opacity-50 border-gray-200 bg-gray-100' 
+                        : 'cursor-pointer border-red-300 text-red-500 hover:bg-red-50'
+                    }`}
+                    title={disabled ? 'Admin access required' : 'Remove Proxy'}
+                    disabled={disabled}
                   >
                     <Trash2 className="h-3 w-3" />
                   </button>

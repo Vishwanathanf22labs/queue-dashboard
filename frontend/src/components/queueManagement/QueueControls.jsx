@@ -1,7 +1,7 @@
 import Button from '../ui/Button';
 import { Trash2, ArrowRight, ArrowLeft, X } from 'lucide-react';
 
-const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, onConfirmDialogStateChange }) => {
+const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, onConfirmDialogStateChange, disabled = false }) => {
   const { showConfirmDialog, confirmText, confirmAction } = confirmDialogState;
 
   const handleClearAllClick = () => {
@@ -105,7 +105,7 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
           <Button
             variant="danger"
             onClick={handleClearAllClick}
-            disabled={isProcessingAction}
+            disabled={disabled || isProcessingAction}
             className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5 px-4"
           >
             <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -122,7 +122,7 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
           <Button
             variant="warning"
             onClick={handleClearPendingClick}
-            disabled={isProcessingAction}
+            disabled={disabled || isProcessingAction}
             className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5"
           >
             <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -133,7 +133,7 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
           <Button
             variant="warning"
             onClick={handleClearFailedClick}
-            disabled={isProcessingAction}
+            disabled={disabled || isProcessingAction}
             className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5"
           >
             <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -144,7 +144,7 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
           <Button
             variant="info"
             onClick={handlePendingToFailedClick}
-            disabled={isProcessingAction}
+            disabled={disabled || isProcessingAction}
             className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5"
           >
             <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -156,7 +156,7 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
           <Button
             variant="success"
             onClick={handleFailedToPendingClick}
-            disabled={isProcessingAction}
+            disabled={disabled || isProcessingAction}
             className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5"
           >
             <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -174,7 +174,7 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
           <Button
             variant="warning"
             onClick={handleWatchlistClearPendingClick}
-            disabled={isProcessingAction}
+            disabled={disabled || isProcessingAction}
             className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5"
           >
             <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -185,7 +185,7 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
           <Button
             variant="warning"
             onClick={handleWatchlistClearFailedClick}
-            disabled={isProcessingAction}
+            disabled={disabled || isProcessingAction}
             className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5"
           >
             <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -196,7 +196,7 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
           <Button
             variant="info"
             onClick={handleWatchlistPendingToFailedClick}
-            disabled={isProcessingAction}
+            disabled={disabled || isProcessingAction}
             className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5"
           >
             <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -208,7 +208,7 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
           <Button
             variant="success"
             onClick={handleWatchlistFailedToPendingClick}
-            disabled={isProcessingAction}
+            disabled={disabled || isProcessingAction}
             className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5"
           >
             <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4" />

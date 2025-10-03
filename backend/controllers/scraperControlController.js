@@ -39,8 +39,18 @@ async function stopScraper(req, res) {
   }
 }
 
+async function getBrandTiming(req, res) {
+  try {
+    const data = await scraperControlService.getBrandTiming();
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch brand timing' });
+  }
+}
+
 module.exports = {
   getScraperStatus,
   startScraper,
-  stopScraper
+  stopScraper,
+  getBrandTiming
 };

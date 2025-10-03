@@ -134,6 +134,15 @@ const switchEnvironment = async (req, res) => {
       clearQueueOverviewCaches();
       reinitializeCacheRedisClient();
       
+      // Clear ad update processing service cache
+      try {
+        const { clearAdUpdateCache } = require("../services/adUpdateProcessingService");
+        clearAdUpdateCache();
+        logger.info(`Ad update processing cache cleared for environment: ${environment}`);
+      } catch (adUpdateError) {
+        logger.warn(`Failed to clear ad update processing cache:`, adUpdateError.message);
+      }
+      
       logger.info(`All service caches cleared for environment: ${environment}`);
     } catch (cacheError) {
       logger.error(`Failed to clear service caches for environment ${environment}:`, cacheError);

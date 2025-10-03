@@ -92,6 +92,7 @@ async function getPreComputedQueueCounters(redis, queueType) {
       return {
         waiting: parseInt(counters.waiting) || 0,
         active: parseInt(counters.active) || 0,
+        prioritized: parseInt(counters.prioritized) || 0,
         delayed: parseInt(counters.delayed) || 0,
         completed: parseInt(counters.completed) || 0,
         failed: parseInt(counters.failed) || 0,
@@ -99,22 +100,25 @@ async function getPreComputedQueueCounters(redis, queueType) {
       };
     }
     
-    // Fallback: Read directly from BullMQ queue lists
-    const [waitingJobs, activeJobs, completedJobs, failedJobs, delayedJobs] = await Promise.all([
+    // Fallback: Read directly from BullMQ queue data structures
+    const [waitingJobs, activeJobs, prioritizedCount, completedCount, failedCount, delayedCount] = await Promise.all([
       redis.lrange(`bull:brand-processing:waiting`, 0, -1).catch(() => []),
       redis.lrange(`bull:brand-processing:active`, 0, -1).catch(() => []),
-      redis.lrange(`bull:brand-processing:completed`, 0, -1).catch(() => []),
-      redis.lrange(`bull:brand-processing:failed`, 0, -1).catch(() => []),
-      redis.lrange(`bull:brand-processing:delayed`, 0, -1).catch(() => [])
+      // Prioritized, completed, failed, and delayed are stored as sorted sets
+      redis.zcard(`bull:brand-processing:prioritized`).catch(() => 0),
+      redis.zcard(`bull:brand-processing:completed`).catch(() => 0),
+      redis.zcard(`bull:brand-processing:failed`).catch(() => 0),
+      redis.zcard(`bull:brand-processing:delayed`).catch(() => 0)
     ]);
     
     const realCounters = {
       waiting: waitingJobs.length,
       active: activeJobs.length,
-      delayed: delayedJobs.length,
-      completed: completedJobs.length,
-      failed: failedJobs.length,
-      total: waitingJobs.length + activeJobs.length + delayedJobs.length + completedJobs.length + failedJobs.length
+      prioritized: prioritizedCount,
+      delayed: delayedCount,
+      completed: completedCount,
+      failed: failedCount,
+      total: waitingJobs.length + activeJobs.length + prioritizedCount + delayedCount + completedCount + failedCount
     };
     
     // Cache the real counters for future use
@@ -129,7 +133,7 @@ async function getPreComputedQueueCounters(redis, queueType) {
   } catch (error) {
     logger.error(`Error getting pre-computed counters for ${queueType}:`, error);
     return {
-      waiting: 0, active: 0, delayed: 0, completed: 0, failed: 0, total: 0
+      waiting: 0, active: 0, prioritized: 0, delayed: 0, completed: 0, failed: 0, total: 0
     };
   }
 }
@@ -179,16 +183,19 @@ async function getBrandsFromCache(brandIds) {
     const missingBrandIds = [];
     
     brandIds.forEach(brandId => {
-      if (brandCache.has(brandId)) {
-        brandMap.set(brandId, brandCache.get(brandId));
+      const intBrandId = parseInt(brandId);
+      if (brandCache.has(intBrandId)) {
+        brandMap.set(brandId, brandCache.get(intBrandId));
       } else {
-        missingBrandIds.push(brandId);
+        missingBrandIds.push(intBrandId);
       }
     });
     
     // If we have missing brands, fetch them from DB and update cache
     if (missingBrandIds.length > 0) {
       logger.info(`Fetching ${missingBrandIds.length} missing brands from DB`);
+      // Require Brand model dynamically to get the latest version
+      const { Brand } = require("../models");
       const missingBrands = await Brand.findAll({
         where: { id: { [Op.in]: missingBrandIds } },
         attributes: ["id", "actual_name", "page_id", "category"],
@@ -431,22 +438,26 @@ async function refreshJobIndex(redis, queueType) {
     const jobStates = new Map();
     
     try {
-      const [waitingJobs, activeJobs, completedJobs, failedJobs, delayedJobs] = await Promise.all([
+      const [waitingJobs, activeJobs, prioritizedJobs, completedJobs, failedJobs, delayedJobs] = await Promise.all([
         redis.lrange(`bull:brand-processing:waiting`, 0, -1).catch(() => []),
         redis.lrange(`bull:brand-processing:active`, 0, -1).catch(() => []),
-        redis.lrange(`bull:brand-processing:completed`, 0, -1).catch(() => []),
-        redis.lrange(`bull:brand-processing:failed`, 0, -1).catch(() => []),
-        redis.lrange(`bull:brand-processing:delayed`, 0, -1).catch(() => [])
+        // Prioritized, completed, failed, and delayed are stored as sorted sets
+        redis.zrange(`bull:brand-processing:prioritized`, 0, -1).catch(() => []),
+        redis.zrange(`bull:brand-processing:completed`, 0, -1).catch(() => []),
+        redis.zrange(`bull:brand-processing:failed`, 0, -1).catch(() => []),
+        redis.zrange(`bull:brand-processing:delayed`, 0, -1).catch(() => [])
       ]);
       
-      // Create job state maps for O(1) lookup
-      waitingJobs.forEach(jobId => jobStates.set(jobId, 'waiting'));
-      activeJobs.forEach(jobId => jobStates.set(jobId, 'active'));
-      completedJobs.forEach(jobId => jobStates.set(jobId, 'completed'));
-      failedJobs.forEach(jobId => jobStates.set(jobId, 'failed'));
+      // Create job state maps for O(1) lookup with priority order
+      // Priority: active > waiting > prioritized > completed > failed > delayed
       delayedJobs.forEach(jobId => jobStates.set(jobId, 'delayed'));
+      failedJobs.forEach(jobId => jobStates.set(jobId, 'failed'));
+      completedJobs.forEach(jobId => jobStates.set(jobId, 'completed'));
+      prioritizedJobs.forEach(jobId => jobStates.set(jobId, 'prioritized'));
+      waitingJobs.forEach(jobId => jobStates.set(jobId, 'waiting'));
+      activeJobs.forEach(jobId => jobStates.set(jobId, 'active')); // Highest priority - overwrites others
       
-      logger.info(`Job states loaded: waiting=${waitingJobs.length}, active=${activeJobs.length}, completed=${completedJobs.length}, failed=${failedJobs.length}, delayed=${delayedJobs.length}`);
+      logger.info(`Job states loaded: waiting=${waitingJobs.length}, active=${activeJobs.length}, prioritized=${prioritizedJobs.length}, completed=${completedJobs.length}, failed=${failedJobs.length}, delayed=${delayedJobs.length}`);
     } catch (error) {
       logger.warn(`Error loading job states, continuing without state info: ${error.message}`);
     }
@@ -469,6 +480,7 @@ async function refreshJobIndex(redis, queueType) {
       !key.includes(':marker') &&
       !key.includes(':waiting') &&
       !key.includes(':active') &&
+      !key.includes(':prioritized') &&
       !key.includes(':completed') &&
       !key.includes(':failed') &&
       !key.includes(':delayed') &&
@@ -735,7 +747,8 @@ async function getBrandProcessingQueue(
   queueType = "regular",
   sortBy = "normal",
   sortOrder = "desc",
-  ifNoneMatch = null
+  ifNoneMatch = null,
+  search = null
 ) {
   const startTime = process.hrtime.bigint();
   
@@ -765,24 +778,26 @@ async function getBrandProcessingQueue(
       throw new Error(`Redis not available for ${queueType}`);
     }
 
-    // CACHE CHECK: Try to get data from cache first (pipeline-style)
-    const cachedResult = await getCachedQueueData(queueType, validPage, validLimit, sortBy, sortOrder, ifNoneMatch);
-    if (cachedResult) {
-      const cacheDuration = Number(process.hrtime.bigint() - startTime) / 1000000;
-      logger.info(`Cache HIT for ${queueType} queue in ${cacheDuration}ms`);
-      
-      // Record performance metrics
-      recordPerformanceMetrics(cacheDuration, true);
-      
-      if (cachedResult.status === 304) {
-        return { status: 304, etag: cachedResult.etag };
+    // CACHE CHECK: Skip cache if searching (search results shouldn't be cached)
+    if (!search || !search.trim()) {
+      const cachedResult = await getCachedQueueData(queueType, validPage, validLimit, sortBy, sortOrder, ifNoneMatch);
+      if (cachedResult) {
+        const cacheDuration = Number(process.hrtime.bigint() - startTime) / 1000000;
+        logger.info(`Cache HIT for ${queueType} queue in ${cacheDuration}ms`);
+        
+        // Record performance metrics
+        recordPerformanceMetrics(cacheDuration, true);
+        
+        if (cachedResult.status === 304) {
+          return { status: 304, etag: cachedResult.etag };
+        }
+        
+        return {
+          ...cachedResult.data,
+          fromCache: true,
+          cache_time_ms: Math.round(cacheDuration)
+        };
       }
-      
-      return {
-        ...cachedResult.data,
-        fromCache: true,
-        cache_time_ms: Math.round(cacheDuration)
-      };
     }
 
     // OPTIMIZATION: Use pre-computed counters for O(1) access
@@ -934,9 +949,36 @@ async function getBrandProcessingQueue(
     // Removed top brands console logging
 
 
+    // SEARCH FILTERING: Apply search if provided (same pattern as queueReadService)
+    let filteredBrands = brandProcessingData;
+    
+    if (search && search.trim()) {
+      const searchTerm = search.toLowerCase().trim();
+      const normalizedSearchTerm = searchTerm.replace(/\s+/g, '');
+      
+      logger.info(`Searching ${queueType} brand processing queue for: "${searchTerm}"`);
+      
+      filteredBrands = brandProcessingData.filter(brand => {
+        const brandName = brand.page_name?.toLowerCase() || '';
+        const normalizedBrandName = brandName.replace(/\s+/g, '');
+        
+        return (
+          // Original search (with spaces)
+          brandName.includes(searchTerm) ||
+          // Space-insensitive search
+          normalizedBrandName.includes(normalizedSearchTerm) ||
+          // ID searches
+          brand.brand_id?.toString().includes(searchTerm) ||
+          brand.page_id?.toString().includes(searchTerm)
+        );
+      });
+      
+      logger.info(`Search results: ${filteredBrands.length} brands found for "${searchTerm}"`);
+    }
+
     // Sort by the specified field and order
     if (sortBy !== "normal") {
-      brandProcessingData.sort((a, b) => {
+      filteredBrands.sort((a, b) => {
         let aValue, bValue;
 
         switch (sortBy) {
@@ -972,7 +1014,7 @@ async function getBrandProcessingQueue(
 
     const startIndex = (validPage - 1) * validLimit;
     const endIndex = startIndex + validLimit;
-    const paginatedBrands = brandProcessingData.slice(startIndex, endIndex);
+    const paginatedBrands = filteredBrands.slice(startIndex, endIndex);
 
     // Calculate total ads for current page
     const currentPageTotalAds = paginatedBrands.reduce((sum, brand) => {
@@ -993,8 +1035,8 @@ async function getBrandProcessingQueue(
       pagination: {
         current_page: validPage,
         per_page: validLimit,
-        total_items: brandProcessingData.length,
-        total_pages: Math.ceil(brandProcessingData.length / validLimit),
+        total_items: filteredBrands.length,
+        total_pages: Math.ceil(filteredBrands.length / validLimit),
       },
       queue_type: queueType,
       analytics: {
@@ -1007,15 +1049,17 @@ async function getBrandProcessingQueue(
       total_ads_watchlist: queueType === 'watchlist' ? totalAds : undefined,
     };
 
-    // CACHE STORAGE: Store the result in cache for future requests (pipeline-style)
-    try {
-      const etag = await setCachedQueueData(queueType, validPage, validLimit, responseData, sortBy, sortOrder);
-      if (etag) {
-        responseData.etag = etag;
-        logger.info(`Cached ${queueType} queue data with ETag: ${etag}`);
+    // CACHE STORAGE: Only cache if not searching (pipeline-style)
+    if (!search || !search.trim()) {
+      try {
+        const etag = await setCachedQueueData(queueType, validPage, validLimit, responseData, sortBy, sortOrder);
+        if (etag) {
+          responseData.etag = etag;
+          logger.info(`Cached ${queueType} queue data with ETag: ${etag}`);
+        }
+      } catch (cacheError) {
+        logger.warn('Failed to cache queue data:', cacheError.message);
       }
-    } catch (cacheError) {
-      logger.warn('Failed to cache queue data:', cacheError.message);
     }
 
     return responseData;
@@ -1031,11 +1075,12 @@ async function getWatchlistBrandsQueue(
   limit = PAGINATION.DEFAULT_LIMIT,
   sortBy = 'normal',
   sortOrder = 'desc',
-  ifNoneMatch = null
+  ifNoneMatch = null,
+  search = null
 ) {
   try {
     // Use the new getBrandProcessingQueue function with watchlist queue type
-    return await getBrandProcessingQueue(page, limit, 'watchlist', sortBy, sortOrder, ifNoneMatch);
+    return await getBrandProcessingQueue(page, limit, 'watchlist', sortBy, sortOrder, ifNoneMatch, search);
   } catch (error) {
     logger.error("Error in getWatchlistBrandsQueue:", error);
     throw error;
@@ -1067,11 +1112,317 @@ function clearAllCaches() {
   }
 }
 
+// Get ALL brand processing jobs without pagination (for dashboard cards)
+async function getAllBrandProcessingJobs(queueType = 'regular', ifNoneMatch = null) {
+  try {
+    const startTime = process.hrtime.bigint();
+    
+    // Generate cache key for all jobs
+    const cacheKey = `all_brand_processing_jobs:${queueType}`;
+    
+    // Check cache first
+    if (ifNoneMatch) {
+      const cachedETag = await getQueueETag(cacheKey);
+      if (cachedETag === ifNoneMatch) {
+        return { status: 304, etag: cachedETag };
+      }
+    }
+    
+    const cachedData = await getQueueCache(cacheKey);
+    if (cachedData) {
+      const etag = await getQueueETag(cacheKey) || generateETag(cachedData);
+      return { ...cachedData, etag, fromCache: true };
+    }
+    
+    // Get Redis instance
+    const redis = getQueueRedis(queueType);
+    if (!redis) {
+      throw new Error(`Redis instance not available for queue type: ${queueType}`);
+    }
+    
+    // Get all job IDs from all BullMQ data structures
+    const [waitingJobs, activeJobs, prioritizedJobsCount, completedJobs, failedJobs, delayedJobsCount] = await Promise.all([
+      redis.lrange(`bull:brand-processing:waiting`, 0, -1).catch(() => []),
+      redis.lrange(`bull:brand-processing:active`, 0, -1).catch(() => []),
+      // Get prioritized jobs count (for counter)
+      redis.zcard(`bull:brand-processing:prioritized`).catch(() => 0),
+      redis.zrange(`bull:brand-processing:completed`, 0, -1).catch(() => []),
+      redis.zrange(`bull:brand-processing:failed`, 0, -1).catch(() => []),
+      // Get delayed jobs count from sorted set (BullMQ stores delayed jobs in a sorted set by timestamp)
+      redis.zcard(`bull:brand-processing:delayed`).catch(() => 0)
+    ]);
+    
+    // Get highest priority jobs (lowest scores = highest priority) - only top 2-3 like delayed
+    const highestPriorityJobs = await redis.zrange(`bull:brand-processing:prioritized`, 0, 2).catch(() => []);
+    logger.info(`Prioritized jobs: count=${prioritizedJobsCount}, highest priority 3 jobs=${highestPriorityJobs.join(', ')}`);
+    
+    // Get latest 2 delayed jobs (highest scores = most recent timestamps) for detailed data
+    const delayedJobsWithScores = await redis.zrevrange(`bull:brand-processing:delayed`, 0, 1, 'WITHSCORES').catch(() => []);
+    const delayedJobs = [];
+    const delayedTimestamps = {};
+    
+    // Process delayed jobs with their scores (timestamps)
+    for (let i = 0; i < delayedJobsWithScores.length; i += 2) {
+      const jobId = delayedJobsWithScores[i];
+      const score = delayedJobsWithScores[i + 1];
+      
+      delayedJobs.push(jobId);
+      
+      // Convert BullMQ score to actual timestamp
+      const timestamp = Number(BigInt(score) >> 12n);
+      delayedTimestamps[jobId] = new Date(timestamp).toISOString();
+      
+      logger.info(`Delayed job ${jobId} scheduled for: ${delayedTimestamps[jobId]}`);
+    }
+    
+    logger.info(`Delayed jobs: count=${delayedJobsCount}, latest 2 jobs=${delayedJobs.join(', ')}`);
+    
+    // Helper function to get job data from Redis (using same logic as existing API)
+    const getJobData = async (jobId, status) => {
+      try {
+        // Use the same approach as the existing getBrandProcessingQueue function
+        const jobData = await redis.hgetall(`bull:brand-processing:${jobId}`);
+        
+        // Parse job data the same way as the existing API
+        let totalAds = 0;
+        let brandId = jobId;
+        let pageCategory = null;
+        let createdAt = new Date().toISOString();
+        let delayedUntil = null;
+        let statusTimestamp = new Date().toISOString();
+        
+        if (jobData.data) {
+          try {
+            const parsedJob = JSON.parse(jobData.data);
+            brandId = parsedJob.brandId || jobId;
+            
+            // Get totalAds from the job data (same as existing API)
+            totalAds = parsedJob.totalAds?.length || 0;
+            
+            // Get page category
+            pageCategory = parsedJob.brandDetails?.page_category;
+            if (!pageCategory && parsedJob.brandDetails?.page_categories) {
+              pageCategory = Array.isArray(parsedJob.brandDetails.page_categories)
+                ? parsedJob.brandDetails.page_categories.join(", ")
+                : parsedJob.brandDetails.page_categories;
+            }
+            
+            createdAt = new Date(parseInt(jobData.timestamp) || Date.now()).toISOString();
+            
+            // Set appropriate timestamp based on job status
+            if (status === 'active') {
+              // For active jobs, show when they started processing
+              statusTimestamp = jobData.processedOn ? new Date(parseInt(jobData.processedOn)).toISOString() : createdAt;
+            } else if (status === 'completed') {
+              // For completed jobs, show when they finished
+              statusTimestamp = jobData.finishedOn ? new Date(parseInt(jobData.finishedOn)).toISOString() : createdAt;
+            } else if (status === 'failed') {
+              // For failed jobs, show when they failed
+              statusTimestamp = jobData.failedReason ? (jobData.finishedOn ? new Date(parseInt(jobData.finishedOn)).toISOString() : createdAt) : createdAt;
+            } else if (status === 'waiting') {
+              // For waiting jobs, show when they were created
+              statusTimestamp = createdAt;
+            } else if (status === 'prioritized') {
+              // For prioritized jobs, show when they were created
+              statusTimestamp = createdAt;
+            } else if (status === 'delayed') {
+              // For delayed jobs, show when they were created
+              statusTimestamp = createdAt;
+            }
+          } catch (parseError) {
+            logger.warn(`Failed to parse job data for ${jobId}:`, parseError.message);
+          }
+        }
+        
+        // If this is a delayed job, get the delayed timestamp
+        if (status === 'delayed' && delayedTimestamps[jobId]) {
+          delayedUntil = delayedTimestamps[jobId];
+        }
+        
+        return {
+          jobId,
+          status,
+          brandId,
+          totalAds,
+          pageCategory,
+          createdAt,
+          statusTimestamp,
+          delayedUntil,
+          jobData: jobData.data ? JSON.parse(jobData.data) : null
+        };
+      } catch (error) {
+        logger.warn(`Failed to get job data for ${jobId}:`, error.message);
+        return {
+          jobId,
+          status,
+          brandId: jobId,
+          totalAds: 0,
+          pageCategory: null,
+          createdAt: new Date().toISOString(),
+          statusTimestamp: new Date().toISOString(),
+          delayedUntil: null,
+          jobData: null
+        };
+      }
+    };
+    
+    // Get job data for all jobs from lists
+    const allJobPromises = [];
+    
+    waitingJobs.forEach(jobId => allJobPromises.push(getJobData(jobId, 'waiting')));
+    activeJobs.forEach(jobId => allJobPromises.push(getJobData(jobId, 'active')));
+    highestPriorityJobs.forEach(jobId => allJobPromises.push(getJobData(jobId, 'prioritized'))); // Only highest priority jobs
+    // Only process first 2 delayed jobs for detailed data
+    delayedJobs.forEach(jobId => allJobPromises.push(getJobData(jobId, 'delayed')));
+    completedJobs.forEach(jobId => allJobPromises.push(getJobData(jobId, 'completed')));
+    failedJobs.forEach(jobId => allJobPromises.push(getJobData(jobId, 'failed')));
+    
+    const allJobsWithData = await Promise.all(allJobPromises);
+    
+    // Get brand details for all jobs (convert job IDs to integers)
+    const brandIds = [...new Set(allJobsWithData.map(job => parseInt(job.brandId || job.jobId)))];
+    
+    // Force refresh brand cache for these specific brand IDs if they're missing
+    const missingBrandIds = brandIds.filter(id => !brandCache.has(id));
+    logger.info(`Brand cache check: ${brandIds.length} total brand IDs, ${missingBrandIds.length} missing`);
+    logger.info(`Brand IDs requested: ${brandIds.join(', ')}`);
+    logger.info(`Missing brand IDs: ${missingBrandIds.join(', ')}`);
+    
+    if (missingBrandIds.length > 0) {
+      logger.info(`Force refreshing brand cache for ${missingBrandIds.length} missing brands: ${missingBrandIds.join(', ')}`);
+      // Require Brand model dynamically
+      const { Brand, Ad } = require("../models");
+      const missingBrands = await Brand.findAll({
+        where: { id: { [Op.in]: missingBrandIds } },
+        attributes: ["id", "actual_name", "page_id", "category"],
+        raw: true,
+      });
+      
+      // Note: ads_count will be fetched from Redis job data, not from database
+      
+      logger.info(`Found ${missingBrands.length} brands in database for IDs: ${missingBrandIds.join(', ')}`);
+      missingBrands.forEach(brand => {
+        logger.info(`Caching brand: ID=${brand.id}, Name=${brand.actual_name}, PageID=${brand.page_id}`);
+      });
+      
+      // Update cache
+      missingBrands.forEach(brand => {
+        brandCache.set(brand.id, brand);
+      });
+      brandCacheLastUpdated = Date.now();
+      
+      logger.info(`Added ${missingBrands.length} brands to cache`);
+    }
+    
+    // Build brand map directly from the brands we fetched
+    const brandMap = new Map();
+    
+    // Add brands that were already in cache
+    brandIds.forEach(brandId => {
+      if (brandCache.has(brandId)) {
+        brandMap.set(brandId.toString(), brandCache.get(brandId));
+      }
+    });
+    
+    // Also add newly fetched brands to the map
+    if (missingBrandIds.length > 0) {
+      const { Brand } = require("../models");
+      const newlyFetchedBrands = await Brand.findAll({
+        where: { id: { [Op.in]: missingBrandIds } },
+        attributes: ["id", "actual_name", "page_id", "category"],
+        raw: true,
+      });
+      
+      newlyFetchedBrands.forEach(brand => {
+        brandMap.set(brand.id.toString(), brand);
+        brandCache.set(brand.id, brand); // Update cache
+      });
+    }
+    
+    logger.info(`Brand map size: ${brandMap.size}, Brand IDs requested: ${brandIds.join(', ')}`);
+    logger.info(`Brand map keys: ${Array.from(brandMap.keys()).join(', ')}`);
+    
+    // Build result with brand details (using same format as existing API)
+    const brands = allJobsWithData.map(job => {
+      // Use brandId for lookup, not jobId
+      const brand = brandMap.get(job.brandId.toString());
+      logger.info(`Building result for job ${job.jobId} (brandId: ${job.brandId}): brand=${brand ? `${brand.actual_name} (${brand.page_id})` : 'NOT FOUND'}`);
+      
+      // Use page category from job data if available, otherwise from database
+      let pageCategory = job.pageCategory;
+      if (!pageCategory && brand?.category) {
+        pageCategory = brand.category;
+      }
+      
+      return {
+        brand_id: parseInt(job.brandId || job.jobId),
+        page_id: brand?.page_id || "Unknown",
+        page_name: brand?.actual_name || "Unknown",
+        total_ads: job.totalAds || 0,
+        page_category: pageCategory || "Unknown",
+        created_at: job.createdAt,
+        status_timestamp: job.statusTimestamp,
+        delayed_until: job.delayedUntil,
+        is_watchlist: queueType === 'watchlist',
+        queue_type: queueType,
+        job_status: job.status,
+        job_id: job.jobId
+      };
+    });
+    
+    // Get pre-computed counters and update with correct delayed count
+    const counters = await getPreComputedQueueCounters(redis, queueType);
+    
+    // Update counters with correct prioritized and delayed count
+    const updatedCounters = {
+      ...counters,
+      prioritized: prioritizedJobsCount, // Use actual prioritized count
+      delayed: delayedJobsCount, // Use actual delayed count
+      total: waitingJobs.length + activeJobs.length + prioritizedJobsCount + delayedJobsCount + completedJobs.length + failedJobs.length
+    };
+    
+    // Calculate total ads across all brands (same as existing API)
+    const totalAdsAcrossAllBrands = brands.reduce((sum, brand) => {
+      return sum + (parseInt(brand.total_ads) || 0);
+    }, 0);
+    
+    const result = {
+      brands,
+      pagination: {
+        current_page: 1,
+        per_page: brands.length,
+        total_items: brands.length,
+        total_pages: 1
+      },
+      queue_type: queueType,
+      analytics: {
+        current_page_total_ads: totalAdsAcrossAllBrands,
+        processing_time_ms: Math.round(Number(process.hrtime.bigint() - startTime) / 1000000),
+        pre_computed_counters: updatedCounters,
+        performance_metrics: getPerformanceMetrics()
+      },
+      total_ads_regular: queueType === 'regular' ? totalAdsAcrossAllBrands : undefined,
+      total_ads_watchlist: queueType === 'watchlist' ? totalAdsAcrossAllBrands : undefined
+    };
+    
+    // Cache the result
+    const etag = generateETag(result);
+    await setQueueCache(cacheKey, result, QUEUE_CACHE_TTL);
+    await setQueueETag(cacheKey, etag, QUEUE_CACHE_TTL);
+    
+    return { ...result, etag, fromCache: false };
+  } catch (error) {
+    logger.error(`Error in getAllBrandProcessingJobs for ${queueType}:`, error);
+    throw error;
+  }
+}
+
 module.exports = {
   initializeBullMQQueues,
   getBullMQJobStates,
   getBrandProcessingQueue,
   getWatchlistBrandsQueue,
+  getAllBrandProcessingJobs,
   startBackgroundRefresh,
   stopBackgroundRefresh,
   initializeCaches,
@@ -1079,4 +1430,5 @@ module.exports = {
   getPerformanceMetrics,
   resetPerformanceMetrics,
   clearAllCaches,
+  refreshJobIndex,
 };

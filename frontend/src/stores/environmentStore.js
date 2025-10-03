@@ -42,6 +42,9 @@ const useEnvironmentStore = create(
           const timestamp = Date.now();
           localStorage.setItem('environment_switch_timestamp', timestamp.toString());
           
+          // Add a small delay to ensure backend environment switch is complete
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
           set({ 
             currentEnvironment: environment,
             isLoading: false,
@@ -52,8 +55,8 @@ const useEnvironmentStore = create(
           // Clear queue store data
           useQueueStore.getState().clearAllData();
           
-          // Clear admin store data
-          useAdminStore.getState().reset();
+          // Don't clear admin store data - admin login should persist across environments
+          // useAdminStore.getState().reset();
 
           // Note: Dashboard component will automatically refresh data via useEffect
           // when currentEnvironment changes, so no need to reload the page

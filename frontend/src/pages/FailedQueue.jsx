@@ -9,11 +9,13 @@ import Table from '../components/ui/Table';
 import Pagination from '../components/ui/Pagination';
 import toast from 'react-hot-toast';
 import useQueueStore from '../stores/queueStore';
-import { AlertCircle, Search, Users, Hash, Tag, XCircle, RefreshCw, ExternalLink } from 'lucide-react';
+import { AlertCircle, Search, Users, Hash, Tag, XCircle, RefreshCw, ExternalLink, RotateCcw, Trash2, X, Shield } from 'lucide-react';
 import SearchInput from '../components/ui/SearchInput';
+import useAdminStore from '../stores/adminStore';
 
 const FailedQueue = () => {
-  const { fetchFailedBrands, loading } = useQueueStore();
+  const { fetchFailedBrands, fetchReenqueueData, requeueSingleBrand, requeueAllBrands, deleteReenqueueBrand, deleteAllReenqueueBrands, loading } = useQueueStore();
+  const { isAdmin } = useAdminStore();
   const currentSearchRef = useRef('');
   const isInitialMountRef = useRef(true);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -35,11 +37,262 @@ const FailedQueue = () => {
     error: null
   });
 
+  // Separate state for reenqueue data
+  const [reenqueueState, setReenqueueState] = useState({
+    items: [],
+    pagination: {},
+    currentPage: 1,
+    itemsPerPage: 10,
+    isLoading: false
+  });
+
+  // Helper function to get initial confirmation dialog state from localStorage
+  const getInitialConfirmDialogState = () => {
+    try {
+      const isPageRefresh = sessionStorage.getItem('failedQueuePageRefreshed') === 'true';
+      const wasPageVisited = sessionStorage.getItem('failedQueuePageVisited') === 'true';
+      
+      if (isPageRefresh && wasPageVisited) {
+        // Don't remove the flag here since it's used by both dialogs
+        const saved = localStorage.getItem('failedQueue_confirmDialog');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          return {
+            show: parsed.show || false,
+            confirmText: parsed.confirmText || ''
+          };
+        }
+      }
+    } catch (error) {
+      console.error('Error loading confirmation dialog state:', error);
+    }
+    return { show: false, confirmText: '' };
+  };
+
+  // Helper function to get initial requeue confirmation dialog state from localStorage
+  const getInitialRequeueConfirmDialogState = () => {
+    try {
+      const isPageRefresh = sessionStorage.getItem('failedQueuePageRefreshed') === 'true';
+      const wasPageVisited = sessionStorage.getItem('failedQueuePageVisited') === 'true';
+      
+      if (isPageRefresh && wasPageVisited) {
+        // Don't remove the flag here since it's used by both dialogs
+        const saved = localStorage.getItem('failedQueue_requeueConfirmDialog');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          return {
+            show: parsed.show || false,
+            confirmText: parsed.confirmText || ''
+          };
+        }
+      }
+    } catch (error) {
+      console.error('Error loading requeue confirmation dialog state:', error);
+    }
+    return { show: false, confirmText: '' };
+  };
+
+  // Confirmation dialog state for Delete All
+  const [confirmDialog, setConfirmDialog] = useState({ show: false, confirmText: '' });
+
+  // Confirmation dialog state for Requeue All
+  const [requeueConfirmDialog, setRequeueConfirmDialog] = useState({ show: false, confirmText: '' });
+
   const { searchTerm, currentPage, itemsPerPage, isRefreshing, brands, pagination, isSearching, error } = queueState;
+  const { items: reenqueueItems, pagination: reenqueuePagination, currentPage: reenqueueCurrentPage, itemsPerPage: reenqueueItemsPerPage, isLoading: reenqueueLoading } = reenqueueState;
 
   const updateQueueState = (updates) => {
     setQueueState(prev => ({ ...prev, ...updates }));
   };
+
+  // Handler for requeue single brand
+  const handleRequeueSingle = async (itemId) => {
+    try {
+      await requeueSingleBrand(itemId, 'non-watchlist');
+      toast.success('Brand requeued successfully to pending queue');
+      loadReenqueueData(reenqueueCurrentPage, false); // Reload current page
+      loadFailedBrands(); // Reload failed brands to update counts
+    } catch (error) {
+      toast.error(`Failed to requeue brand: ${error.message}`);
+    }
+  };
+
+  // Handler for requeue all brands
+  const handleRequeueAll = () => {
+    setRequeueConfirmDialog({ show: true, confirmText: '' });
+  };
+
+  const handleConfirmRequeueAll = async () => {
+    if (requeueConfirmDialog.confirmText.toLowerCase() !== 'confirm') {
+      toast.error('Please type "confirm" to proceed');
+      return;
+    }
+
+    try {
+      const result = await requeueAllBrands('non-watchlist');
+      toast.success(`${result.data.count} brands requeued successfully`);
+      loadReenqueueData(1, false); // Reset to page 1
+      loadFailedBrands(); // Reload failed brands to update counts
+      setRequeueConfirmDialog({ show: false, confirmText: '' });
+    } catch (error) {
+      toast.error(`Failed to requeue all brands: ${error.message}`);
+    }
+  };
+
+  const handleCancelRequeueAll = () => {
+    setRequeueConfirmDialog({ show: false, confirmText: '' });
+  };
+
+  // Handler for delete single brand (no confirmation)
+  const handleDeleteSingle = async (itemId) => {
+    try {
+      await deleteReenqueueBrand(itemId, 'non-watchlist');
+      toast.success('Brand deleted successfully from reenqueue list');
+      loadReenqueueData(reenqueueCurrentPage, false); // Reload current page
+    } catch (error) {
+      toast.error(`Failed to delete brand: ${error.message}`);
+    }
+  };
+
+  // Handler for delete all brands (with typing confirmation)
+  const handleDeleteAllClick = () => {
+    setConfirmDialog({ show: true, confirmText: '' });
+  };
+
+  const handleConfirmDeleteAll = async () => {
+    if (confirmDialog.confirmText.toLowerCase() !== 'confirm') {
+      toast.error('Please type "confirm" to proceed');
+      return;
+    }
+
+    try {
+      const result = await deleteAllReenqueueBrands('non-watchlist');
+      toast.success(`${result.data.count} brands deleted successfully`);
+      setConfirmDialog({ show: false, confirmText: '' });
+      loadReenqueueData(1, false); // Reset to page 1
+    } catch (error) {
+      toast.error(`Failed to delete all brands: ${error.message}`);
+    }
+  };
+
+  const handleCancelDeleteAll = () => {
+    setConfirmDialog({ show: false, confirmText: '' });
+  };
+
+  // Reenqueue table columns: Position → Brand Name → Brand ID → Page ID → Coverage → Actions
+  const reenqueueColumns = [
+    {
+      key: 'position',
+      label: 'Position',
+      render: (value, row, rowIndex) => {
+        const position = (reenqueueCurrentPage - 1) * reenqueueItemsPerPage + rowIndex + 1;
+        return (
+          <div className="flex items-center">
+            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-red-100 rounded-full flex items-center justify-center">
+              <span className="text-xs sm:text-sm font-medium text-red-600">
+                {position}
+              </span>
+            </div>
+          </div>
+        );
+      },
+      className: 'hidden sm:table-cell'
+    },
+    {
+      key: 'brand_name',
+      label: 'Brand Name',
+      render: (value, row) => {
+        const brandName = value || row.brand_name || 'Unknown Brand';
+        const pageId = row.page_id || 'N/A';
+        return (
+          <div className="flex items-center">
+            <Users className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
+            <div className="flex items-center space-x-2 flex-1">
+              <div className="text-xs font-medium text-gray-900 max-w-[80px] sm:max-w-none truncate">
+                {brandName}
+              </div>
+              {pageId && pageId !== 'N/A' && (
+                <button
+                  onClick={() => {
+                    const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=${pageId}`;
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="flex-shrink-0 p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                  title="View in Facebook Ad Library"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'id',
+      label: 'Brand ID',
+      render: (value) => (
+        <div className="flex items-center">
+          <Hash className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
+          <span className="text-xs font-mono text-gray-900">
+            {value || 'N/A'}
+          </span>
+        </div>
+      )
+    },
+    {
+      key: 'page_id',
+      label: 'Page ID',
+      render: (value) => (
+        <div className="flex items-center">
+          <Tag className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
+          <span className="text-xs font-mono text-gray-900">
+            {value || 'N/A'}
+          </span>
+        </div>
+      )
+    },
+    {
+      key: 'coverage',
+      label: 'Coverage',
+      render: (value) => (
+        <div className="flex items-center">
+          <span className="text-xs font-medium text-blue-600">
+            {value || 'N/A'}
+          </span>
+        </div>
+      ),
+      className: 'hidden sm:table-cell'
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (value, row) => (
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => handleRequeueSingle(row.id)}
+            disabled={!isAdmin}
+            size="sm"
+            variant="success"
+            className="px-3 py-1.5 text-xs font-medium rounded-md hover:bg-green-600 transition-colors"
+            title={!isAdmin ? 'Admin access required' : 'Requeue to Pending'}
+          >
+            <RotateCcw className="h-3 w-3" />
+          </Button>
+          <Button
+            onClick={() => handleDeleteSingle(row.id)}
+            disabled={!isAdmin}
+            size="sm"
+            variant="danger"
+            className="px-3 py-1.5 text-xs font-medium rounded-md hover:bg-red-600 transition-colors"
+            title={!isAdmin ? 'Admin access required' : 'Delete from List'}
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </div>
+      )
+    }
+  ];
 
   const columns = [
     {
@@ -172,6 +425,43 @@ const FailedQueue = () => {
     }
   ];
 
+  const loadReenqueueData = useCallback(async (page = 1, showLoading = false) => {
+    try {
+      // Only show loading spinner on initial load, not on page changes
+      if (showLoading) {
+        setReenqueueState(prev => ({ ...prev, isLoading: true }));
+      }
+      
+      // Always use the page parameter passed in
+      const response = await fetchReenqueueData(page, 10, null, 'non-watchlist');
+      
+      let items = [];
+      let pagination = {};
+
+      if (response.items && response.pagination) {
+        items = response.items;
+        pagination = response.pagination;
+      } else if (response.data) {
+        items = response.data.items || response.data || [];
+        pagination = response.data.pagination || {};
+      } else {
+        items = response || [];
+        pagination = {};
+      }
+
+      setReenqueueState(prev => ({
+        ...prev,
+        items,
+        pagination,
+        currentPage: page,
+        isLoading: false
+      }));
+    } catch (error) {
+      console.error('Error loading reenqueue data:', error);
+      setReenqueueState(prev => ({ ...prev, isLoading: false }));
+    }
+  }, [fetchReenqueueData]);
+
   const loadFailedBrands = useCallback(async (searchTerm = null, pageOverride = null) => {
     try {
       // Set loading states appropriately
@@ -245,6 +535,9 @@ const FailedQueue = () => {
       loadFailedBrands(null, initialPage);
     }
 
+    // Load reenqueue data (show loading on initial load)
+    loadReenqueueData(1, true);
+
     // Mark initial mount as complete
     setTimeout(() => {
       isInitialMountRef.current = false;
@@ -283,6 +576,85 @@ const FailedQueue = () => {
       loadFailedBrands(null, 1);
     }
   }, [searchTerm, loadFailedBrands]);
+
+  // Handle reenqueue page changes
+  useEffect(() => {
+    // Skip initial mount
+    if (isInitialMountRef.current) {
+      return;
+    }
+
+    // Save scroll position before loading
+    const scrollY = window.scrollY;
+    
+    // Load reenqueue data when page changes
+    loadReenqueueData(reenqueueCurrentPage, false).then(() => {
+      // Restore scroll position after data loads and DOM updates
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollY);
+      });
+    });
+  }, [reenqueueCurrentPage, loadReenqueueData]);
+
+  // Detect page refresh and set flag, then restore dialog states
+  useEffect(() => {
+    const isInitialLoad = !sessionStorage.getItem('failedQueuePageVisited');
+    
+    if (!isInitialLoad) {
+      // This is a page refresh, set the flag
+      sessionStorage.setItem('failedQueuePageRefreshed', 'true');
+      
+      // Restore dialog states from localStorage
+      try {
+        const savedConfirmDialog = localStorage.getItem('failedQueue_confirmDialog');
+        if (savedConfirmDialog) {
+          const parsed = JSON.parse(savedConfirmDialog);
+          setConfirmDialog({
+            show: parsed.show || false,
+            confirmText: parsed.confirmText || ''
+          });
+        }
+        
+        const savedRequeueDialog = localStorage.getItem('failedQueue_requeueConfirmDialog');
+        if (savedRequeueDialog) {
+          const parsed = JSON.parse(savedRequeueDialog);
+          setRequeueConfirmDialog({
+            show: parsed.show || false,
+            confirmText: parsed.confirmText || ''
+          });
+        }
+      } catch (error) {
+        console.error('Error restoring dialog states:', error);
+      }
+    } else {
+      // This is initial load, mark page as visited
+      sessionStorage.setItem('failedQueuePageVisited', 'true');
+    }
+
+    // Cleanup function to clear the visited flag when navigating away
+    return () => {
+      sessionStorage.removeItem('failedQueuePageVisited');
+    };
+  }, []);
+
+  // Save confirmation dialog state to localStorage whenever it changes
+  useEffect(() => {
+    if (confirmDialog.show) {
+      localStorage.setItem('failedQueue_confirmDialog', JSON.stringify(confirmDialog));
+    } else {
+      localStorage.removeItem('failedQueue_confirmDialog');
+    }
+  }, [confirmDialog]);
+
+  // Save requeue confirmation dialog state to localStorage whenever it changes
+  useEffect(() => {
+    if (requeueConfirmDialog.show) {
+      localStorage.setItem('failedQueue_requeueConfirmDialog', JSON.stringify(requeueConfirmDialog));
+    } else {
+      localStorage.removeItem('failedQueue_requeueConfirmDialog');
+    }
+  }, [requeueConfirmDialog]);
+
 
   const handleRefresh = async () => {
     if (isRefreshing) return;
@@ -343,6 +715,12 @@ const FailedQueue = () => {
     const newParams = new URLSearchParams(searchParams);
     newParams.set('page', page.toString());
     setSearchParams(newParams, { replace: true });
+    
+    // Scroll to the table section when changing pages
+    const tableSection = document.getElementById('failed-queue-table-section');
+    if (tableSection) {
+      tableSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
   const filteredBrands = brands;
@@ -373,15 +751,30 @@ const FailedQueue = () => {
               </p>
             </div>
           </div>
-          <Button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            size="sm"
-            className="flex items-center gap-2 w-full sm:w-auto justify-center text-xs sm:text-sm"
-          >
-            <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
-          </Button>
+
+          <div className="flex items-center space-x-3">
+            {!isAdmin && (reenqueuePagination.total_items || 0) > 0 ? (
+              <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg">
+                <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="text-xs sm:text-sm font-medium">Admin Access Required</span>
+              </div>
+            ) : isAdmin && (reenqueuePagination.total_items || 0) > 0 ? (
+              <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-green-100 text-green-800 rounded-lg">
+                <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="text-xs sm:text-sm font-medium">Admin Mode</span>
+              </div>
+            ) : null}
+
+            <Button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              size="sm"
+              className="flex items-center gap-2 w-full sm:w-auto justify-center text-xs sm:text-sm"
+            >
+              <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -451,7 +844,7 @@ const FailedQueue = () => {
       </Card>
 
       {/* Desktop Table View */}
-      <Card className="hidden md:block">
+      <Card id="failed-queue-table-section" className="hidden md:block">
         {isSearching ? (
           <div className="text-center py-12 sm:py-16">
             <div className="flex flex-col items-center space-y-4">
@@ -603,6 +996,7 @@ const FailedQueue = () => {
         )}
       </div>
 
+      {/* Pagination for Failed Brands Table */}
       {totalPages > 1 && (
         <Pagination
           currentPage={currentPage}
@@ -612,6 +1006,189 @@ const FailedQueue = () => {
           itemsPerPage={itemsPerPage}
           showPageInfo={true}
         />
+      )}
+
+      {/* Reenqueue Data Section - Below Failed Brands Pagination */}
+      {reenqueueItems && reenqueueItems.length > 0 && (
+        <>
+          <Card id="reenqueue-table-section" className="mt-6 mb-4">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-orange-600" />
+                  Reenqueue List ({reenqueuePagination.total_items || 0})
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Brands waiting to be requeued for processing
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={handleRequeueAll}
+                  disabled={!isAdmin}
+                  size="md"
+                  variant="primary"
+                  className="flex items-center gap-2 px-4 py-2 font-medium"
+                  title={!isAdmin ? 'Admin access required' : 'Requeue all brands'}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Requeue All
+                </Button>
+                <Button
+                  onClick={handleDeleteAllClick}
+                  disabled={!isAdmin}
+                  size="md"
+                  variant="danger"
+                  className="flex items-center gap-2 px-4 py-2 font-medium"
+                  title={!isAdmin ? 'Admin access required' : 'Delete all brands'}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete All
+                </Button>
+              </div>
+            </div>
+            {reenqueueLoading && reenqueueItems.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600 mx-auto"></div>
+                <p className="text-sm text-gray-500 mt-2">Loading reenqueue data...</p>
+              </div>
+            ) : (
+              <Table
+                data={reenqueueItems}
+                columns={reenqueueColumns}
+                emptyMessage="No items in reenqueue list"
+                className="shadow-md rounded-lg"
+              />
+            )}
+          </Card>
+
+          {/* Pagination for Reenqueue Table */}
+          {reenqueuePagination.total_pages > 1 && (
+            <Pagination
+              currentPage={reenqueueCurrentPage}
+              totalPages={reenqueuePagination.total_pages || 1}
+              onPageChange={(page) => {
+                // Immediately update only the reenqueue current page (no re-render of failed queue)
+                setReenqueueState(prev => ({ ...prev, currentPage: page }));
+                
+                // Scroll to the reenqueue table section when changing pages
+                const tableSection = document.getElementById('reenqueue-table-section');
+                if (tableSection) {
+                  tableSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }}
+              totalItems={reenqueuePagination.total_items || 0}
+              itemsPerPage={reenqueueItemsPerPage}
+              showPageInfo={true}
+            />
+          )}
+        </>
+      )}
+
+      {/* Confirmation Dialog for Delete All */}
+      {confirmDialog.show && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Confirm Delete All Reenqueue Brands</h3>
+              <button
+                onClick={handleCancelDeleteAll}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-3">
+                This action will permanently delete all brands from the reenqueue list. This action cannot be undone.
+              </p>
+              <p className="text-sm text-gray-600 mb-4">
+                Type <strong>"confirm"</strong> to proceed:
+              </p>
+              
+              <input
+                type="text"
+                value={confirmDialog.confirmText}
+                onChange={(e) => setConfirmDialog({ ...confirmDialog, confirmText: e.target.value })}
+                placeholder="Type 'confirm' here"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                autoFocus
+              />
+            </div>
+            
+            <div className="flex gap-3">
+              <Button
+                onClick={handleCancelDeleteAll}
+                variant="secondary"
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmDeleteAll}
+                variant="danger"
+                className="flex-1"
+                disabled={confirmDialog.confirmText.toLowerCase() !== 'confirm'}
+              >
+                Delete All
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Dialog for Requeue All */}
+      {requeueConfirmDialog.show && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Confirm Requeue All Brands</h3>
+              <button
+                onClick={handleCancelRequeueAll}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-3">
+                This action will requeue all brands from the reenqueue list to the pending queue.
+              </p>
+              <p className="text-sm text-gray-600 mb-4">
+                Type <strong>"confirm"</strong> to proceed:
+              </p>
+              
+              <input
+                type="text"
+                value={requeueConfirmDialog.confirmText}
+                onChange={(e) => setRequeueConfirmDialog({ ...requeueConfirmDialog, confirmText: e.target.value })}
+                placeholder="Type 'confirm' here"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                autoFocus
+              />
+            </div>
+            
+            <div className="flex gap-3">
+              <Button
+                onClick={handleCancelRequeueAll}
+                variant="secondary"
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmRequeueAll}
+                variant="primary"
+                className="flex-1"
+                disabled={requeueConfirmDialog.confirmText.toLowerCase() !== 'confirm'}
+              >
+                Requeue All
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

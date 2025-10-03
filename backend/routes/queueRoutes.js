@@ -1,16 +1,19 @@
 const express = require("express");
 const queueController = require("../controllers/queueController");
 const queueManagementRoutes = require("./queueManagementRoutes");
+const queueReenqueueController = require("../controllers/queueReenqueueController");
 
 const proxyManagementRoutes = require("./proxyManagementRoutes");
 const scraperControlController = require('../controllers/scraperControlController');
 const adminAuth = require("../middleware/adminAuth");
+const brandManagementController = require("../controllers/brandManagementController");
 
 const router = express.Router();
 
 router.get("/overview", queueController.getQueueOverview);
 router.get("/pending", queueController.getPendingBrands);
 router.get("/failed", queueController.getFailedBrands);
+router.get("/reenqueue-data", queueController.getReenqueueData);
 router.get("/watchlist", queueController.getWatchlistBrands);
 router.get("/watchlist-pending-brands", queueController.getWatchlistPendingBrands);
 router.get("/watchlist-failed-brands", queueController.getWatchlistFailedBrands);
@@ -21,6 +24,12 @@ router.get("/stats", queueController.getQueueStats);
 
 router.get("/brand-processing", queueController.getBrandProcessingQueue);
 router.get("/watchlist-brands", queueController.getWatchlistBrandsQueue);
+router.get("/all-brand-processing-jobs", queueController.getAllBrandProcessingJobs);
+
+// Ad-update processing routes
+router.get("/ad-update-processing", queueController.getAdUpdateQueue);
+router.get("/watchlist-ad-update", queueController.getWatchlistAdUpdateQueue);
+router.get("/all-ad-update-jobs", queueController.getAllAdUpdateJobs);
 router.get("/scraped-stats", queueController.getBrandsScrapedStats);
 router.get("/scraped-stats/separate", queueController.getSeparateBrandsScrapedStats);
 
@@ -29,6 +38,14 @@ router.get("/search-brands", queueController.searchBrands);
 
 // Get brand counts by status (READ operation - no auth required)
 router.get("/brand-counts", queueController.getBrandCounts);
+
+// Brand status read/update
+router.get("/brand/status", brandManagementController.getBrandStatus);
+router.put("/brand/status", adminAuth, brandManagementController.updateBrandStatus);
+
+// Bulk brand status operations (admin only)
+router.post("/brand/status/bulk/preview", adminAuth, brandManagementController.bulkPreviewBrands);
+router.put("/brand/status/bulk/apply", adminAuth, brandManagementController.bulkApplyStatusUpdates);
 
 // ADMIN ONLY: Brand addition routes (POST methods - require admin auth)
 router.post(
@@ -60,6 +77,12 @@ router.put(
 // Queue Management Routes - Imported from separate file (ALL require admin auth)
 router.use("/queue-management", queueManagementRoutes);
 
+// Reenqueue Management Routes - Admin only
+router.post("/reenqueue/single", adminAuth, queueReenqueueController.requeueSingleBrand);
+router.post("/reenqueue/all", adminAuth, queueReenqueueController.requeueAllBrands);
+router.delete("/reenqueue/single", adminAuth, queueReenqueueController.deleteSingleBrand);
+router.delete("/reenqueue/all", adminAuth, queueReenqueueController.deleteAllBrands);
+
 
 
 // Proxy Management Routes - Admin only
@@ -69,6 +92,8 @@ router.use("/proxy", proxyManagementRoutes);
 router.get('/scraper/status', scraperControlController.getScraperStatus);
 router.post('/scraper/start', adminAuth, scraperControlController.startScraper);
 router.post('/scraper/stop', adminAuth, scraperControlController.stopScraper);
+// Read-only: brand timing (accessible to all users)
+router.get('/scraper/brand-timing', scraperControlController.getBrandTiming);
 
 // Manual cleanup endpoint - Admin only (for testing/debugging)
 router.post('/cleanup-completed-brands', adminAuth, async (req, res) => {
@@ -99,5 +124,7 @@ router.post('/cleanup-completed-brands', adminAuth, async (req, res) => {
   }
 });
 
+// Cache invalidation endpoint
+router.post('/invalidate-cache', queueController.invalidateQueueCache);
 
 module.exports = router;

@@ -11,28 +11,35 @@ async function clearAllQueues() {
   try {
     const REDIS_KEYS = getRedisKeys();
     
-    logger.info("Clearing all queues (regular and watchlist pending and failed)");
+    logger.info("Clearing all queues (regular and watchlist pending and failed) and reenqueue list");
 
     // Get both Redis instances
     const regularRedis = getQueueRedis('regular');
     const watchlistRedis = getQueueRedis('watchlist');
+    const globalRedis = getGlobalRedis();
 
     // Get counts from all queues
     const regularPendingCount = await regularRedis.zcard(REDIS_KEYS.REGULAR.PENDING_BRANDS);
     const regularFailedCount = await regularRedis.llen(REDIS_KEYS.REGULAR.FAILED_BRANDS);
     const watchlistPendingCount = await watchlistRedis.zcard(REDIS_KEYS.WATCHLIST.PENDING_BRANDS);
     const watchlistFailedCount = await watchlistRedis.llen(REDIS_KEYS.WATCHLIST.FAILED_BRANDS);
+    
+    // Get count from reenqueue list
+    const reenqueueCount = await globalRedis.llen(REDIS_KEYS.GLOBAL.REENQUEUE_KEY);
 
     // Clear all queues
     await regularRedis.del(REDIS_KEYS.REGULAR.PENDING_BRANDS);
     await regularRedis.del(REDIS_KEYS.REGULAR.FAILED_BRANDS);
     await watchlistRedis.del(REDIS_KEYS.WATCHLIST.PENDING_BRANDS);
     await watchlistRedis.del(REDIS_KEYS.WATCHLIST.FAILED_BRANDS);
+    
+    // Clear reenqueue list
+    await globalRedis.del(REDIS_KEYS.GLOBAL.REENQUEUE_KEY);
 
-    const totalCleared = regularPendingCount + regularFailedCount + watchlistPendingCount + watchlistFailedCount;
+    const totalCleared = regularPendingCount + regularFailedCount + watchlistPendingCount + watchlistFailedCount + reenqueueCount;
 
     logger.info(
-      `Successfully cleared all queues. Removed ${regularPendingCount} regular pending + ${regularFailedCount} regular failed + ${watchlistPendingCount} watchlist pending + ${watchlistFailedCount} watchlist failed = ${totalCleared} total brands`
+      `Successfully cleared all queues and reenqueue list. Removed ${regularPendingCount} regular pending + ${regularFailedCount} regular failed + ${watchlistPendingCount} watchlist pending + ${watchlistFailedCount} watchlist failed + ${reenqueueCount} reenqueue = ${totalCleared} total brands`
     );
 
     return {
@@ -44,8 +51,11 @@ async function clearAllQueues() {
         cleared_pending: watchlistPendingCount,
         cleared_failed: watchlistFailedCount,
       },
+      reenqueue: {
+        cleared_count: reenqueueCount,
+      },
       total_cleared: totalCleared,
-      message: `Cleared all queues: ${totalCleared} total brands (regular: ${regularPendingCount + regularFailedCount}, watchlist: ${watchlistPendingCount + watchlistFailedCount})`,
+      message: `Cleared all queues and reenqueue list: ${totalCleared} total brands (regular: ${regularPendingCount + regularFailedCount}, watchlist: ${watchlistPendingCount + watchlistFailedCount}, reenqueue: ${reenqueueCount})`,
     };
   } catch (error) {
     logger.error("Error clearing all queues:", error);

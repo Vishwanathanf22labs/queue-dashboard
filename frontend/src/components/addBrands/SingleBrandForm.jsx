@@ -8,7 +8,7 @@ import { validateSingleBrand } from '../../utils/validation';
 import { queueAPI } from '../../services/api';
 import { Plus, Check } from 'lucide-react';
 
-const SingleBrandForm = ({ loading, isSubmitting, onSubmittingChange }) => {
+const SingleBrandForm = ({ loading, isSubmitting, onSubmittingChange, disabled = false }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   
   const getInitialSingleBrand = () => {
@@ -131,7 +131,7 @@ const SingleBrandForm = ({ loading, isSubmitting, onSubmittingChange }) => {
                   checked={queueType === 'regular'}
                   onChange={(e) => updateQueueType(e.target.value)}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 accent-blue-600"
-                  disabled={isSubmitting || loading}
+                  disabled={disabled || isSubmitting || loading}
                 />
                 <span className="ml-2 text-base font-semibold text-gray-700">Regular Queue</span>
               </label>
@@ -143,7 +143,7 @@ const SingleBrandForm = ({ loading, isSubmitting, onSubmittingChange }) => {
                   checked={queueType === 'watchlist'}
                   onChange={(e) => updateQueueType(e.target.value)}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 accent-blue-600"
-                  disabled={isSubmitting || loading}
+                  disabled={disabled || isSubmitting || loading}
                 />
                 <span className="ml-2 text-base font-semibold text-gray-700">Watchlist Queue</span>
               </label>
@@ -158,7 +158,7 @@ const SingleBrandForm = ({ loading, isSubmitting, onSubmittingChange }) => {
               onBrandSelect={handleSingleBrandSelect}
               placeholder="Type brand name to search (e.g., 'nike', 'adidas')..."
               selectedBrand={singleBrandForm.id ? singleBrandForm : null}
-              disabled={Boolean(isSubmitting || loading || isSearchDisabled(singleBrandForm))}
+              disabled={Boolean(disabled || isSubmitting || loading || isSearchDisabled(singleBrandForm))}
               onSearchAttempt={handleSearchAttempt}
             />
             <p className="mt-1.5 sm:mt-1 text-xs sm:text-sm text-gray-500 leading-relaxed">
@@ -211,12 +211,12 @@ const SingleBrandForm = ({ loading, isSubmitting, onSubmittingChange }) => {
                 score: score !== null ? score : 0
               });
             }}
-            disabled={!singleBrandForm.id || isSubmitting || loading}
+            disabled={disabled || !singleBrandForm.id || isSubmitting || loading}
             className="mt-4"
           />
         </div>
       </div>
-      <Button type="submit" variant="primary" disabled={loading || isSubmitting || !singleBrandForm.id} className="w-full sm:w-auto">
+      <Button type="submit" variant="primary" disabled={disabled || loading || isSubmitting || !singleBrandForm.id} className="w-full sm:w-auto">
         <Plus className="h-4 w-4 mr-2" />
         {isSubmitting ? 'Adding Brand...' : 'Add Brand'}
       </Button>

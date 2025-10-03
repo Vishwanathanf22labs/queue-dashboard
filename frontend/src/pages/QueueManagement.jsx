@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import AdminAccessRequired from '../components/ui/AdminAccessRequired';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import QueueControls from '../components/queueManagement/QueueControls';
 import QueueStats from '../components/queueManagement/QueueStats';
@@ -613,9 +612,6 @@ const QueueManagement = () => {
     return <LoadingSpinner />;
   }
 
-  if (!isAdmin) {
-    return <AdminAccessRequired />;
-  }
 
   return (
     <div className="space-y-4 sm:space-y-6 lg:space-y-8">
@@ -635,7 +631,7 @@ const QueueManagement = () => {
                 <span className="text-xs sm:text-sm font-medium">Admin Mode</span>
               </div>
             ) : (
-              <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-100 text-gray-600 rounded-lg">
+              <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg">
                 <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="text-xs sm:text-sm font-medium">Admin Access Required</span>
               </div>
@@ -667,6 +663,7 @@ const QueueManagement = () => {
           onAdminAction={handleAdminAction}
           confirmDialogState={confirmDialogState}
           onConfirmDialogStateChange={setConfirmDialogState}
+          disabled={!isAdmin}
         />
       </Card>
 
@@ -698,6 +695,7 @@ const QueueManagement = () => {
         onMoveBrand={handleMoveBrand}
         onRemoveBrand={handleRemoveBrand}
         isProcessingAction={isProcessingAction}
+        disabled={!isAdmin}
       />
 
       <FailedQueue
@@ -727,6 +725,7 @@ const QueueManagement = () => {
         onMoveBrand={handleMoveBrand}
         onRemoveBrand={handleRemoveBrand}
         isProcessingAction={isProcessingAction}
+        disabled={!isAdmin}
       />
     </div>
   );
