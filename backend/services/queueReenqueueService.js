@@ -1,7 +1,11 @@
 const { globalRedis } = require("../config/redis");
 const logger = require("../utils/logger");
 const { PAGINATION } = require("../config/constants");
-const { Brand } = require("../models");
+
+// Function to get dynamic models (ensures fresh database connection)
+function getModels() {
+  return require("../models");
+}
 
 // Function to get dynamic Redis keys
 function getRedisKeys() {
@@ -104,6 +108,7 @@ async function getReenqueueData(
     // If we have IDs but no page_ids, fetch page_ids from database
     if (itemIds.length > 0 && parsedItems.some(item => !item.page_id)) {
       try {
+        const { Brand } = getModels(); // Use dynamic model import
         const brands = await Brand.findAll({
           where: { id: itemIds },
           attributes: ["id", "page_id"],
@@ -140,6 +145,7 @@ async function getReenqueueData(
     // Batch fetch brand names from database
     if (pageIds.length > 0) {
       try {
+        const { Brand } = getModels(); // Use dynamic model import
         const brands = await Brand.findAll({
           where: { page_id: pageIds },
           attributes: ["name", "actual_name", "page_id"],
