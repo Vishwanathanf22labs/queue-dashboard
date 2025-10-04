@@ -74,6 +74,7 @@ const QueueManagement = () => {
     clearAllQueues,
     clearPendingQueue,
     clearFailedQueue,
+    clearCurrentlyScraping,
     moveAllPendingToFailed,
     moveAllFailedToPending,
     removePendingBrand,
@@ -503,6 +504,9 @@ const QueueManagement = () => {
       switch (action) {
         case 'Clear All Queues':
           response = await clearAllQueues();
+          break;
+        case 'Clear Currently Scraping':
+          response = await clearCurrentlyScraping();
           break;
         case 'Clear Pending Queue':
           response = await clearPendingQueue();

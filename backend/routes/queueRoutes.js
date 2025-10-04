@@ -124,6 +124,40 @@ router.post('/cleanup-completed-brands', adminAuth, async (req, res) => {
   }
 });
 
+// Clear all currently scraping brands - Admin only
+router.delete('/clear-currently-processing', adminAuth, async (req, res) => {
+  try {
+    const { getGlobalRedis } = require('../utils/redisSelector');
+    const { REDIS_KEYS } = require('../config/constants');
+    const logger = require('../utils/logger');
+    
+    // Get current count before clearing
+    const currentlyScrapingBrands = await getGlobalRedis().lrange(REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING, 0, -1);
+    const countBeforeClear = currentlyScrapingBrands ? currentlyScrapingBrands.length : 0;
+    
+    // Clear the entire currently scraping Redis key
+    await getGlobalRedis().del(REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING);
+    
+    logger.info(`Admin cleared all currently scraping brands: ${countBeforeClear} brands removed`);
+    
+    res.json({
+      success: true,
+      message: `All currently scraping brands cleared successfully`,
+      data: {
+        cleared_count: countBeforeClear,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    logger.error('Error clearing currently scraping brands:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to clear currently scraping brands',
+      error: error.message
+    });
+  }
+});
+
 // Cache invalidation endpoint
 router.post('/invalidate-cache', queueController.invalidateQueueCache);
 

@@ -12,6 +12,14 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
     });
   };
 
+  const handleClearCurrentlyScrapingClick = () => {
+    onConfirmDialogStateChange({
+      showConfirmDialog: true,
+      confirmText: '',
+      confirmAction: 'Clear Currently Scraping'
+    });
+  };
+
   const handleWatchlistClearPendingClick = () => {
     onConfirmDialogStateChange({
       showConfirmDialog: true,
@@ -101,7 +109,7 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
       
       {/* Clear All Queues - Common */}
       <div className="mb-6">
-        <div className="flex justify-center">
+        <div className="flex justify-center gap-3">
           <Button
             variant="danger"
             onClick={handleClearAllClick}
@@ -111,6 +119,17 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
             <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
             <span className="hidden sm:inline">Clear All Queues</span>
             <span className="sm:hidden">Clear All</span>
+          </Button>
+          
+          <Button
+            variant="danger"
+            onClick={handleClearCurrentlyScrapingClick}
+            disabled={disabled || isProcessingAction}
+            className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5 px-4"
+          >
+            <X className="h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Clear Currently Scraping</span>
+            <span className="sm:hidden">Clear Scraping</span>
           </Button>
         </div>
       </div>

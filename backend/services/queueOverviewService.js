@@ -26,12 +26,12 @@ async function cleanupCompletedBrands() {
         const processingData = JSON.parse(currentlyProcessingBrands[i]);
         const status = processingData.status?.toLowerCase();
         
-        // Keep only brands that are actively processing (not completed or failed)
+        // Remove completed/failed brands (they should not show in "currently scraping")
         if (status && (status === 'completed' || status === 'complete' || status === 'failed' || status === 'error')) {
           logger.info(`Cleanup: Removing ${status} brand ${processingData.brandId} from ${REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING} Redis key`);
           removedCount++;
         } else {
-          // Keep this brand in the list (processing, active, etc.)
+          // Keep this brand in the list (running, processing, active, etc.)
           brandsToKeep.push(currentlyProcessingBrands[i]);
         }
       } catch (parseError) {
@@ -562,6 +562,16 @@ function clearAllCaches() {
       cleanupInterval = null;
       logger.info('Stopped cleanup interval for environment switch');
     }
+    
+    if (runningCleanupInterval) {
+      clearInterval(runningCleanupInterval);
+      runningCleanupInterval = null;
+      logger.info('Stopped running cleanup interval for environment switch');
+    }
+    
+    // Restart cleanup intervals for the new environment
+    startCleanupInterval();
+    logger.info('✅ Restarted cleanup intervals for new environment');
     
     logger.info('✅ All queue overview caches cleared successfully');
   } catch (error) {
