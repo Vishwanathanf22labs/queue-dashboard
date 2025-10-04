@@ -467,6 +467,22 @@ const useQueueStore = create((set, get) => ({
     }
   },
 
+  clearCurrentlyScraping: async () => {
+    try {
+      set({ loading: true, error: null });
+      const response = await queueAPI.clearCurrentlyScraping();
+      set({ loading: false });
+      return response.data;
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to clear currently scraping brands";
+      set({ error: errorMessage, loading: false });
+      throw error;
+    }
+  },
+
   clearPendingQueue: async () => {
     try {
       set({ loading: true, error: null });

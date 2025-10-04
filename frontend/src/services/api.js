@@ -187,6 +187,7 @@ export const queueAPI = {
   clearAllQueues: () => api.delete("/queue/queue-management/clear-all"),
   clearPendingQueue: () => api.delete("/queue/queue-management/pending/clear"),
   clearFailedQueue: () => api.delete("/queue/queue-management/failed/clear"),
+  clearCurrentlyScraping: () => api.delete("/queue/clear-currently-processing"),
 
   removePendingBrand: (brandId) =>
     api.delete(`/queue/queue-management/pending/${brandId}`),
