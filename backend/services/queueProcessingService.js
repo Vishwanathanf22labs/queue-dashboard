@@ -18,7 +18,7 @@ let regularBrandProcessingQueue = null;
 let watchlistBrandProcessingQueue = null;
 
 // Pipeline-style caching for queue APIs (same as pipeline status page)
-const QUEUE_CACHE_TTL = 600; // 10 minutes (increased for better speed)
+const QUEUE_CACHE_TTL = 30; // 30 seconds for faster updates
 
 // Pre-computed job index for ultra-fast pagination
 let jobIndex = {
@@ -31,8 +31,8 @@ let brandCache = new Map(); // brandId -> brandData
 let brandCacheLastUpdated = 0;
 
 // Cache refresh intervals - optimized for speed
-const JOB_INDEX_REFRESH_INTERVAL = 300000; // 5 minutes for hot data (increased for better speed)
-const BRAND_CACHE_REFRESH_INTERVAL = 600000; // 10 minutes for brand data (increased for better speed)
+const JOB_INDEX_REFRESH_INTERVAL = 30000; // 30 seconds for faster updates
+const BRAND_CACHE_REFRESH_INTERVAL = 60000; // 1 minute for brand data
 
 // Get cached queue data with ETag support (pipeline-style)
 async function getCachedQueueData(queueType, page, limit, sortBy, sortOrder, ifNoneMatch) {
@@ -124,7 +124,7 @@ async function getPreComputedQueueCounters(redis, queueType) {
     // Cache the real counters for future use
     try {
       await redis.hset(counterKey, realCounters);
-      await redis.expire(counterKey, 60); // Cache for 1 minute
+      await redis.expire(counterKey, 10); // Cache for 10 seconds
     } catch (cacheError) {
       logger.warn(`Failed to cache counters: ${cacheError.message}`);
     }
@@ -276,6 +276,25 @@ const HOT_PATTERNS = [
   { queueType: 'watchlist', page: 1, limit: 10, sortBy: 'normal', sortOrder: 'desc' },
   { queueType: 'watchlist', page: 1, limit: 20, sortBy: 'normal', sortOrder: 'desc' }
 ];
+
+// Clear all in-memory caches
+function clearInMemoryCaches() {
+  try {
+    // Clear job index
+    jobIndex = {
+      regular: { jobs: [], lastUpdated: 0, brandIds: new Set() },
+      watchlist: { jobs: [], lastUpdated: 0, brandIds: new Set() }
+    };
+    
+    // Clear brand cache
+    brandCache.clear();
+    brandCacheLastUpdated = 0;
+    
+    console.log('QueueProcessingService in-memory caches cleared');
+  } catch (error) {
+    console.error('Error clearing QueueProcessingService caches:', error);
+  }
+}
 
 // Start background refresh for hot data
 function startBackgroundRefresh() {
@@ -1417,7 +1436,7 @@ async function getAllBrandProcessingJobs(queueType = 'regular', ifNoneMatch = nu
   }
 }
 
-module.exports = {
+const serviceExports = {
   initializeBullMQQueues,
   getBullMQJobStates,
   getBrandProcessingQueue,
@@ -1431,4 +1450,10 @@ module.exports = {
   resetPerformanceMetrics,
   clearAllCaches,
   refreshJobIndex,
+  clearInMemoryCaches,
 };
+
+// Set global reference for cache clearing
+global.queueProcessingService = serviceExports;
+
+module.exports = serviceExports;

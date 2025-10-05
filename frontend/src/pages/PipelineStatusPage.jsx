@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import {
   CheckCircle,
   XCircle,
   Clock,
-  RefreshCw,
   Search,
   Calendar,
   AlertCircle,
@@ -21,7 +21,9 @@ import Button from '../components/ui/Button';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import ErrorDisplay from '../components/ui/ErrorDisplay';
 import SortButton from '../components/ui/SortButton';
+import RefreshControl from '../components/ui/RefreshControl';
 import usePipelineSorting from '../hooks/usePipelineSorting';
+import useAutoRefresh from '../hooks/useAutoRefresh';
 
 const PipelineStatusPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -311,11 +313,25 @@ const PipelineStatusPage = () => {
     return () => clearTimeout(timer);
   }, [dateInputValue, selectedDate, setSearchParams]);
 
+  // Auto-refresh hook
+  const refreshFn = useCallback(async () => {
+    try {
+      await fetchPipelineStatus(currentPage);
+      toast.success('Pipeline status refreshed successfully');
+    } catch (error) {
+      console.error('PipelineStatus refresh failed:', error);
+    }
+  }, [fetchPipelineStatus, currentPage]);
+
+  const { refreshInterval, isRefreshing, setIntervalValue, manualRefresh } = useAutoRefresh(
+    refreshFn,
+    [currentPage, selectedDate, sortBy, sortOrder]
+  );
+
   // Memoize handlers to prevent unnecessary re-renders
-  const handleRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchPipelineStatus(currentPage);
-  }, [currentPage]);
+  const handleRefresh = useCallback(async () => {
+    await manualRefresh();
+  }, [manualRefresh]);
 
   // const handlePageChange = useCallback(async (newPage) => {
   //   setPageLoading(true);
@@ -810,21 +826,12 @@ const PipelineStatusPage = () => {
                 </div>
               </div>
 
-              {/* Refresh Button */}
-              <Button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                variant="primary"
-                size="sm"
-                className="flex items-center gap-2 w-full sm:w-auto"
-              >
-                {refreshing ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
-                )}
-                {refreshing ? 'Refreshing...' : 'Refresh'}
-              </Button>
+              <RefreshControl
+                isRefreshing={isRefreshing}
+                refreshInterval={refreshInterval}
+                onManualRefresh={handleRefresh}
+                onIntervalChange={setIntervalValue}
+              />
             </div>
           </div>
         </div>

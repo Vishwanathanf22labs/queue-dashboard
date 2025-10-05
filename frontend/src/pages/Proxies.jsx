@@ -8,14 +8,18 @@ import SearchInput from '../components/ui/SearchInput';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import Pagination from '../components/ui/Pagination';
+import RefreshControl from '../components/ui/RefreshControl';
+import { useAdminLogin } from '../contexts/AdminLoginContext';
 import toast from 'react-hot-toast';
 import useAdminStore from '../stores/adminStore';
+import useAutoRefresh from '../hooks/useAutoRefresh';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { Search, Shield } from 'lucide-react';
 import CustomDropdown from '../components/ui/CustomDropdown';
 
 const Proxies = () => {
   const { isAdmin, isLoading: adminLoading } = useAdminStore();
+  const { onAdminLogin } = useAdminLogin();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Refs for managing state
@@ -209,6 +213,29 @@ const Proxies = () => {
     setSearchParams(newParams, { replace: true });
   }, [searchParams, setSearchParams]);
 
+  // Auto-refresh hook
+  const refreshFn = useCallback(async () => {
+    try {
+      await Promise.all([
+        loadStats(),
+        loadManagementStats(),
+        loadProxies(currentPage, filter, searchTerm, false)
+      ]);
+      toast.success('Proxies refreshed successfully');
+    } catch (error) {
+      console.error('Proxies refresh failed:', error);
+    }
+  }, [loadStats, loadManagementStats, loadProxies, currentPage, filter, searchTerm]);
+
+  const { refreshInterval, isRefreshing, setIntervalValue, manualRefresh } = useAutoRefresh(
+    refreshFn,
+    [currentPage, filter, searchTerm]
+  );
+
+  const handleRefresh = async () => {
+    await manualRefresh();
+  };
+
 
 
 
@@ -237,11 +264,21 @@ const Proxies = () => {
             </div>
 
             {!isAdmin && (
-              <div className="flex items-center px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-red-600 bg-red-100 rounded-lg">
+              <button
+                onClick={onAdminLogin}
+                className="flex items-center px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-red-600 bg-red-100 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
+              >
                 <Shield className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
                 Admin Access Required
-              </div>
+              </button>
             )}
+
+            <RefreshControl
+              isRefreshing={isRefreshing}
+              refreshInterval={refreshInterval}
+              onManualRefresh={handleRefresh}
+              onIntervalChange={setIntervalValue}
+            />
           </div>
         </div>
 
@@ -334,6 +371,7 @@ const Proxies = () => {
           </Card>
         )}
       </div>
+
     </div>
   );
 };

@@ -7,6 +7,7 @@ const proxyManagementRoutes = require("./proxyManagementRoutes");
 const scraperControlController = require('../controllers/scraperControlController');
 const adminAuth = require("../middleware/adminAuth");
 const brandManagementController = require("../controllers/brandManagementController");
+const { getCacheRedisClient } = require('../services/utils/cacheUtils');
 
 const router = express.Router();
 
@@ -155,6 +156,63 @@ router.delete('/clear-currently-processing', adminAuth, async (req, res) => {
       message: 'Failed to clear currently scraping brands',
       error: error.message
     });
+  }
+});
+
+// Clear Cache Redis (current environment) - Admin only
+router.post('/clear-cache-only', adminAuth, async (req, res) => {
+  try {
+    const client = getCacheRedisClient();
+    
+    // Get all cache keys (only the ones we want to clear)
+    const cacheKeyPatterns = [
+      'pipeline:*',
+      'queue:*', 
+      'watchlist_brands',
+      'overall_stats:*'
+    ];
+    
+    let totalDeleted = 0;
+    
+    // Delete keys by pattern
+    for (const pattern of cacheKeyPatterns) {
+      const keys = await client.keys(pattern);
+      if (keys.length > 0) {
+        await client.del(keys);
+        totalDeleted += keys.length;
+        console.log(`Deleted ${keys.length} keys matching pattern: ${pattern}`);
+      }
+    }
+    
+    // ALSO clear in-memory caches (duplicate the logic to avoid circular dependency)
+    try {
+      // Clear service-level in-memory caches
+      if (global.queueProcessingService && global.queueProcessingService.clearInMemoryCaches) {
+        global.queueProcessingService.clearInMemoryCaches();
+        console.log('QueueProcessingService in-memory caches cleared');
+      }
+      
+      if (global.adUpdateProcessingService && global.adUpdateProcessingService.clearInMemoryCaches) {
+        global.adUpdateProcessingService.clearInMemoryCaches();
+        console.log('AdUpdateProcessingService in-memory caches cleared');
+      }
+      
+      // Clear in-memory fallback cache
+      if (global.cacheUtils && global.cacheUtils.clearInMemoryFallbackCache) {
+        global.cacheUtils.clearInMemoryFallbackCache();
+        console.log('In-memory fallback cache cleared');
+      }
+    } catch (memoryError) {
+      console.warn('Error clearing in-memory caches:', memoryError.message);
+    }
+    
+    return res.json({ 
+      success: true, 
+      message: `Cache Redis and in-memory caches cleared for current environment - ${totalDeleted} cache keys deleted`,
+      deletedCount: totalDeleted
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to clear Cache Redis', error: error.message });
   }
 });
 

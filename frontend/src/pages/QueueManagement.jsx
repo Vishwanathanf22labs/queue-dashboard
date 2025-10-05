@@ -3,17 +3,19 @@ import { useSearchParams } from 'react-router-dom';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
+import RefreshControl from '../components/ui/RefreshControl';
+import { useAdminLogin } from '../contexts/AdminLoginContext';
 import QueueControls from '../components/queueManagement/QueueControls';
 import QueueStats from '../components/queueManagement/QueueStats';
 import PendingQueue from '../components/queueManagement/PendingQueue';
 import FailedQueue from '../components/queueManagement/FailedQueue';
 import useAdminStore from '../stores/adminStore';
 import useQueueStore from '../stores/queueStore';
+import useAutoRefresh from '../hooks/useAutoRefresh';
 import { queueAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import {
-  Shield,
-  RefreshCw
+  Shield
 } from 'lucide-react';
 
 const QueueManagement = () => {
@@ -68,6 +70,8 @@ const QueueManagement = () => {
   // State for confirmation dialog persistence
   const [confirmDialogState, setConfirmDialogState] = useState(getInitialConfirmDialogState);
   
+  const { onAdminLogin } = useAdminLogin();
+  
   const {
     loading: storeLoading,
     error: storeError,
@@ -84,7 +88,8 @@ const QueueManagement = () => {
     clearWatchlistPendingQueue,
     clearWatchlistFailedQueue,
     moveAllWatchlistPendingToFailed,
-    moveAllWatchlistFailedToPending
+    moveAllWatchlistFailedToPending,
+    clearCacheOnly
   } = useQueueStore();
 
   const [state, setState] = useState({
@@ -481,9 +486,23 @@ const QueueManagement = () => {
     // Don't call loadFailedBrands here - let useEffect handle it
   };
 
+  // Auto-refresh hook
+  const refreshFn = useCallback(async () => {
+    try {
+      await Promise.all([loadPendingBrands(), loadFailedBrands()]);
+      toast.success('Queue data refreshed successfully');
+    } catch (error) {
+      console.error('QueueManagement refresh failed:', error);
+    }
+  }, [loadPendingBrands, loadFailedBrands]);
+
+  const { refreshInterval, isRefreshing, setIntervalValue, manualRefresh } = useAutoRefresh(
+    refreshFn,
+    [pending.currentPage, failed.currentPage]
+  );
+
   const handleRefresh = async () => {
-    await Promise.all([loadPendingBrands(), loadFailedBrands()]);
-    toast.success('Queue data refreshed successfully');
+    await manualRefresh();
   };
 
   const handlePendingRefresh = async () => {
@@ -502,6 +521,9 @@ const QueueManagement = () => {
       let response;
 
       switch (action) {
+        case 'Clear Cache Only':
+          response = await clearCacheOnly();
+          break;
         case 'Clear All Queues':
           response = await clearAllQueues();
           break;
@@ -635,21 +657,21 @@ const QueueManagement = () => {
                 <span className="text-xs sm:text-sm font-medium">Admin Mode</span>
               </div>
             ) : (
-              <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg">
+              <button
+                onClick={onAdminLogin}
+                className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
+              >
                 <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="text-xs sm:text-sm font-medium">Admin Access Required</span>
-              </div>
+              </button>
             )}
 
-            <Button
-              onClick={handleRefresh}
-              disabled={pending.loading || failed.loading}
-              size="sm"
-              className="flex items-center gap-2 text-xs sm:text-sm"
-            >
-              <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 ${(pending.loading || failed.loading) ? 'animate-spin' : ''}`} />
-              {pending.loading || failed.loading ? 'Refreshing...' : 'Refresh'}
-            </Button>
+            <RefreshControl
+              isRefreshing={isRefreshing}
+              refreshInterval={refreshInterval}
+              onManualRefresh={handleRefresh}
+              onIntervalChange={setIntervalValue}
+            />
           </div>
         </div>
       </div>
@@ -731,6 +753,7 @@ const QueueManagement = () => {
         isProcessingAction={isProcessingAction}
         disabled={!isAdmin}
       />
+
     </div>
   );
 };

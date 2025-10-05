@@ -483,6 +483,85 @@ const useQueueStore = create((set, get) => ({
     }
   },
 
+  clearCacheOnly: async () => {
+    try {
+      set({ loading: true, error: null });
+      const response = await queueAPI.clearCacheOnly();
+      
+      // Clear only cache-related frontend data (safe approach)
+      // Clear this store's cached data
+      set({
+        overview: null,
+        nextBrand: null,
+        nextWatchlistBrand: null,
+        pendingBrands: null,
+        failedBrands: null,
+        reenqueueData: null,
+        watchlistBrands: null,
+        watchlistPendingBrands: null,
+        watchlistFailedBrands: null,
+        brandProcessingQueue: null,
+        watchlistBrandsQueue: null,
+        allRegularBrandProcessingJobs: null,
+        allWatchlistBrandProcessingJobs: null,
+        adUpdateQueue: null,
+        watchlistAdUpdateQueue: null,
+        allRegularAdUpdateJobs: null,
+        allWatchlistAdUpdateJobs: null,
+        scrapedStats: null,
+        separateScrapedStats: null,
+        loading: false,
+        error: null
+      });
+      
+      // Clear only cache-related localStorage (not admin/login data)
+      const cacheKeys = [
+        'pipeline-sorting',
+        'queueManagement_pendingSearch',
+        'queueManagement_failedSearch', 
+        'queueManagement_confirmDialog',
+        'watchlistQueues_confirmDialog',
+        'watchlistQueues_requeueConfirmDialog',
+        'failedQueue_confirmDialog',
+        'failedQueue_requeueConfirmDialog',
+        'dashboard_*',
+        'scrapedBrands_*',
+        'proxies_*'
+      ];
+      
+      // Remove specific cache keys only
+      Object.keys(localStorage).forEach(key => {
+        if (cacheKeys.some(pattern => key.includes(pattern.replace('*', '')))) {
+          localStorage.removeItem(key);
+        }
+      });
+      
+      // Clear only cache-related sessionStorage
+      const sessionCacheKeys = [
+        'queueManagementPageRefreshed',
+        'queueManagementPageVisited',
+        'watchlistQueuesPageRefreshed', 
+        'watchlistQueuesPageVisited',
+        'failedQueuePageRefreshed',
+        'failedQueuePageVisited'
+      ];
+      
+      sessionCacheKeys.forEach(key => {
+        sessionStorage.removeItem(key);
+      });
+      
+      set({ loading: false });
+      return response.data;
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to clear cache";
+      set({ error: errorMessage, loading: false });
+      throw error;
+    }
+  },
+
   clearPendingQueue: async () => {
     try {
       set({ loading: true, error: null });

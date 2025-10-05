@@ -7,9 +7,11 @@ import LoadingSpinner from '../components/ui/LoadingSpinner';
 import ErrorDisplay from '../components/ui/ErrorDisplay';
 import Table from '../components/ui/Table';
 import Pagination from '../components/ui/Pagination';
+import RefreshControl from '../components/ui/RefreshControl';
 import toast from 'react-hot-toast';
 import useQueueStore from '../stores/queueStore';
-import { Clock, Search, Users, Hash, Tag, RefreshCw, ExternalLink } from 'lucide-react';
+import useAutoRefresh from '../hooks/useAutoRefresh';
+import { Clock, Search, Users, Hash, Tag, ExternalLink } from 'lucide-react';
 import SearchInput from '../components/ui/SearchInput';
 
 const PendingQueue = () => {
@@ -236,10 +238,8 @@ const PendingQueue = () => {
     }
   }, [searchTerm, loadPendingBrands]);
 
-  const handleRefresh = async () => {
-    if (isRefreshing) return;
-
-    updateQueueState({ isRefreshing: true });
+  // Auto-refresh hook
+  const refreshFn = useCallback(async () => {
     try {
       if (searchTerm && searchTerm.trim().length >= 3) {
         await loadPendingBrands(searchTerm);
@@ -248,10 +248,18 @@ const PendingQueue = () => {
       }
       toast.success('Pending queue refreshed successfully');
     } catch (error) {
-      toast.error(`Failed to refresh pending queue: ${error.message || error}`);
-    } finally {
-      updateQueueState({ isRefreshing: false });
+      console.error('PendingQueue refresh failed:', error);
     }
+  }, [searchTerm, loadPendingBrands]);
+
+  const { refreshInterval, isRefreshing: autoRefreshing, setIntervalValue, manualRefresh } = useAutoRefresh(
+    refreshFn,
+    [searchTerm, currentPage]
+  );
+
+  const handleRefresh = async () => {
+    await manualRefresh();
+    // Toast is now handled in refreshFn
   };
 
   const handleSearch = (searchValue) => {
@@ -322,15 +330,12 @@ const PendingQueue = () => {
               </p>
             </div>
           </div>
-          <Button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            size="sm"
-            className="flex items-center gap-2 w-full sm:w-auto justify-center text-xs sm:text-sm"
-          >
-            <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
-          </Button>
+          <RefreshControl
+            isRefreshing={autoRefreshing}
+            refreshInterval={refreshInterval}
+            onManualRefresh={handleRefresh}
+            onIntervalChange={setIntervalValue}
+          />
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -6,12 +6,15 @@ import LoadingSpinner from '../components/ui/LoadingSpinner';
 import LoadingState from '../components/ui/LoadingState';
 import CustomDropdown from '../components/ui/CustomDropdown';
 import Toggle from '../components/ui/Toggle';
+import RefreshControl from '../components/ui/RefreshControl';
+import { useAdminLogin } from '../contexts/AdminLoginContext';
 import useAdminStore from '../stores/adminStore';
 import useEnvironmentStore from '../stores/environmentStore';
+import useAutoRefresh from '../hooks/useAutoRefresh';
 import { queueAPI } from '../services/api';
 import { validateField, getFieldType, getFieldPlaceholder, getFieldStep } from '../utils/validation/settingsValidation';
 import toast from 'react-hot-toast';
-import { Shield, Save, RefreshCw, Edit, X, Settings as SettingsIcon } from 'lucide-react';
+import { Shield, Save, Edit, X, Settings as SettingsIcon } from 'lucide-react';
 
 const Settings = () => {
   const { isAdmin, isLoading: adminLoading } = useAdminStore();
@@ -24,6 +27,7 @@ const Settings = () => {
   const [editingGroup, setEditingGroup] = useState(null);
   const [formData, setFormData] = useState({});
   const [errors, setErrors] = useState({});
+  const { onAdminLogin } = useAdminLogin();
 
   // Local loading state for immediate feedback
   const [isTogglingEnvironment, setIsTogglingEnvironment] = useState(false);
@@ -195,9 +199,24 @@ const Settings = () => {
     setErrors({});
   };
 
+  // Auto-refresh hook
+  const refreshFn = useCallback(async () => {
+    try {
+      await loadData();
+      toast.success('Settings refreshed successfully');
+    } catch (error) {
+      console.error('Settings refresh failed:', error);
+    }
+  }, [loadData]);
+
+  const { refreshInterval, isRefreshing, setIntervalValue, manualRefresh } = useAutoRefresh(
+    refreshFn,
+    []
+  );
+
   const handleRefresh = async () => {
-    await loadData();
-    toast.success('Settings refreshed');
+    await manualRefresh();
+    // Toast is now handled in refreshFn
   };
 
   const handleEnvironmentToggle = async () => {
@@ -379,21 +398,21 @@ const Settings = () => {
                 <span className="text-xs sm:text-sm font-medium">Admin Mode</span>
               </div>
             ) : (
-              <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg">
+              <button
+                onClick={onAdminLogin}
+                className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
+              >
                 <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="text-xs sm:text-sm font-medium">Admin Access Required</span>
-              </div>
+              </button>
             )}
 
-            <Button
-              onClick={handleRefresh}
-              disabled={loading}
-              size="sm"
-              className="flex items-center gap-2 text-xs sm:text-sm"
-            >
-              <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 ${loading ? 'animate-spin' : ''}`} />
-              {loading ? 'Refreshing...' : 'Refresh'}
-            </Button>
+            <RefreshControl
+              isRefreshing={isRefreshing}
+              refreshInterval={refreshInterval}
+              onManualRefresh={handleRefresh}
+              onIntervalChange={setIntervalValue}
+            />
           </div>
         </div>
       </div>

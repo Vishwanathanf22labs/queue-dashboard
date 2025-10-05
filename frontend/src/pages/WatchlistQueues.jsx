@@ -7,18 +7,22 @@ import LoadingSpinner from '../components/ui/LoadingSpinner';
 import ErrorDisplay from '../components/ui/ErrorDisplay';
 import Table from '../components/ui/Table';
 import Pagination from '../components/ui/Pagination';
+import RefreshControl from '../components/ui/RefreshControl';
+import { useAdminLogin } from '../contexts/AdminLoginContext';
 import toast from 'react-hot-toast';
 import useQueueStore from '../stores/queueStore';
-import { Clock, Search, Users, Hash, Tag, RefreshCw, XCircle, AlertCircle, ExternalLink, RotateCcw, Trash2, X, Shield } from 'lucide-react';
+import useAutoRefresh from '../hooks/useAutoRefresh';
+import { Clock, Search, Users, Hash, Tag, XCircle, AlertCircle, ExternalLink, RotateCcw, Trash2, X, Shield } from 'lucide-react';
 import SearchInput from '../components/ui/SearchInput';
 import CustomDropdown from '../components/ui/CustomDropdown';
 import useAdminStore from '../stores/adminStore';
 
 const WatchlistQueues = () => {
   const { fetchWatchlistPendingBrands, fetchWatchlistFailedBrands, fetchReenqueueData, requeueSingleBrand, requeueAllBrands, deleteReenqueueBrand, deleteAllReenqueueBrands } = useQueueStore();
-  const { isAdmin } = useAdminStore();
+  const { isAdmin, isLoading: adminLoading } = useAdminStore();
   const currentSearchRef = useRef('');
   const [searchParams, setSearchParams] = useSearchParams();
+  const { onAdminLogin } = useAdminLogin();
   
   // Separate state for original totals (for static display)
   const [originalTotals, setOriginalTotals] = useState({
@@ -664,6 +668,28 @@ const WatchlistQueues = () => {
     }
   };
 
+  // Auto-refresh hook
+  const refreshFn = useCallback(async () => {
+    try {
+      if (activeTab === 'pending') {
+        await loadBrands(null, currentPage);
+      } else {
+        await Promise.all([
+          loadBrands(null, currentPage),
+          loadReenqueueData(reenqueueCurrentPage, false)
+        ]);
+      }
+      toast.success('Watchlist queues refreshed successfully');
+    } catch (error) {
+      console.error('WatchlistQueues refresh failed:', error);
+    }
+  }, [activeTab, currentPage, reenqueueCurrentPage, loadBrands, loadReenqueueData]);
+
+  const { refreshInterval, isRefreshing, setIntervalValue, manualRefresh } = useAutoRefresh(
+    refreshFn,
+    [activeTab, currentPage, reenqueueCurrentPage]
+  );
+
   const handleRefresh = async () => {
     updateQueueState({ currentPage: 1, searchTerm: '' });
     
@@ -674,7 +700,7 @@ const WatchlistQueues = () => {
     newParams.set('tab', activeTab); // Preserve active tab
     setSearchParams(newParams);
     
-    await loadBrands();
+    await manualRefresh();
   };
 
   const handleItemsPerPageChange = async (newItemsPerPage) => {
@@ -814,6 +840,10 @@ const WatchlistQueues = () => {
     ? 'Manage brands waiting in the watchlist pending queue' 
     : 'Manage brands that failed in the watchlist processing';
 
+  if (adminLoading) {
+    return <LoadingSpinner />;
+  }
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -825,10 +855,13 @@ const WatchlistQueues = () => {
         
         <div className="flex items-center space-x-3">
           {activeTab === 'failed' && !isAdmin && (reenqueuePagination.total_items || 0) > 0 ? (
-            <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg">
+            <button
+              onClick={onAdminLogin}
+              className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
+            >
               <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
               <span className="text-xs sm:text-sm font-medium">Admin Access Required</span>
-            </div>
+            </button>
           ) : activeTab === 'failed' && isAdmin && (reenqueuePagination.total_items || 0) > 0 ? (
             <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-green-100 text-green-800 rounded-lg">
               <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -865,19 +898,28 @@ const WatchlistQueues = () => {
             </button>
           </div>
           
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-600">Items per page:</span>
-            <CustomDropdown
-              options={[
-                { value: 10, label: '10' },
-                { value: 25, label: '25' },
-                { value: 50, label: '50' },
-                { value: 100, label: '100' }
-              ]}
-              value={itemsPerPage}
-              onChange={handleItemsPerPageChange}
-              placeholder="Select items per page"
-              className="w-20"
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-600">Items per page:</span>
+              <CustomDropdown
+                options={[
+                  { value: 10, label: '10' },
+                  { value: 25, label: '25' },
+                  { value: 50, label: '50' },
+                  { value: 100, label: '100' }
+                ]}
+                value={itemsPerPage}
+                onChange={handleItemsPerPageChange}
+                placeholder="Select items per page"
+                className="w-20"
+              />
+            </div>
+            
+            <RefreshControl
+              isRefreshing={isRefreshing}
+              refreshInterval={refreshInterval}
+              onManualRefresh={handleRefresh}
+              onIntervalChange={setIntervalValue}
             />
           </div>
         </div>
@@ -1327,6 +1369,7 @@ const WatchlistQueues = () => {
            </div>
          </div>
        )}
+
     </div>
   );
 };

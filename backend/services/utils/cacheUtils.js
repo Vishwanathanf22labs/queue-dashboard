@@ -159,7 +159,7 @@ async function invalidatePipelineCache(date) {
 
 async function invalidateQueueCache(queueType = null) {
   try {
-    // Get all keys matching the pattern
+    // Clear Redis cache
     const pattern = queueType ? `queue:${queueType}:*` : `queue:*`;
     const client = getCacheRedisClient();
     const keys = await client.keys(pattern);
@@ -167,12 +167,39 @@ async function invalidateQueueCache(queueType = null) {
     if (keys.length > 0) {
       await client.del(keys);
     }
+    
+    // Clear in-memory fallback cache
+    redisCache.clear();
+    console.log('In-memory fallback cache cleared');
+    
+    // Clear service-level in-memory caches (avoid circular dependency)
+    try {
+      // Use global references to avoid circular dependencies
+      if (global.queueProcessingService && global.queueProcessingService.clearInMemoryCaches) {
+        global.queueProcessingService.clearInMemoryCaches();
+        console.log('QueueProcessingService caches cleared via global reference');
+      }
+      
+      if (global.adUpdateProcessingService && global.adUpdateProcessingService.clearInMemoryCaches) {
+        global.adUpdateProcessingService.clearInMemoryCaches();
+        console.log('AdUpdateProcessingService caches cleared via global reference');
+      }
+    } catch (serviceError) {
+      console.warn('Error clearing service caches:', serviceError.message);
+    }
+    
   } catch (error) {
     console.error('Queue cache invalidation error:', error);
   }
 }
 
-module.exports = {
+// Clear in-memory fallback cache
+function clearInMemoryFallbackCache() {
+  redisCache.clear();
+  console.log('In-memory fallback cache cleared');
+}
+
+const cacheUtilsExports = {
   getCacheKey,
   getCachedData,
   setCachedData,
@@ -188,4 +215,11 @@ module.exports = {
   setQueueETag,
   invalidateQueueCache,
   reinitializeCacheRedisClient,
+  getCacheRedisClient,
+  clearInMemoryFallbackCache,
 };
+
+// Set global reference for cache clearing
+global.cacheUtils = cacheUtilsExports;
+
+module.exports = cacheUtilsExports;

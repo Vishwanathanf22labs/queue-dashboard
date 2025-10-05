@@ -21,11 +21,11 @@ const ProcessingStatus = ({
       // Map specific reasons to shorter labels for display
       switch (reason) {
         case 'cooldown NWL':
-          label = 'Stopped (Cooldown NWL)';
-          break;
+          label = 'Stopped (Cooldown Regular)';
+          return { variant: 'cooldownNWL', icon: Square, label: label };
         case 'cooldown WL':
-          label = 'Stopped (Cooldown WL)';
-          break;
+          label = 'Stopped (Cooldown Watchlist)';
+          return { variant: 'cooldownWL', icon: Square, label: label };
         case 'Hold':
           label = 'Stopped (Hold)';
           break;
@@ -34,6 +34,15 @@ const ProcessingStatus = ({
       }
       
       return { variant: 'warning', icon: Square, label: label };
+    }
+    
+    // Handle direct cooldown status (not wrapped in stopped())
+    if (status === 'cooldown(WL)' || status === 'cooldown (WL)') {
+      return { variant: 'cooldownWL', icon: Square, label: 'Cooldown (Watchlist Only)' };
+    }
+    
+    if (status === 'cooldown(NWL)' || status === 'cooldown (NWL)') {
+      return { variant: 'cooldownNWL', icon: Square, label: 'Cooldown (Regular Only)' };
     }
     
     switch (status) {
