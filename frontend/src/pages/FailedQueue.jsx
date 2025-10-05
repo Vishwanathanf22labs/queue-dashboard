@@ -7,18 +7,22 @@ import LoadingSpinner from '../components/ui/LoadingSpinner';
 import ErrorDisplay from '../components/ui/ErrorDisplay';
 import Table from '../components/ui/Table';
 import Pagination from '../components/ui/Pagination';
+import RefreshControl from '../components/ui/RefreshControl';
+import { useAdminLogin } from '../contexts/AdminLoginContext';
 import toast from 'react-hot-toast';
 import useQueueStore from '../stores/queueStore';
-import { AlertCircle, Search, Users, Hash, Tag, XCircle, RefreshCw, ExternalLink, RotateCcw, Trash2, X, Shield } from 'lucide-react';
+import useAutoRefresh from '../hooks/useAutoRefresh';
+import { AlertCircle, Search, Users, Hash, Tag, XCircle, ExternalLink, RotateCcw, Trash2, X, Shield } from 'lucide-react';
 import SearchInput from '../components/ui/SearchInput';
 import useAdminStore from '../stores/adminStore';
 
 const FailedQueue = () => {
   const { fetchFailedBrands, fetchReenqueueData, requeueSingleBrand, requeueAllBrands, deleteReenqueueBrand, deleteAllReenqueueBrands, loading } = useQueueStore();
-  const { isAdmin } = useAdminStore();
+  const { isAdmin, isLoading: adminLoading } = useAdminStore();
   const currentSearchRef = useRef('');
   const isInitialMountRef = useRef(true);
   const [searchParams, setSearchParams] = useSearchParams();
+  const { onAdminLogin } = useAdminLogin();
   
   // Separate state for original totals (for static display)
   const [originalTotals, setOriginalTotals] = useState({
@@ -656,10 +660,8 @@ const FailedQueue = () => {
   }, [requeueConfirmDialog]);
 
 
-  const handleRefresh = async () => {
-    if (isRefreshing) return;
-
-    updateQueueState({ isRefreshing: true });
+  // Auto-refresh hook
+  const refreshFn = useCallback(async () => {
     try {
       if (searchTerm && searchTerm.trim().length >= 3) {
         await loadFailedBrands(searchTerm);
@@ -668,10 +670,18 @@ const FailedQueue = () => {
       }
       toast.success('Failed queue refreshed successfully');
     } catch (error) {
-      toast.error(`Failed to refresh failed queue: ${error.message || error}`);
-    } finally {
-      updateQueueState({ isRefreshing: false });
+      console.error('FailedQueue refresh failed:', error);
     }
+  }, [searchTerm, loadFailedBrands]);
+
+  const { refreshInterval, isRefreshing: autoRefreshing, setIntervalValue, manualRefresh } = useAutoRefresh(
+    refreshFn,
+    [searchTerm, currentPage]
+  );
+
+  const handleRefresh = async () => {
+    await manualRefresh();
+    // Toast is now handled in refreshFn
   };
 
   const handleSearch = (searchValue) => {
@@ -737,6 +747,10 @@ const FailedQueue = () => {
     return <ErrorDisplay message={error} onRetry={() => loadFailedBrands()} />;
   }
 
+  if (adminLoading) {
+    return <LoadingSpinner />;
+  }
+
   return (
     <div className="space-y-3 sm:space-y-4 lg:space-y-6 xl:space-y-8">
 
@@ -754,10 +768,13 @@ const FailedQueue = () => {
 
           <div className="flex items-center space-x-3">
             {!isAdmin && (reenqueuePagination.total_items || 0) > 0 ? (
-              <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg">
+              <button
+                onClick={onAdminLogin}
+                className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
+              >
                 <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="text-xs sm:text-sm font-medium">Admin Access Required</span>
-              </div>
+              </button>
             ) : isAdmin && (reenqueuePagination.total_items || 0) > 0 ? (
               <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-green-100 text-green-800 rounded-lg">
                 <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -765,15 +782,12 @@ const FailedQueue = () => {
               </div>
             ) : null}
 
-            <Button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              size="sm"
-              className="flex items-center gap-2 w-full sm:w-auto justify-center text-xs sm:text-sm"
-            >
-              <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              {isRefreshing ? 'Refreshing...' : 'Refresh'}
-            </Button>
+            <RefreshControl
+              isRefreshing={autoRefreshing}
+              refreshInterval={refreshInterval}
+              onManualRefresh={handleRefresh}
+              onIntervalChange={setIntervalValue}
+            />
           </div>
         </div>
       </div>
@@ -1190,6 +1204,7 @@ const FailedQueue = () => {
           </div>
         </div>
       )}
+
     </div>
   );
 };

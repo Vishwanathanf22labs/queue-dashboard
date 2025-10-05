@@ -13,7 +13,7 @@ const {
 const getModels = () => require("../models");
 
 // Pipeline-style caching for queue APIs (same as pipeline status page)
-const QUEUE_CACHE_TTL = 600; // 10 minutes (increased for better speed)
+const QUEUE_CACHE_TTL = 30; // 30 seconds for faster updates
 
 // Pre-computed job index for ultra-fast pagination
 let adUpdateJobIndex = {
@@ -26,8 +26,8 @@ let brandCache = new Map(); // brandId -> brandData
 let brandCacheLastUpdated = 0;
 
 // Cache refresh intervals - optimized for speed
-const JOB_INDEX_REFRESH_INTERVAL = 300000; // 5 minutes for hot data (increased for better speed)
-const BRAND_CACHE_REFRESH_INTERVAL = 600000; // 10 minutes for brand data (increased for better speed)
+const JOB_INDEX_REFRESH_INTERVAL = 30000; // 30 seconds for faster updates
+const BRAND_CACHE_REFRESH_INTERVAL = 60000; // 1 minute for brand data
 
 // Get cached queue data with ETag support (pipeline-style)
 async function getCachedAdUpdateQueueData(queueType, page, limit, sortBy, sortOrder, ifNoneMatch) {
@@ -103,7 +103,7 @@ async function getPreComputedAdUpdateQueueCounters(redis, queueType) {
     // Cache the real counters for future use
     try {
       await redis.hset(counterKey, realCounters);
-      await redis.expire(counterKey, 60); // Cache for 1 minute
+      await redis.expire(counterKey, 10); // Cache for 10 seconds
     } catch (cacheError) {
       logger.warn(`Failed to cache counters: ${cacheError.message}`);
     }
@@ -868,12 +868,37 @@ function clearAdUpdateCache() {
   }
 }
 
-module.exports = {
+// Clear all in-memory caches
+function clearInMemoryCaches() {
+  try {
+    // Clear job index
+    adUpdateJobIndex = {
+      regular: { jobs: [], lastUpdated: 0, brandIds: new Set() },
+      watchlist: { jobs: [], lastUpdated: 0, brandIds: new Set() }
+    };
+    
+    // Clear brand cache
+    brandCache.clear();
+    brandCacheLastUpdated = 0;
+    
+    console.log('AdUpdateProcessingService in-memory caches cleared');
+  } catch (error) {
+    console.error('Error clearing AdUpdateProcessingService caches:', error);
+  }
+}
+
+const serviceExports = {
   getAdUpdateQueue,
   getWatchlistAdUpdateQueue,
   getAllAdUpdateJobs,
   refreshAdUpdateJobIndex,
   getPreComputedAdUpdateQueueCounters,
-  clearAdUpdateCache
+  clearAdUpdateCache,
+  clearInMemoryCaches
 };
+
+// Set global reference for cache clearing
+global.adUpdateProcessingService = serviceExports;
+
+module.exports = serviceExports;
 

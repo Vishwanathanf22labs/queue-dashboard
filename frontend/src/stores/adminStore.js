@@ -1,12 +1,47 @@
 import { create } from "zustand";
 import { adminAPI } from "../services/api";
 
-const useAdminStore = create((set, get) => ({
-  isAdmin: false,
-  isLoading: false,
-  error: null,
+// Load initial state from localStorage
+const getInitialState = () => {
+  try {
+    const stored = localStorage.getItem('adminState');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return {
+        isAdmin: parsed.isAdmin || false,
+        isLoading: false,
+        error: null
+      };
+    }
+  } catch (error) {
+    console.error('Error loading admin state from localStorage:', error);
+  }
+  return {
+    isAdmin: false,
+    isLoading: false,
+    error: null
+  };
+};
 
-  setAdminStatus: (status) => set({ isAdmin: status }),
+// Save state to localStorage
+const saveToLocalStorage = (state) => {
+  try {
+    localStorage.setItem('adminState', JSON.stringify({
+      isAdmin: state.isAdmin
+    }));
+  } catch (error) {
+    console.error('Error saving admin state to localStorage:', error);
+  }
+};
+
+const useAdminStore = create((set, get) => ({
+  ...getInitialState(),
+
+  setAdminStatus: (status) => {
+    const newState = { isAdmin: status };
+    set(newState);
+    saveToLocalStorage(newState);
+  },
   setLoading: (loading) => set({ isLoading: loading }),
   setError: (error) => set({ error }),
   clearError: () => set({ error: null }),
@@ -22,11 +57,15 @@ const useAdminStore = create((set, get) => ({
       const response = await adminAPI.checkStatus();
       const isAdminStatus =
         response.data?.isAdmin || response.data?.status === "authenticated";
-      set({ isAdmin: isAdminStatus, isLoading: false });
+      const newState = { isAdmin: isAdminStatus, isLoading: false };
+      set(newState);
+      saveToLocalStorage(newState);
       return isAdminStatus;
     } catch (error) {
       console.error("Error checking admin status:", error);
-      set({ isAdmin: false, isLoading: false, error: error.message });
+      const newState = { isAdmin: false, isLoading: false, error: error.message };
+      set(newState);
+      saveToLocalStorage(newState);
       return false;
     }
   },
@@ -35,13 +74,17 @@ const useAdminStore = create((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       const response = await adminAPI.login(credentials);
-      set({ isAdmin: true, isLoading: false, error: null });
+      const newState = { isAdmin: true, isLoading: false, error: null };
+      set(newState);
+      saveToLocalStorage(newState);
       return response.data;
     } catch (error) {
       console.error("Admin login error:", error);
       const errorMessage =
         error.response?.data?.message || error.message || "Login failed";
-      set({ isAdmin: false, isLoading: false, error: errorMessage });
+      const newState = { isAdmin: false, isLoading: false, error: errorMessage };
+      set(newState);
+      saveToLocalStorage(newState);
       throw new Error(errorMessage);
     }
   },
@@ -50,14 +93,22 @@ const useAdminStore = create((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       await adminAPI.logout();
-      set({ isAdmin: false, isLoading: false, error: null });
+      const newState = { isAdmin: false, isLoading: false, error: null };
+      set(newState);
+      saveToLocalStorage(newState);
     } catch (error) {
       console.error("Admin logout error:", error);
-      set({ isAdmin: false, isLoading: false, error: error.message });
+      const newState = { isAdmin: false, isLoading: false, error: error.message };
+      set(newState);
+      saveToLocalStorage(newState);
     }
   },
 
-  reset: () => set({ isAdmin: false, isLoading: false, error: null }),
+  reset: () => {
+    const newState = { isAdmin: false, isLoading: false, error: null };
+    set(newState);
+    saveToLocalStorage(newState);
+  },
 }));
 
 export default useAdminStore;

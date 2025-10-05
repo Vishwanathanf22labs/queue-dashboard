@@ -1,18 +1,22 @@
 import { useState, useEffect } from 'react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 import SingleBrandForm from '../components/addBrands/SingleBrandForm';
 import CsvUploadForm from '../components/addBrands/CsvUploadForm';
 import AddAllBrandsForm from '../components/addBrands/AddAllBrandsForm';
 import MadanglesCsvUploadForm from '../components/addBrands/MadanglesCsvUploadForm';
 import EditBrandStatusForm from '../components/addBrands/EditBrandStatusForm';
+import { useAdminLogin } from '../contexts/AdminLoginContext';
 import useQueueStore from '../stores/queueStore';
 import useAdminStore from '../stores/adminStore';
 import { Shield } from 'lucide-react';
 import { tabs } from '../constants/data';
+import toast from 'react-hot-toast';
 
 const AddBrands = () => {
   const { loading } = useQueueStore();
+  const { onAdminLogin } = useAdminLogin();
   const { isAdmin, isLoading: adminLoading } = useAdminStore();
 
   const [state, setState] = useState({
@@ -37,6 +41,11 @@ const AddBrands = () => {
     localStorage.setItem('addBrands_activeTab', activeTab);
   }, [activeTab]);
 
+  // Handle loading state after all hooks are called
+  if (adminLoading) {
+    return <LoadingSpinner />;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-3 sm:p-4 md:p-6">
       <div className="max-w-4xl mx-auto">
@@ -59,10 +68,13 @@ const AddBrands = () => {
                 Admin Mode
               </div>
             ) : (
-              <div className="flex items-center px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-red-600 bg-red-100 rounded-lg">
+              <button
+                onClick={onAdminLogin}
+                className="flex items-center px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-red-600 bg-red-100 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
+              >
                 <Shield className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
                 Admin Access Required
-              </div>
+              </button>
             )}
           </div>
         </div>
@@ -128,6 +140,7 @@ const AddBrands = () => {
           )}
         </Card>
       </div>
+
     </div>
   );
 };

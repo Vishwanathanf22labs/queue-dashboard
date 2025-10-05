@@ -48,6 +48,18 @@ export const colors = {
     dark: "bg-gray-700 text-white border-gray-700",
     hover: "hover:bg-gray-600",
   },
+  cooldownWL: {
+    light: "bg-indigo-100 text-indigo-800 border-indigo-200",
+    default: "bg-indigo-500 text-white border-indigo-500",
+    dark: "bg-indigo-600 text-white border-indigo-600",
+    hover: "hover:bg-indigo-600",
+  },
+  cooldownNWL: {
+    light: "bg-orange-100 text-orange-800 border-orange-200",
+    default: "bg-orange-500 text-white border-orange-500",
+    dark: "bg-orange-600 text-white border-orange-600",
+    hover: "hover:bg-orange-600",
+  },
 };
 
 Object.keys(colors).forEach((key) => {
@@ -79,6 +91,8 @@ export const statusColors = {
   active: colors.success,
   delayed: colors.warning,
   gray: colors.gray,
+  cooldownWL: colors.cooldownWL,
+  cooldownNWL: colors.cooldownNWL,
 };
 
 Object.keys(statusColors).forEach((key) => {

@@ -19,16 +19,16 @@ const CooldownIndicator = ({
       
       switch (reason) {
         case 'cooldown NWL':
-          label = 'Cooldown NWL';
-          bgColor = 'bg-yellow-100';
-          textColor = 'text-yellow-800';
-          icon = Clock;
+          label = 'Cooldown (NWL)';
+          bgColor = 'bg-orange-100';
+          textColor = 'text-orange-800';
+          icon = Square;
           break;
         case 'cooldown WL':
-          label = 'Cooldown WL';
-          bgColor = 'bg-blue-100';
-          textColor = 'text-blue-800';
-          icon = Clock;
+          label = 'Cooldown (WL)';
+          bgColor = 'bg-indigo-100';
+          textColor = 'text-indigo-800';
+          icon = Square;
           break;
         case 'Hold':
           label = 'Hold';
@@ -44,6 +44,25 @@ const CooldownIndicator = ({
       }
       
       return { label, bgColor, textColor, icon };
+    }
+    
+    // Handle direct cooldown status (not wrapped in stopped())
+    if (status === 'cooldown(WL)' || status === 'cooldown (WL)') {
+      return { 
+        label: 'Cooldown (WL)', 
+        bgColor: 'bg-indigo-100', 
+        textColor: 'text-indigo-800', 
+        icon: Square 
+      };
+    }
+    
+    if (status === 'cooldown(NWL)' || status === 'cooldown (NWL)') {
+      return { 
+        label: 'Cooldown (NWL)', 
+        bgColor: 'bg-orange-100', 
+        textColor: 'text-orange-800', 
+        icon: Square 
+      };
     }
     
     switch (status) {
@@ -83,7 +102,6 @@ const CooldownIndicator = ({
 
   return (
     <div className="flex items-center space-x-2">
-      <StatusIcon className="h-4 w-4 text-gray-600" />
       <span className="text-sm font-medium text-gray-700">Status:</span>
       <div className={`flex items-center space-x-1 px-2 py-1 ${statusInfo.bgColor} ${statusInfo.textColor} rounded-full`}>
         <StatusIcon className="h-3 w-3" />

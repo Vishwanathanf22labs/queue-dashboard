@@ -8,7 +8,9 @@ import LoadingSpinner from '../components/ui/LoadingSpinner';
 import ErrorDisplay from '../components/ui/ErrorDisplay';
 import Badge from '../components/ui/Badge';
 import SortButton from '../components/ui/SortButton';
+import RefreshControl from '../components/ui/RefreshControl';
 import useScrapedBrandsSorting from '../hooks/useScrapedBrandsSorting';
+import useAutoRefresh from '../hooks/useAutoRefresh';
 import { Calendar, Search, TrendingUp, TrendingDown, Minus, BarChart3, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -310,6 +312,29 @@ const ScrapedBrands = () => {
     // Don't call loadScrapedBrands here - let useEffect handle it
   };
 
+  // Auto-refresh hook
+  const refreshFn = useCallback(async () => {
+    try {
+      await Promise.all([
+        loadScrapedBrands(dataState.currentPage, dataState.selectedDate, sortBy, sortOrder),
+        loadStats(dataState.selectedDate)
+      ]);
+      toast.success('Scraped brands refreshed successfully');
+    } catch (error) {
+      console.error('ScrapedBrands refresh failed:', error);
+    }
+  }, [loadScrapedBrands, loadStats, dataState.currentPage, dataState.selectedDate, sortBy, sortOrder]);
+
+  const { refreshInterval, isRefreshing, setIntervalValue, manualRefresh } = useAutoRefresh(
+    refreshFn,
+    [dataState.currentPage, dataState.selectedDate, sortBy, sortOrder]
+  );
+
+  const handleRefresh = async () => {
+    await manualRefresh();
+    // Toast is now handled in refreshFn
+  };
+
   const getComparativeStatusIcon = (status) => {
     switch (status) {
       case 'increased':
@@ -392,12 +417,23 @@ const ScrapedBrands = () => {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
-            Scraped Brands
-          </h1>
-          <p className="text-gray-600">
-            View scraped brands data for the selected date
-          </p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+                Scraped Brands
+              </h1>
+              <p className="text-gray-600">
+                View scraped brands data for the selected date
+              </p>
+            </div>
+            
+            <RefreshControl
+              isRefreshing={isRefreshing}
+              refreshInterval={refreshInterval}
+              onManualRefresh={handleRefresh}
+              onIntervalChange={setIntervalValue}
+            />
+          </div>
         </div>
 
         {/* Stats Cards */}

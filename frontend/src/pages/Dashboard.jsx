@@ -38,6 +38,12 @@ const Dashboard = () => {
     fetchNextWatchlistBrand,
     fetchBrandProcessingQueue,
     fetchWatchlistBrandsQueue,
+    fetchWatchlistBrands,
+    fetchWatchlistPendingBrands,
+    fetchWatchlistFailedBrands,
+    watchlistBrands,
+    watchlistPendingBrands,
+    watchlistFailedBrands,
     fetchAllRegularBrandProcessingJobs,
     fetchAllWatchlistBrandProcessingJobs,
     fetchSeparateScrapedStats,
@@ -116,8 +122,48 @@ const Dashboard = () => {
   
   const watchlistPendingCount = overview?.watchlist_stats?.pending_count || 0;
   const watchlistFailedCount = overview?.watchlist_stats?.failed_count || 0;
-  const watchlistCompletedCount = overview?.watchlist_stats?.completed_count || 0;
-  const watchlistBrands = overview?.watchlist_stats?.brands || [];
+  
+  // Calculate completed count using the same logic as Watchlist Status page
+  const determineScraperStatus = (brand) => {
+    // Check if brand is in watchlist_pending_brands_prod queue
+    const isInPending = watchlistPendingBrands?.brands?.some(
+      pendingBrand => pendingBrand.page_id === brand.page_id
+    );
+    
+    // Check if brand is in watchlist_failed_brands_prod queue
+    const isInFailed = watchlistFailedBrands?.brands?.some(
+      failedBrand => failedBrand.page_id === brand.page_id
+    );
+
+    // If brand is in pending queue, show as waiting regardless of active/inactive status
+    if (isInPending) {
+      return 'waiting';
+    }
+    
+    // If brand is in failed queue, show as failed regardless of active/inactive status
+    if (isInFailed) {
+      return 'failed';
+    }
+
+    // If brand is inactive and not in any queue, show as inactive
+    if (brand.status === 'Inactive') {
+      return 'inactive';
+    }
+
+    // For active brands not in queues
+    if (brand.scraper_status === 'completed' &&
+      (!watchlistPendingBrands?.brands || watchlistPendingBrands.brands.length === 0) &&
+      (!watchlistFailedBrands?.brands || watchlistFailedBrands.brands.length === 0)) {
+      return 'queues_empty';
+    } else {
+      return 'completed';
+    }
+  };
+
+  // Calculate completed count using frontend logic (same as Watchlist Status page)
+  const watchlistCompletedCount = watchlistBrands?.brands 
+    ? watchlistBrands.brands.filter(b => determineScraperStatus(b) === 'completed').length
+    : (overview?.watchlist_stats?.completed_count || 0); // Fallback to backend count
 
   // Total ads counts are now provided by individual queue APIs
 
@@ -252,6 +298,9 @@ const Dashboard = () => {
       const promises = [
         fetchBrandProcessingQueue(regularBrandsPage, 10, regularBrandsSortBy, regularBrandsSortOrder, regularBrandsSearch),
         fetchWatchlistBrandsQueue(watchlistPage, 10, watchlistSortBy, watchlistSortOrder, watchlistBrandsSearch),
+        fetchWatchlistBrands(1, 10000), // Fetch all watchlist brands for completed count calculation
+        fetchWatchlistPendingBrands(1, 10000), // Fetch pending brands for completed count calculation
+        fetchWatchlistFailedBrands(1, 10000), // Fetch failed brands for completed count calculation
         fetchAllRegularBrandProcessingJobs(),
         fetchAllWatchlistBrandProcessingJobs(),
         fetchAdUpdateQueue(regularAdUpdatePage, 10, regularAdUpdateSortBy, regularAdUpdateSortOrder, regularAdSearch),
@@ -906,6 +955,7 @@ const Dashboard = () => {
         adsProcessed={adsProcessed}
       />
 
+      {/* Always show both cards - only badge colors change based on status */}
       <WatchlistProcessingStatus
         currentlyProcessing={currentlyProcessing}
         watchlistPendingCount={watchlistPendingCount}

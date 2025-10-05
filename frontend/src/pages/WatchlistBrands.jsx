@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -8,15 +8,20 @@ import Table from '../components/ui/Table';
 import Pagination from '../components/ui/Pagination';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import ErrorDisplay from '../components/ui/ErrorDisplay';
+import RefreshControl from '../components/ui/RefreshControl';
+import { useAdminLogin } from '../contexts/AdminLoginContext';
 import { Eye, Clock, CheckCircle, XCircle, Search, ExternalLink, ChevronUp, ChevronDown, Shield } from 'lucide-react';
 import useQueueStore from '../stores/queueStore';
 import useAdminStore from '../stores/adminStore';
+import useAutoRefresh from '../hooks/useAutoRefresh';
 import { watchlistBrandsColumns } from '../constants/data';
 import toast from 'react-hot-toast';
 import { queueAPI } from '../services/api';
 
 const WatchlistBrands = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { isAdmin, isLoading: adminLoading } = useAdminStore();
+  const { onAdminLogin } = useAdminLogin();
   
   const { 
     watchlistBrands, 
@@ -31,7 +36,6 @@ const WatchlistBrands = () => {
     moveWatchlistToPending,
     moveIndividualWatchlistFailedToPending
   } = useQueueStore();
-  const { isAdmin } = useAdminStore();
 
   // Get pagination and search state from URL params
   const searchTerm = searchParams.get('search') || '';
@@ -51,6 +55,26 @@ const WatchlistBrands = () => {
   const updateState = (updates) => {
     setState(prev => ({ ...prev, ...updates }));
   };
+
+  // Auto-refresh hook
+  const refreshFn = useCallback(async () => {
+    try {
+      await Promise.all([
+        fetchWatchlistBrands(1, 10000),
+        fetchWatchlistPendingBrands(1, 10000),
+        fetchWatchlistFailedBrands(1, 10000),
+        fetchActiveWatchlistCount()
+      ]);
+      toast.success('Watchlist brands refreshed successfully');
+    } catch (error) {
+      console.error('WatchlistBrands refresh failed:', error);
+    }
+  }, [fetchWatchlistBrands, fetchWatchlistPendingBrands, fetchWatchlistFailedBrands]);
+
+  const { refreshInterval, isRefreshing, setIntervalValue, manualRefresh } = useAutoRefresh(
+    refreshFn,
+    []
+  );
 
   // Handle status sort mode change
   const handleStatusSortChange = () => {
@@ -426,6 +450,10 @@ const WatchlistBrands = () => {
     return <LoadingSpinner />;
   }
 
+  if (adminLoading) {
+    return <LoadingSpinner />;
+  }
+
   if (error) {
     return (
       <ErrorDisplay title="Error Loading Watchlist Brands" message={error}>
@@ -451,10 +479,13 @@ const WatchlistBrands = () => {
         
         <div className="flex items-center space-x-3">
           {!isAdmin ? (
-            <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg">
+            <button
+              onClick={onAdminLogin}
+              className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
+            >
               <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
               <span className="text-xs sm:text-sm font-medium">Admin Access Required</span>
-            </div>
+            </button>
           ) : (
             <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-green-100 text-green-800 rounded-lg">
               <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -462,27 +493,15 @@ const WatchlistBrands = () => {
             </div>
           )}
 
-          {/* Refresh Button */}
-          <Button
-          variant="primary"
-          size="sm"
-          onClick={async () => {
-            // Refresh data
-            try {
-              updateState({ loadingActiveCount: true });
-              await Promise.all([
-                fetchWatchlistBrands(1, 10000),
-                fetchWatchlistPendingBrands(1, 10000),
-                fetchWatchlistFailedBrands(1, 10000),
-                fetchActiveWatchlistCount()
-              ]);
-            } finally {
-              updateState({ loadingActiveCount: false });
-            }
-          }}
-        >
-          Refresh
-        </Button>
+          <RefreshControl
+            isRefreshing={isRefreshing}
+            refreshInterval={refreshInterval}
+            onManualRefresh={async () => {
+              await manualRefresh();
+              // Toast is now handled in refreshFn
+            }}
+            onIntervalChange={setIntervalValue}
+          />
         </div>
       </div>
 
@@ -816,6 +835,7 @@ const WatchlistBrands = () => {
          showPageInfo={true}
          className="py-4"
        />
+
     </div>
   );
 };

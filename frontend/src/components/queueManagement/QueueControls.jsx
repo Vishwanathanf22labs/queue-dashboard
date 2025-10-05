@@ -131,6 +131,22 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
             <span className="hidden sm:inline">Clear Currently Scraping</span>
             <span className="sm:hidden">Clear Scraping</span>
           </Button>
+
+          {/* Clear Cache Only (Cache Redis) */}
+          <Button
+            variant="danger"
+            onClick={() => onConfirmDialogStateChange({
+              showConfirmDialog: true,
+              confirmText: '',
+              confirmAction: 'Clear Cache Only'
+            })}
+            disabled={disabled || isProcessingAction}
+            className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5 px-4"
+          >
+            <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Clear Cache Only</span>
+            <span className="sm:hidden">Clear Cache</span>
+          </Button>
         </div>
       </div>
 
@@ -256,9 +272,11 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
               <p className="text-sm text-gray-600 mb-3">
                 {confirmAction === 'Clear All Queues' 
                   ? 'This action will permanently clear ALL queues (both regular and watchlist pending/failed queues). This action cannot be undone.'
-                  : confirmAction.includes('Clear')
+                  : confirmAction === 'Clear Cache Only'
+                    ? 'This will safely clear only Cache Redis (pipeline, queue, brand caches) and related frontend cache data. Admin login and other important data will remain untouched. Type confirm to proceed.'
+                    : confirmAction.includes('Clear')
                     ? `This action will permanently clear the ${confirmAction.toLowerCase().replace('clear ', '').replace(' queue', '')} queue. This action cannot be undone.`
-                    : `This action will move all brands in the ${confirmAction.toLowerCase().replace('move all ', '').replace(' to ', ' → ')}. This action cannot be undone.`
+                  : `This action will move all brands in the ${confirmAction.toLowerCase().replace('move all ', '').replace(' to ', ' → ')}. This action cannot be undone.`
                 }
               </p>
               <p className="text-sm text-gray-600 mb-4">

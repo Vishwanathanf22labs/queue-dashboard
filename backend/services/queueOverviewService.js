@@ -131,9 +131,9 @@ function startCleanupInterval() {
     await cleanupCompletedBrands();
     
     // Log next cleanup time
-    const nextCleanup = new Date(Date.now() + 4 * 60 * 1000);
+    const nextCleanup = new Date(Date.now() + 30 * 1000);
     logger.info(`Next cleanup scheduled for: ${nextCleanup.toLocaleString()}`);
-  }, 4 * 60 * 1000); // Every 4 minutes
+  }, 30 * 1000); // Every 30 seconds
   
   // Start 4-hour interval for running brands
   runningCleanupInterval = setInterval(async () => {
@@ -145,10 +145,10 @@ function startCleanupInterval() {
     logger.info(`Next 4-hour cleanup scheduled for: ${nextCleanup.toLocaleString()}`);
   }, 4 * 60 * 60 * 1000); // Every 4 hours
   
-  logger.info('Started automatic cleanup intervals: completed/failed brands (every 4 minutes), running brands (every 4 hours)');
+  logger.info('Started automatic cleanup intervals: completed/failed brands (every 30 seconds), running brands (every 4 hours)');
   
   // Log the first cleanup times
-  const firstCleanup = new Date(Date.now() + 4 * 60 * 1000);
+  const firstCleanup = new Date(Date.now() + 30 * 1000);
   const firstRunningCleanup = new Date(Date.now() + 4 * 60 * 60 * 1000);
   logger.info(`First cleanup scheduled for: ${firstCleanup.toLocaleString()}`);
   logger.info(`First 4-hour cleanup scheduled for: ${firstRunningCleanup.toLocaleString()}`);
