@@ -44,12 +44,18 @@ const PendingQueue = ({
       label: 'Brand Name',
       render: (value, row) => {
         const pageId = row.page_id || 'N/A';
+        const score = row.score || 'N/A';
         return (
           <div className="flex items-center">
             <Users className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
             <div className="flex items-center space-x-2 flex-1">
               <div className="text-xs font-medium text-gray-900 max-w-[80px] sm:max-w-none truncate">
-                {value || 'Unknown Brand'}
+                <span title={`Score: ${score}`}>
+                  {value || 'Unknown Brand'}
+                  {score !== 'N/A' && (
+                    <span className="text-gray-400 font-medium ml-1">({score})</span>
+                  )}
+                </span>
               </div>
               {pageId && pageId !== 'N/A' && (
                 <button
@@ -253,6 +259,7 @@ const PendingQueue = ({
             const brandName = brand.brand_name || 'Unknown Brand';
             const brandId = brand.queue_id || brand.brand_id || 'N/A';
             const pageId = brand.page_id || 'N/A';
+            const score = brand.score || 'N/A';
 
             return (
               <Card key={`${brandId}-${index}`} className="p-4 relative pb-16">
@@ -266,7 +273,12 @@ const PendingQueue = ({
                           {position}
                         </span>
                       </div>
-                      <h3 className="font-semibold text-gray-900 text-lg">{brandName}</h3>
+                      <h3 className="font-semibold text-gray-900 text-lg" title={`Score: ${score}`}>
+                        {brandName}
+                        {score !== 'N/A' && (
+                          <span className="text-gray-400 font-medium ml-1">({score})</span>
+                        )}
+                      </h3>
                     </div>
                   </div>
 

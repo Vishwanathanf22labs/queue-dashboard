@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -21,6 +21,8 @@ const FailedQueue = () => {
   const { isAdmin, isLoading: adminLoading } = useAdminStore();
   const currentSearchRef = useRef('');
   const isInitialMountRef = useRef(true);
+  const scrollPositionRef = useRef(0);
+  const isScrollLockedRef = useRef(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const { onAdminLogin } = useAdminLogin();
   
@@ -109,14 +111,31 @@ const FailedQueue = () => {
     setQueueState(prev => ({ ...prev, ...updates }));
   };
 
+  useLayoutEffect(() => {
+    if (isScrollLockedRef.current) {
+      window.scrollTo(0, scrollPositionRef.current);
+    }
+  });
+
   // Handler for requeue single brand
   const handleRequeueSingle = async (itemId) => {
+
+    const scrollPosition = window.scrollY;
+    scrollPositionRef.current = scrollPosition;
+    isScrollLockedRef.current = true;
+    
     try {
       await requeueSingleBrand(itemId, 'non-watchlist');
       toast.success('Brand requeued successfully to pending queue');
+      
       loadReenqueueData(reenqueueCurrentPage, false); // Reload current page
       loadFailedBrands(); // Reload failed brands to update counts
+      
+      setTimeout(() => {
+        isScrollLockedRef.current = false;
+      }, 100);
     } catch (error) {
+      isScrollLockedRef.current = false;
       toast.error(`Failed to requeue brand: ${error.message}`);
     }
   };
@@ -132,13 +151,23 @@ const FailedQueue = () => {
       return;
     }
 
+    const scrollPosition = window.scrollY;
+    scrollPositionRef.current = scrollPosition;
+    isScrollLockedRef.current = true;
+
     try {
       const result = await requeueAllBrands('non-watchlist');
       toast.success(`${result.data.count} brands requeued successfully`);
+      
       loadReenqueueData(1, false); // Reset to page 1
       loadFailedBrands(); // Reload failed brands to update counts
       setRequeueConfirmDialog({ show: false, confirmText: '' });
+      
+      setTimeout(() => {
+        isScrollLockedRef.current = false;
+      }, 100);
     } catch (error) {
+      isScrollLockedRef.current = false;
       toast.error(`Failed to requeue all brands: ${error.message}`);
     }
   };
@@ -149,11 +178,21 @@ const FailedQueue = () => {
 
   // Handler for delete single brand (no confirmation)
   const handleDeleteSingle = async (itemId) => {
+    const scrollPosition = window.scrollY;
+    scrollPositionRef.current = scrollPosition;
+    isScrollLockedRef.current = true;
+    
     try {
       await deleteReenqueueBrand(itemId, 'non-watchlist');
       toast.success('Brand deleted successfully from reenqueue list');
+      
       loadReenqueueData(reenqueueCurrentPage, false); // Reload current page
+
+      setTimeout(() => {
+        isScrollLockedRef.current = false;
+      }, 100);
     } catch (error) {
+      isScrollLockedRef.current = false;
       toast.error(`Failed to delete brand: ${error.message}`);
     }
   };
@@ -169,12 +208,23 @@ const FailedQueue = () => {
       return;
     }
 
+    // Lock scroll position during the entire operation
+    const scrollPosition = window.scrollY;
+    scrollPositionRef.current = scrollPosition;
+    isScrollLockedRef.current = true;
+
     try {
       const result = await deleteAllReenqueueBrands('non-watchlist');
       toast.success(`${result.data.count} brands deleted successfully`);
+      
       setConfirmDialog({ show: false, confirmText: '' });
       loadReenqueueData(1, false); // Reset to page 1
+
+      setTimeout(() => {
+        isScrollLockedRef.current = false;
+      }, 100);
     } catch (error) {
+      isScrollLockedRef.current = false;
       toast.error(`Failed to delete all brands: ${error.message}`);
     }
   };
@@ -556,7 +606,7 @@ const FailedQueue = () => {
     }
 
     loadFailedBrands(null, currentPage);
-  }, [currentPage, loadFailedBrands]);
+  }, [currentPage]);
 
   // Handle search with debouncing
   useEffect(() => {
@@ -579,7 +629,7 @@ const FailedQueue = () => {
       currentSearchRef.current = '';
       loadFailedBrands(null, 1);
     }
-  }, [searchTerm, loadFailedBrands]);
+  }, [searchTerm]);
 
   // Handle reenqueue page changes
   useEffect(() => {
@@ -588,17 +638,9 @@ const FailedQueue = () => {
       return;
     }
 
-    // Save scroll position before loading
-    const scrollY = window.scrollY;
-    
     // Load reenqueue data when page changes
-    loadReenqueueData(reenqueueCurrentPage, false).then(() => {
-      // Restore scroll position after data loads and DOM updates
-      requestAnimationFrame(() => {
-        window.scrollTo(0, scrollY);
-      });
-    });
-  }, [reenqueueCurrentPage, loadReenqueueData]);
+    loadReenqueueData(reenqueueCurrentPage, false);
+  }, [reenqueueCurrentPage]);
 
   // Detect page refresh and set flag, then restore dialog states
   useEffect(() => {
@@ -672,7 +714,7 @@ const FailedQueue = () => {
     } catch (error) {
       console.error('FailedQueue refresh failed:', error);
     }
-  }, [searchTerm, loadFailedBrands]);
+  }, [searchTerm]);
 
   const { refreshInterval, isRefreshing: autoRefreshing, setIntervalValue, manualRefresh } = useAutoRefresh(
     refreshFn,

@@ -79,8 +79,8 @@ const ProcessingStatus = ({
 
   // Determine if status badge should be visible based on scraper status
   const shouldShowStatusBadge = () => {
-    // Hide badge only when status is cooldown(WL) 
-    if (scraperStatus === 'cooldown(WL)' || scraperStatus === 'cooldown (WL)') {
+    if (scraperStatus === 'cooldown(WL)' || scraperStatus === 'cooldown (WL)' || 
+        scraperStatus === 'stopped(cooldown WL)') {
       return false;
     }
     

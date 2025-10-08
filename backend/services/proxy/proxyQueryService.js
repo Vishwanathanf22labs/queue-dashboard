@@ -181,8 +181,8 @@ async function getProxies(page = 1, limit = 10, filter = "all", search = "") {
         last_used: null,
         last_checked: new Date().toISOString(),
         disabled_at: proxy.disabledAt || null,
-        disabled_date: proxy.disabledAt ? formatDisabledTimestamp(proxy.disabledAt).date : null,
-        disabled_time: proxy.disabledAt ? formatDisabledTimestamp(proxy.disabledAt).time : null
+        disabled_date: proxy.disabled_date || (proxy.disabledAt ? formatDisabledTimestamp(proxy.disabledAt).date : null),
+        disabled_time: proxy.disabled_time || (proxy.disabledAt ? formatDisabledTimestamp(proxy.disabledAt).time : null)
       };
     });
     

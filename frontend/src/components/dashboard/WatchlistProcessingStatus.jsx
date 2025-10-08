@@ -34,8 +34,8 @@ const WatchlistProcessingStatus = ({
 
   // Determine if status badge should be visible based on scraper status
   const shouldShowStatusBadge = () => {
-    // Hide badge only when status is cooldown(NWL)
-    if (scraperStatus === 'cooldown(NWL)' || scraperStatus === 'cooldown (NWL)') {
+    if (scraperStatus === 'cooldown(NWL)' || scraperStatus === 'cooldown (NWL)' || 
+        scraperStatus === 'stopped(cooldown NWL)') {
       return false;
     }
     

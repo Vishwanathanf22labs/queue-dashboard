@@ -141,7 +141,7 @@ const Proxies = () => {
       // Subsequent loads
       loadProxies(urlPage, urlFilter, urlSearch || null, false);
     }
-  }, [searchParams, loadProxies, loadStats, loadManagementStats]);
+  }, [searchParams]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -158,24 +158,49 @@ const Proxies = () => {
 
 
 
-  const handleProxyAdded = useCallback((newProxy) => {
-    loadStats();
-    loadManagementStats();
-    loadProxies(currentPage, filter, searchTerm);
+
+  const handleProxyRemoved = useCallback(async (proxyId) => {
+    setDataState(prev => ({
+      ...prev,
+      proxies: prev.proxies.filter(proxy => proxy._id !== proxyId),
+      totalItems: prev.totalItems - 1
+    }));
+
+    setTimeout(async () => {
+      await Promise.all([
+        loadStats(),
+        loadManagementStats(),
+        loadProxies(currentPage, filter, searchTerm, false)
+      ]);
+    }, 100);
   }, [loadStats, loadManagementStats, currentPage, filter, searchTerm, loadProxies]);
 
 
-  const handleProxyRemoved = useCallback((proxyId) => {
-    loadStats();
-    loadManagementStats();
-    loadProxies(currentPage, filter, searchTerm);
+  const handleProxyUpdated = useCallback(async (proxyId, updates) => {
+    
+    setDataState(prev => ({
+      ...prev,
+      proxies: prev.proxies.map(proxy =>
+        proxy._id === proxyId ? { ...proxy, ...updates } : proxy
+      )
+    }));
+
+    setTimeout(async () => {
+      await Promise.all([
+        loadStats(),
+        loadManagementStats(),
+        loadProxies(currentPage, filter, searchTerm, false)
+      ]);
+    }, 100);
   }, [loadStats, loadManagementStats, currentPage, filter, searchTerm, loadProxies]);
 
 
-  const handleProxyUpdated = useCallback((proxyId, updates) => {
-    loadStats();
-    loadManagementStats();
-    loadProxies(currentPage, filter, searchTerm);
+  const handleProxyAdded = useCallback(async (newProxy) => {
+    await Promise.all([
+      loadStats(),
+      loadManagementStats(),
+      loadProxies(currentPage, filter, searchTerm, false)
+    ]);
   }, [loadStats, loadManagementStats, currentPage, filter, searchTerm, loadProxies]);
 
   const handleSearch = useCallback((searchValue) => {
@@ -255,30 +280,32 @@ const Proxies = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         <div className="mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
-            <div>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
               <h1 className="text-3xl font-bold text-gray-900">Proxy Management</h1>
               <p className="mt-2 text-gray-600">
                 Manage your proxy configurations, monitor health, and control proxy rotation
               </p>
             </div>
 
-            {!isAdmin && (
-              <button
-                onClick={onAdminLogin}
-                className="flex items-center px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-red-600 bg-red-100 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
-              >
-                <Shield className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
-                Admin Access Required
-              </button>
-            )}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              {!isAdmin && (
+                <button
+                  onClick={onAdminLogin}
+                  className="flex items-center px-3 py-2 text-sm font-medium text-red-600 bg-red-100 rounded-lg hover:bg-red-200 transition-colors cursor-pointer whitespace-nowrap"
+                >
+                  <Shield className="h-4 w-4 mr-2" />
+                  Admin Access Required
+                </button>
+              )}
 
-            <RefreshControl
-              isRefreshing={isRefreshing}
-              refreshInterval={refreshInterval}
-              onManualRefresh={handleRefresh}
-              onIntervalChange={setIntervalValue}
-            />
+              <RefreshControl
+                isRefreshing={isRefreshing}
+                refreshInterval={refreshInterval}
+                onManualRefresh={handleRefresh}
+                onIntervalChange={setIntervalValue}
+              />
+            </div>
           </div>
         </div>
 

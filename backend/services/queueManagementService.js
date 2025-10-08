@@ -100,14 +100,24 @@ async function changeBrandScore(queueType, brandName, newScore) {
           if (brandData.id && brandData.page_id) {
             const brand = await Brand.findOne({ where: { id: brandData.id } });
 
-            if (brand && (brand.name || brand.actual_name)) {
-              // Case-insensitive and space-insensitive brand name matching
-              // Check both 'name' and 'actual_name' fields
-              const normalizedBrandName = brand.name ? brand.name.toLowerCase().replace(/\s+/g, '') : '';
-              const normalizedActualName = brand.actual_name ? brand.actual_name.toLowerCase().replace(/\s+/g, '') : '';
+            if (brand) {
               const normalizedSearchName = brandName.toLowerCase().replace(/\s+/g, '');
               
-              if (normalizedBrandName === normalizedSearchName || normalizedActualName === normalizedSearchName) {
+      
+              const normalizedBrandName = brand.name ? brand.name.toLowerCase().replace(/\s+/g, '') : '';
+              const normalizedActualName = brand.actual_name ? brand.actual_name.toLowerCase().replace(/\s+/g, '') : '';
+              
+        
+              const pageIdMatch = brand.page_id && brand.page_id.toString() === brandName;
+              
+             
+              const brandIdMatch = brand.id && brand.id.toString() === brandName;
+              
+
+              if (normalizedBrandName === normalizedSearchName || 
+                  normalizedActualName === normalizedSearchName ||
+                  pageIdMatch || 
+                  brandIdMatch) {
                 // Remove the old entry and add with new score
                 await config.redis.zrem(config.queueKey, member);
                 await config.redis.zadd(config.queueKey, newScore, member);
@@ -151,14 +161,20 @@ async function changeBrandScore(queueType, brandName, newScore) {
           if (brandData.id && brandData.page_id) {
             const brand = await Brand.findOne({ where: { id: brandData.id } });
 
-            if (brand && (brand.name || brand.actual_name)) {
-              // Case-insensitive and space-insensitive brand name matching
-              // Check both 'name' and 'actual_name' fields
-              const normalizedBrandName = brand.name ? brand.name.toLowerCase().replace(/\s+/g, '') : '';
-              const normalizedActualName = brand.actual_name ? brand.actual_name.toLowerCase().replace(/\s+/g, '') : '';
+            if (brand) {
               const normalizedSearchName = brandName.toLowerCase().replace(/\s+/g, '');
               
-              if (normalizedBrandName === normalizedSearchName || normalizedActualName === normalizedSearchName) {
+              const normalizedBrandName = brand.name ? brand.name.toLowerCase().replace(/\s+/g, '') : '';
+              const normalizedActualName = brand.actual_name ? brand.actual_name.toLowerCase().replace(/\s+/g, '') : '';
+              
+              const pageIdMatch = brand.page_id && brand.page_id.toString() === brandName;
+              
+              const brandIdMatch = brand.id && brand.id.toString() === brandName;
+              
+              if (normalizedBrandName === normalizedSearchName || 
+                  normalizedActualName === normalizedSearchName ||
+                  pageIdMatch || 
+                  brandIdMatch) {
                 brandMember = member;
                 currentIndex = i;
                 brandFound = true;

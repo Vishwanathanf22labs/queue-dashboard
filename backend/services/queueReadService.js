@@ -92,7 +92,8 @@ async function enrichBrandsWithDBInfo(brandItems, isSortedSet = false) {
           status: "Unknown",
           queue_position: results.length + 1,
           page_category: pageCategory || "Unknown",
-          error_message: brandData.reason || "Unknown error"
+          error_message: brandData.reason || "Unknown error",
+          score: score
         };
 
         // Use batched data

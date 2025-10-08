@@ -49,22 +49,29 @@ const ScraperControlsPage = () => {
               <p className="text-xs sm:text-sm lg:text-base text-gray-600">Monitor and control scraper status</p>
             </div>
             
-            {!isAdmin && (
-              <button
-                onClick={onAdminLogin}
-                className="flex items-center px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-red-600 bg-red-100 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
-              >
-                <Shield className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
-                Admin Access Required
-              </button>
-            )}
+            <div className="flex items-center space-x-3">
+              {isAdmin ? (
+                <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-green-100 text-green-800 rounded-lg">
+                  <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="text-xs sm:text-sm font-medium">Admin Mode</span>
+                </div>
+              ) : (
+                <button
+                  onClick={onAdminLogin}
+                  className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
+                >
+                  <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="text-xs sm:text-sm font-medium">Admin Access Required</span>
+                </button>
+              )}
 
-            <RefreshControl
-              isRefreshing={isRefreshing}
-              refreshInterval={refreshInterval}
-              onManualRefresh={handleRefresh}
-              onIntervalChange={setIntervalValue}
-            />
+              <RefreshControl
+                isRefreshing={isRefreshing}
+                refreshInterval={refreshInterval}
+                onManualRefresh={handleRefresh}
+                onIntervalChange={setIntervalValue}
+              />
+            </div>
           </div>
         </div>
 

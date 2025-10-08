@@ -179,14 +179,6 @@ const ScraperControls = ({ disabled = false }) => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Scraper Controls</h1>
-          <p className="text-gray-600 mt-1">Monitor and control scraper status</p>
-        </div>
-      </div>
-
       {/* Status Card */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between">

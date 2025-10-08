@@ -59,31 +59,14 @@ async function getWatchlistCompletedCount() {
       return 0;
     }
     
-    // Get all watchlist brands from database
-    const { Brand, WatchList } = require('../models');
+
+    const { getWatchlistBrands } = require('./queueReadService');
     
-    // Get all watchlist brand_ids
-    const watchlistItems = await WatchList.findAll({
-      attributes: ['brand_id'],
-      raw: true
-    });
+
+    const watchlistData = await getWatchlistBrands(1, 10000, null, null);
     
-    if (watchlistItems.length === 0) {
-      return 0;
-    }
-    
-    const watchlistBrandIds = watchlistItems.map(item => item.brand_id);
-    
-    // Get the brand details for watchlist brands
-    const watchlistBrands = await Brand.findAll({
-      where: {
-        id: watchlistBrandIds
-      },
-      attributes: ['id', 'page_id'],
-      raw: true
-    });
-    
-    if (watchlistBrands.length === 0) {
+    if (!watchlistData || !watchlistData.brands || watchlistData.brands.length === 0) {
+      logger.info('No watchlist brands found');
       return 0;
     }
     
@@ -109,15 +92,28 @@ async function getWatchlistCompletedCount() {
       }
     });
     
-    // Count brands that are NOT in pending or failed queues
+
     let completedCount = 0;
-    watchlistBrands.forEach(brand => {
-      if (!pendingPageIds.has(brand.page_id) && !failedPageIds.has(brand.page_id)) {
-        completedCount++;
+    
+    watchlistData.brands.forEach(brand => {
+      const pageId = brand.page_id;
+
+      if (pendingPageIds.has(pageId)) {
+        return; 
       }
+
+      if (failedPageIds.has(pageId)) {
+        return; 
+      }
+      
+      if (brand.status === 'Inactive') {
+        return; 
+      }
+
+      completedCount++;
     });
     
-    logger.info(`Watchlist completed count: ${completedCount}`);
+    logger.info(`Watchlist completed count: ${completedCount} (from ${watchlistData.brands.length} total watchlist brands)`);
     return completedCount;
   } catch (error) {
     logger.error('Error getting watchlist completed count:', error);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Button from '../ui/Button';
@@ -10,6 +10,7 @@ import { Plus, Check } from 'lucide-react';
 
 const SingleBrandForm = ({ loading, isSubmitting, onSubmittingChange, disabled = false }) => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const brandSearchRef = useRef(null);
   
   const getInitialSingleBrand = () => {
     try {
@@ -68,6 +69,9 @@ const SingleBrandForm = ({ loading, isSubmitting, onSubmittingChange, disabled =
   const clearSearchInputs = () => {
     setSingleBrandForm(getInitialSingleBrand());
     localStorage.removeItem('addBrands_singleBrand');
+    if (brandSearchRef.current) {
+      brandSearchRef.current.clearSearch();
+    }
   };
 
   const handleSingleBrandSubmit = async (e) => {
@@ -155,6 +159,7 @@ const SingleBrandForm = ({ loading, isSubmitting, onSubmittingChange, disabled =
               Search Brand <span className="text-red-500">*</span>
             </label>
             <BrandSearch
+              ref={brandSearchRef}
               onBrandSelect={handleSingleBrandSelect}
               placeholder="Type brand name to search (e.g., 'nike', 'adidas')..."
               selectedBrand={singleBrandForm.id ? singleBrandForm : null}

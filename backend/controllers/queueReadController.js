@@ -371,7 +371,7 @@ async function changeBrandScore(req, res) {
     if (!queueType || !brandName || newScore === undefined || newScore === null) {
       return res.status(400).json({
         success: false,
-        message: "Queue type, brand name, and new score are required",
+        message: "Queue type, brand identifier, and new score are required",
         timestamp: new Date().toISOString(),
       });
     }

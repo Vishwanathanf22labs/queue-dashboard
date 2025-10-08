@@ -219,12 +219,18 @@ const WatchlistQueues = () => {
        render: (value, row) => {
          const brandName = value || row.brand_name || row.name || row.brandName || 'Unknown Brand';
          const pageId = row.page_id || 'N/A';
+         const score = row.score || 'N/A';
          return (
            <div className="flex items-center">
              <Users className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
              <div className="flex items-center space-x-2 flex-1">
                <div className="text-xs font-medium text-gray-900 max-w-[80px] sm:max-w-none truncate">
-                 {brandName}
+                 <span title={`Score: ${score}`}>
+                   {brandName}
+                   {score !== 'N/A' && (
+                     <span className="text-gray-400 font-medium ml-1">({score})</span>
+                   )}
+                 </span>
                </div>
                {pageId && pageId !== 'N/A' && (
                  <button
@@ -854,20 +860,31 @@ const WatchlistQueues = () => {
         </div>
         
         <div className="flex items-center space-x-3">
-          {activeTab === 'failed' && !isAdmin && (reenqueuePagination.total_items || 0) > 0 ? (
-            <button
-              onClick={onAdminLogin}
-              className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
-            >
-              <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="text-xs sm:text-sm font-medium">Admin Access Required</span>
-            </button>
-          ) : activeTab === 'failed' && isAdmin && (reenqueuePagination.total_items || 0) > 0 ? (
-            <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-green-100 text-green-800 rounded-lg">
-              <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="text-xs sm:text-sm font-medium">Admin Mode</span>
-            </div>
-          ) : null}
+          {activeTab === 'failed' && (
+            <>
+              {isAdmin ? (
+                <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-green-100 text-green-800 rounded-lg">
+                  <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="text-xs sm:text-sm font-medium">Admin Mode</span>
+                </div>
+              ) : (
+                <button
+                  onClick={onAdminLogin}
+                  className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
+                >
+                  <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="text-xs sm:text-sm font-medium">Admin Access Required</span>
+                </button>
+              )}
+            </>
+          )}
+
+          <RefreshControl
+            isRefreshing={isRefreshing}
+            refreshInterval={refreshInterval}
+            onManualRefresh={handleRefresh}
+            onIntervalChange={setIntervalValue}
+          />
         </div>
       </div>
 
@@ -898,30 +915,6 @@ const WatchlistQueues = () => {
             </button>
           </div>
           
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-600">Items per page:</span>
-              <CustomDropdown
-                options={[
-                  { value: 10, label: '10' },
-                  { value: 25, label: '25' },
-                  { value: 50, label: '50' },
-                  { value: 100, label: '100' }
-                ]}
-                value={itemsPerPage}
-                onChange={handleItemsPerPageChange}
-                placeholder="Select items per page"
-                className="w-20"
-              />
-            </div>
-            
-            <RefreshControl
-              isRefreshing={isRefreshing}
-              refreshInterval={refreshInterval}
-              onManualRefresh={handleRefresh}
-              onIntervalChange={setIntervalValue}
-            />
-          </div>
         </div>
       </Card>
 
@@ -993,6 +986,22 @@ const WatchlistQueues = () => {
               }}
             />
           </div>
+          
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-600">Items per page:</span>
+            <CustomDropdown
+              options={[
+                { value: 10, label: '10' },
+                { value: 25, label: '25' },
+                { value: 50, label: '50' },
+                { value: 100, label: '100' }
+              ]}
+              value={itemsPerPage}
+              onChange={handleItemsPerPageChange}
+              placeholder="Select items per page"
+              className="w-20"
+            />
+          </div>
         </div>
       </Card>
 
@@ -1055,6 +1064,7 @@ const WatchlistQueues = () => {
              const brandName = brand.brand_name || brand.name || brand.brandName || 'Unknown Brand';
              const brandId = brand.brand_id || brand.id || brand.queue_id || brand.brandId || 'N/A';
              const pageId = brand.page_id || brand.pageId || 'N/A';
+             const score = brand.score || 'N/A';
              const isPending = activeTab === 'pending';
 
              return (
@@ -1069,7 +1079,12 @@ const WatchlistQueues = () => {
                            {position}
                          </span>
                        </div>
-                       <h3 className="font-semibold text-gray-900 text-lg">{brandName}</h3>
+                       <h3 className="font-semibold text-gray-900 text-lg" title={`Score: ${score}`}>
+                         {brandName}
+                         {score !== 'N/A' && (
+                           <span className="text-gray-400 font-medium ml-1">({score})</span>
+                         )}
+                       </h3>
                      </div>
                      <div className="flex items-center space-x-2">
                        <Badge variant={isPending ? "info" : "error"}>

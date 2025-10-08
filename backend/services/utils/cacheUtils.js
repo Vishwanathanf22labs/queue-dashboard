@@ -141,6 +141,46 @@ async function setQueueETag(queueType, page, limit, etag, sortBy = 'normal', sor
   return await setCachedData(etagKey, etag, ttl);
 }
 
+async function getIpStatsListCache(page, limit, search = '', sortBy = 'totalAds', sortOrder = 'desc') {
+  const key = getCacheKey("ip_stats_list", `p${page}`, `l${limit}`, `s${search}`, `sb${sortBy}`, `so${sortOrder}`);
+  return await getCachedData(key);
+}
+
+async function setIpStatsListCache(page, limit, data, search = '', sortBy = 'totalAds', sortOrder = 'desc', ttl = 300) {
+  const key = getCacheKey("ip_stats_list", `p${page}`, `l${limit}`, `s${search}`, `sb${sortBy}`, `so${sortOrder}`);
+  return await setCachedData(key, data, ttl);
+}
+
+async function getIpStatsListETag(page, limit, search = '', sortBy = 'totalAds', sortOrder = 'desc') {
+  const etagKey = getCacheKey("ip_stats_list", `p${page}`, `l${limit}`, `s${search}`, `sb${sortBy}`, `so${sortOrder}`, "etag");
+  return await getCachedData(etagKey);
+}
+
+async function setIpStatsListETag(page, limit, etag, search = '', sortBy = 'totalAds', sortOrder = 'desc', ttl = 300) {
+  const etagKey = getCacheKey("ip_stats_list", `p${page}`, `l${limit}`, `s${search}`, `sb${sortBy}`, `so${sortOrder}`, "etag");
+  return await setCachedData(etagKey, etag, ttl);
+}
+
+async function getIpBrandsCache(ip, page, limit, search = '') {
+  const key = getCacheKey("ip_brands", ip, `p${page}`, `l${limit}`, `s${search}`);
+  return await getCachedData(key);
+}
+
+async function setIpBrandsCache(ip, page, limit, data, search = '', ttl = 300) {
+  const key = getCacheKey("ip_brands", ip, `p${page}`, `l${limit}`, `s${search}`);
+  return await setCachedData(key, data, ttl);
+}
+
+async function getIpBrandsETag(ip, page, limit, search = '') {
+  const etagKey = getCacheKey("ip_brands", ip, `p${page}`, `l${limit}`, `s${search}`, "etag");
+  return await getCachedData(etagKey);
+}
+
+async function setIpBrandsETag(ip, page, limit, etag, search = '', ttl = 300) {
+  const etagKey = getCacheKey("ip_brands", ip, `p${page}`, `l${limit}`, `s${search}`, "etag");
+  return await setCachedData(etagKey, etag, ttl);
+}
+
 // Cache invalidation functions
 async function invalidatePipelineCache(date) {
   try {
@@ -193,6 +233,28 @@ async function invalidateQueueCache(queueType = null) {
   }
 }
 
+async function invalidateIpStatsCache() {
+  try {
+    const patterns = ['ip_stats_list:*', 'ip_brands:*', 'ip_all_brands:*'];
+    const client = getCacheRedisClient();
+    
+    let totalDeleted = 0;
+    for (const pattern of patterns) {
+      const keys = await client.keys(pattern);
+      if (keys.length > 0) {
+        const deleted = await client.del(keys);
+        totalDeleted += deleted;
+      }
+    }
+    
+    console.log(`IP Stats cache invalidated - ${totalDeleted} keys deleted`);
+    return totalDeleted;
+  } catch (error) {
+    console.error('IP Stats cache invalidation error:', error);
+    throw error;
+  }
+}
+
 // Clear in-memory fallback cache
 function clearInMemoryFallbackCache() {
   redisCache.clear();
@@ -214,6 +276,15 @@ const cacheUtilsExports = {
   getQueueETag,
   setQueueETag,
   invalidateQueueCache,
+  getIpStatsListCache,
+  setIpStatsListCache,
+  getIpStatsListETag,
+  setIpStatsListETag,
+  getIpBrandsCache,
+  setIpBrandsCache,
+  getIpBrandsETag,
+  setIpBrandsETag,
+  invalidateIpStatsCache,
   reinitializeCacheRedisClient,
   getCacheRedisClient,
   clearInMemoryFallbackCache,

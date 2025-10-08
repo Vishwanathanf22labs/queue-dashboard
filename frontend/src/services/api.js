@@ -280,6 +280,45 @@ export const scrapedBrandsAPI = {
   }
 };
 
+export const ipStatsAPI = {
+  getIpStatsList: (page = 1, limit = 10, search = '', sortBy = 'totalAds', sortOrder = 'desc') => {
+    const params = new URLSearchParams();
+    params.append("page", page);
+    params.append("limit", limit);
+    if (search) params.append("search", search);
+    params.append("sortBy", sortBy);
+    params.append("sortOrder", sortOrder);
+    return api.get(`/ip-stats/list?${params.toString()}`);
+  },
+
+  getIpStatsDetail: (ip, page = 1, limit = 10) => {
+    const params = new URLSearchParams();
+    params.append("page", page);
+    params.append("limit", limit);
+    return api.get(`/ip-stats/${ip}?${params.toString()}`);
+  },
+
+  getIpStatsSummary: () => {
+    return api.get("/ip-stats/summary");
+  },
+
+  getIpBrands: (ip, page = 1, limit = 10, search = '') => {
+    const params = new URLSearchParams();
+    params.append("page", page);
+    params.append("limit", limit);
+    if (search && search.trim()) params.append("search", search);
+    return api.get(`/ip-stats/${ip}/brands?${params.toString()}`);
+  },
+
+  invalidateIpStatsCache: () => {
+    return api.post("/ip-stats/invalidate-cache");
+  },
+
+  deleteIpStats: (ip) => {
+    return api.delete(`/ip-stats/${ip}`);
+  }
+};
+
 export const pipelineAPI = {
   getAllBrandsStatus: (page = 1, limit = 10, date = null, sortBy = 'normal', sortOrder = 'desc') => {
     const params = new URLSearchParams();

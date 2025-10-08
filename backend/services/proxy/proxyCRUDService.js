@@ -1,10 +1,34 @@
 const { getGlobalRedis } = require("../../utils/redisSelector");
 const logger = require("../../utils/logger");
+const ipStatsService = require("../ipStatsService");
 
 // Function to get dynamic Redis keys
 function getRedisKeys() {
   return require("../../config/constants").REDIS_KEYS;
 }
+
+const REDIS_KEYS = getRedisKeys();
+const PROXY_STATS_KEY = REDIS_KEYS.GLOBAL.PROXY_STATS;
+
+async function initializeProxyStats() {
+  try {
+    const stats = await getGlobalRedis().hgetall(PROXY_STATS_KEY);
+    
+    if (Object.keys(stats).length === 0) {
+      await getGlobalRedis().hset(PROXY_STATS_KEY, {
+        added: "0",
+        removed: "0",
+        last_updated: new Date().toISOString()
+      });
+      logger.info("Proxy stats initialized with default values");
+    }
+  } catch (error) {
+    logger.error("Error initializing proxy stats:", error);
+  }
+}
+
+
+initializeProxyStats();
 
 /**
  * Add a new proxy to the system using Redis hash storage
@@ -130,11 +154,21 @@ async function removeProxy(proxyKey) {
       };
     }
 
+    const keyParts = proxyKey.split(':');
+    const ip = keyParts[1]; 
+
     // Remove from Redis hash
     await getGlobalRedis().del(proxyKey);
     
     // Update stats
     await updateProxyStats("remove");
+
+    try {
+      await ipStatsService.deleteIpStats(ip);
+      logger.info(`IP stats cleaned up for IP: ${ip}`);
+    } catch (ipStatsError) {
+      logger.warn(`Failed to cleanup IP stats for ${ip}:`, ipStatsError.message);
+    }
 
     logger.info(`Proxy removed successfully: ${proxyKey}`);
 
@@ -242,6 +276,14 @@ async function updateProxyStats(action) {
   try {
     const stats = await getGlobalRedis().hgetall(PROXY_STATS_KEY);
     
+    if (Object.keys(stats).length === 0) {
+      await getGlobalRedis().hset(PROXY_STATS_KEY, {
+        added: "0",
+        removed: "0",
+        last_updated: new Date().toISOString()
+      });
+    }
+    
     if (action === "add") {
       const added = parseInt(stats.added || 0) + 1;
       await getGlobalRedis().hset(PROXY_STATS_KEY, "added", added.toString());
@@ -251,6 +293,8 @@ async function updateProxyStats(action) {
     }
     
     await getGlobalRedis().hset(PROXY_STATS_KEY, "last_updated", new Date().toISOString());
+    
+    logger.info(`Proxy stats updated: ${action} action performed`);
   } catch (error) {
     logger.error("Error updating proxy stats:", error);
   }

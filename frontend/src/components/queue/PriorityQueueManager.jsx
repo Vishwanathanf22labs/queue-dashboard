@@ -179,10 +179,10 @@ const PriorityQueueManager = ({ disabled = false }) => {
               type="text"
               id="brandName"
               name="brandName"
-              label="Brand Name"
+              label="Brand Identifier"
               value={state.formData.brandName}
               onChange={(value) => handleInputChange('brandName', value)}
-              placeholder="Enter brand name to search"
+              placeholder="Enter brand name, page_id, or brand_id"
               className="w-full"
               disabled={disabled}
             />
