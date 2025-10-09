@@ -129,17 +129,23 @@ router.post('/cleanup-completed-brands', adminAuth, async (req, res) => {
 router.delete('/clear-currently-processing', adminAuth, async (req, res) => {
   try {
     const { getGlobalRedis } = require('../utils/redisSelector');
-    const { REDIS_KEYS } = require('../config/constants');
+    const { getRedisKeys } = require('../config/constants');
     const logger = require('../utils/logger');
     
+    // Use environment from request (set by middleware)
+    const environment = req.environment || 'production';
+    
+    // Get environment-specific Redis keys
+    const REDIS_KEYS = getRedisKeys(environment);
+    
     // Get current count before clearing
-    const currentlyScrapingBrands = await getGlobalRedis().lrange(REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING, 0, -1);
+    const currentlyScrapingBrands = await getGlobalRedis(environment).lrange(REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING, 0, -1);
     const countBeforeClear = currentlyScrapingBrands ? currentlyScrapingBrands.length : 0;
     
     // Clear the entire currently scraping Redis key
-    await getGlobalRedis().del(REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING);
+    await getGlobalRedis(environment).del(REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING);
     
-    logger.info(`Admin cleared all currently scraping brands: ${countBeforeClear} brands removed`);
+    logger.info(`Admin cleared all currently scraping brands [${environment}]: ${countBeforeClear} brands removed`);
     
     res.json({
       success: true,
@@ -162,7 +168,12 @@ router.delete('/clear-currently-processing', adminAuth, async (req, res) => {
 // Clear Cache Redis (current environment) - Admin only
 router.post('/clear-cache-only', adminAuth, async (req, res) => {
   try {
-    const client = getCacheRedisClient();
+    // Use environment from request (set by middleware)
+    const environment = req.environment || 'production';
+    
+    // Get environment-specific cache Redis client
+    const { getCacheRedisClientWithEnvironment } = require('../services/utils/cacheUtils');
+    const client = getCacheRedisClientWithEnvironment(environment);
     
     // Get all cache keys (only the ones we want to clear)
     const cacheKeyPatterns = [
@@ -208,8 +219,9 @@ router.post('/clear-cache-only', adminAuth, async (req, res) => {
     
     return res.json({ 
       success: true, 
-      message: `Cache Redis and in-memory caches cleared for current environment - ${totalDeleted} cache keys deleted`,
-      deletedCount: totalDeleted
+      message: `Cache Redis and in-memory caches cleared for ${environment} environment - ${totalDeleted} cache keys deleted`,
+      deletedCount: totalDeleted,
+      environment: environment
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to clear Cache Redis', error: error.message });

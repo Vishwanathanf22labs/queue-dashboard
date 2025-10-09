@@ -77,6 +77,12 @@ router.put(
   queueManagementController.moveAllWatchlistFailedToPending
 );
 
+// Cleanup watchlist failed queue (remove corrupted entries)
+router.post(
+  "/watchlist/failed/cleanup",
+  queueManagementController.cleanupWatchlistFailedQueue
+);
+
 // Get queue management statistics
 router.get("/stats", queueManagementController.getQueueManagementStats);
 

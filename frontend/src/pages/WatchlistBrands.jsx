@@ -116,17 +116,22 @@ const WatchlistBrands = () => {
 
   // Function to load active watchlist brands to pending queue
   const handleLoadActiveWatchlist = async () => {
+ 
+    const scrollPosition = window.scrollY;
+
     try {
       const result = await queueAPI.addAllBrands('watchlist_active', 'watchlist');
       toast.success(result.message || 'Successfully loaded active watchlist brands to watchlist pending queue');
-      
-      // Refresh the data to show updated statuses
+
       await Promise.all([
-        fetchWatchlistBrands(1, 10000),
         fetchWatchlistPendingBrands(1, 10000),
-        fetchWatchlistFailedBrands(1, 10000),
         fetchActiveWatchlistCount()
       ]);
+
+
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollPosition);
+      });
     } catch (error) {
       toast.error(error.message || 'Failed to load active watchlist brands to watchlist pending queue');
     }
@@ -262,11 +267,10 @@ const WatchlistBrands = () => {
         );
       });
 
-      const sortedFiltered = sortBrandsStably(filtered);
+      const sortedFiltered = sortBrandsStably(filtered);w
       updateState({ filteredBrands: sortedFiltered });
     }
-  }, [searchTerm, allWatchlistBrands, watchlistPendingBrands, watchlistFailedBrands, statusSortMode]);
-
+  }, [searchTerm, allWatchlistBrands, statusSortMode]);
 
 
   const getScraperStatusInfo = (status) => {
@@ -348,8 +352,12 @@ const WatchlistBrands = () => {
 
 
 
+
+
   // Handle individual brand movement from failed to pending
   const handleMoveIndividualBrand = async (brand) => {
+    const scrollPosition = window.scrollY;
+
     try {
       // Get the brand identifier (brand_id, page_id, or queue_id)
       const brandIdentifier = brand.brand_id || brand.page_id;
@@ -363,17 +371,18 @@ const WatchlistBrands = () => {
       await moveIndividualWatchlistFailedToPending(brandIdentifier);
       toast.success(`Brand "${brand.brand_name || 'Unknown'}" moved to watchlist pending queue successfully`);
 
-      // Refresh the data to show updated statuses
       await Promise.all([
-        fetchWatchlistBrands(1, 10000),
         fetchWatchlistPendingBrands(1, 10000),
         fetchWatchlistFailedBrands(1, 10000)
       ]);
+
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollPosition);
+      });
     } catch (error) {
       toast.error(error.message || 'Failed to move brand to watchlist pending queue');
     }
   };
-
   // Table columns definition with custom render functions
   const tableColumns = watchlistBrandsColumns
     .map(column => {
@@ -471,25 +480,25 @@ const WatchlistBrands = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Watchlist Brands</h1>
-          <p className="text-gray-600">Monitor all your watchlist brands and their scraping status</p>
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">Watchlist Brands</h1>
+          <p className="text-sm sm:text-base text-gray-600">Monitor all your watchlist brands and their scraping status</p>
         </div>
         
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-3">
           {!isAdmin ? (
             <button
               onClick={onAdminLogin}
-              className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
+              className="flex items-center justify-center space-x-2 px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
             >
-              <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="text-xs sm:text-sm font-medium">Admin Access Required</span>
+              <Shield className="h-4 w-4" />
+              <span className="text-sm font-medium">Admin Access Required</span>
             </button>
           ) : (
-            <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-green-100 text-green-800 rounded-lg">
-              <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="text-xs sm:text-sm font-medium">Admin Mode</span>
+            <div className="flex items-center justify-center space-x-2 px-3 py-2 bg-green-100 text-green-800 rounded-lg">
+              <Shield className="h-4 w-4" />
+              <span className="text-sm font-medium">Admin Mode</span>
             </div>
           )}
 
@@ -506,60 +515,61 @@ const WatchlistBrands = () => {
       </div>
 
 
-      {/* Watchlist Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card>
+      {/* Status Cards - Mobile: 2 columns, Desktop: 3 columns */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4">
+        {/* Row 1 */}
+        <Card className="p-3 sm:p-4 md:p-6">
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-lg sm:text-xl md:text-2xl font-bold text-green-600">
               {allWatchlistBrands.filter(b => b.status === 'Active').length}
             </div>
-            <div className="text-sm text-gray-600">Watchlist Active</div>
+            <div className="text-xs sm:text-sm text-gray-600">Watchlist Active</div>
           </div>
         </Card>
-        <Card>
+        <Card className="p-3 sm:p-4 md:p-6">
           <div className="text-center">
-            <div className="text-2xl font-bold text-gray-600">
+            <div className="text-lg sm:text-xl md:text-2xl font-bold text-gray-600">
               {allWatchlistBrands.filter(b => b.status === 'Inactive').length}
             </div>
-            <div className="text-sm text-gray-600">Watchlist Inactive</div>
+            <div className="text-xs sm:text-sm text-gray-600">Watchlist Inactive</div>
           </div>
         </Card>
-        <Card>
+        
+        {/* Row 2 */}
+        <Card className="p-3 sm:p-4 md:p-6">
           <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">
+            <div className="text-lg sm:text-xl md:text-2xl font-bold text-blue-600">
               {allWatchlistBrands.length}
             </div>
-            <div className="text-sm text-gray-600">Watchlist Total</div>
+            <div className="text-xs sm:text-sm text-gray-600">Watchlist Total</div>
           </div>
         </Card>
-      </div>
-
-      {/* Processing Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
-                {allWatchlistBrands.filter(b => determineScraperStatus(b) === 'completed').length}
-              </div>
-              <div className="text-sm text-gray-600">Completed</div>
+        <Card className="p-3 sm:p-4 md:p-6">
+          <div className="text-center">
+            <div className="text-lg sm:text-xl md:text-2xl font-bold text-green-600">
+              {allWatchlistBrands.filter(b => determineScraperStatus(b) === 'completed').length}
             </div>
-          </Card>
-          <Card>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-600">
-                {allWatchlistBrands.filter(b => determineScraperStatus(b) === 'waiting').length}
-              </div>
-              <div className="text-sm text-gray-600">Waiting</div>
+            <div className="text-xs sm:text-sm text-gray-600">Completed</div>
+          </div>
+        </Card>
+        
+        {/* Row 3 */}
+        <Card className="p-3 sm:p-4 md:p-6">
+          <div className="text-center">
+            <div className="text-lg sm:text-xl md:text-2xl font-bold text-yellow-600">
+              {allWatchlistBrands.filter(b => determineScraperStatus(b) === 'waiting').length}
             </div>
-          </Card>
-          <Card>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">
-                {allWatchlistBrands.filter(b => determineScraperStatus(b) === 'failed').length}
-              </div>
-              <div className="text-sm text-gray-600">Failed</div>
+            <div className="text-xs sm:text-sm text-gray-600">Waiting</div>
+          </div>
+        </Card>
+        <Card className="p-3 sm:p-4 md:p-6">
+          <div className="text-center">
+            <div className="text-lg sm:text-xl md:text-2xl font-bold text-red-600">
+              {allWatchlistBrands.filter(b => determineScraperStatus(b) === 'failed').length}
             </div>
-          </Card>
+            <div className="text-xs sm:text-sm text-gray-600">Failed</div>
+          </div>
+        </Card>
       </div>
 
        {/* Load Active Watchlist Button */}
@@ -610,24 +620,29 @@ const WatchlistBrands = () => {
                variant="primary"
                size="md"
                disabled={!isAdmin}
-               onClick={async () => {
-                 if (!isAdmin) {
-                   toast.error('Admin access required to load brands');
-                   return;
-                 }
-                 try {
-                   const result = await moveWatchlistToPending();
-                   toast.success(result.message || 'Successfully loaded watchlist brands to watchlist pending queue');
-                   // Refresh the data to show updated statuses
-                   await fetchWatchlistBrands(1, 10000);
-                   await Promise.all([
-                     fetchWatchlistPendingBrands(1, 10000),
-                     fetchWatchlistFailedBrands(1, 10000)
-                   ]);
-                 } catch (error) {
-                   toast.error(error.message || 'Failed to load watchlist brands to watchlist pending queue');
-                 }
-               }}
+
+              onClick={async () => {
+                if (!isAdmin) {
+                  toast.error('Admin access required to load brands');
+                  return;
+                }
+
+         
+                const scrollPosition = window.scrollY;
+
+                try {
+                  const result = await moveWatchlistToPending();
+                  toast.success(result.message || 'Successfully loaded watchlist brands to watchlist pending queue');
+
+                  await fetchWatchlistPendingBrands(1, 10000);
+
+                  requestAnimationFrame(() => {
+                    window.scrollTo(0, scrollPosition);
+                  });
+                } catch (error) {
+                  toast.error(error.message || 'Failed to load watchlist brands to watchlist pending queue');
+                }
+              }}
                className={`w-full sm:w-auto ${!isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}
              >
                <span className="hidden sm:inline">
@@ -656,20 +671,28 @@ const WatchlistBrands = () => {
                 variant="primary"
                 size="md"
                 disabled={!isAdmin}
+
                 onClick={async () => {
                   if (!isAdmin) {
                     toast.error('Admin access required to move brands');
                     return;
                   }
+
+                 
+                  const scrollPosition = window.scrollY;
+
                   try {
                     const result = await moveWatchlistFailedToPending();
                     toast.success(result.message || 'Successfully moved failed watchlist brands to watchlist pending queue');
-                    // Refresh the data to show updated statuses
+
                     await Promise.all([
-                      fetchWatchlistBrands(1, 10000),
                       fetchWatchlistPendingBrands(1, 10000),
                       fetchWatchlistFailedBrands(1, 10000)
                     ]);
+
+                    requestAnimationFrame(() => {
+                      window.scrollTo(0, scrollPosition);
+                    });
                   } catch (error) {
                     toast.error(error.message || 'Failed to move watchlist failed brands to watchlist pending queue');
                   }
@@ -753,7 +776,7 @@ const WatchlistBrands = () => {
            </Card>
          ) : (
            currentBrands.map((brand, index) => (
-            <Card key={`${brand.brand_id}-${index}`} className="p-4 relative">
+             <Card key={brand.page_id || brand.brand_id} className="p-4 relative transition-all duration-200">
               <div className="space-y-3">
                 {/* Brand Name */}
                 <div className="flex items-center justify-between">

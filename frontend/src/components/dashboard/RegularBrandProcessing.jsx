@@ -166,34 +166,34 @@ const RegularBrandProcessing = ({ allBrandProcessingData, loading, error }) => {
         {allJobs.length > 0 ? (
           <div className="space-y-4">
             {/* Header with count and badges */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-sm font-medium text-gray-600">
                 {allJobs.length} job{allJobs.length !== 1 ? 's' : ''} in processing
               </span>
-              <div className="flex gap-2 flex-wrap">
-                <Badge variant="success" className="flex items-center space-x-1">
-                  <Play className="h-3 w-3" />
-                  <span>Active: {counters.active || 0}</span>
+              <div className="grid grid-cols-2 sm:flex sm:gap-2 sm:flex-wrap gap-1">
+                <Badge variant="success" className="flex items-center justify-center space-x-1 text-xs px-2 py-1">
+                  <Play className="h-2.5 w-2.5" />
+                  <span className="text-xs">Active: {counters.active || 0}</span>
                 </Badge>
-                <Badge variant="warning" className="flex items-center space-x-1">
-                  <Hourglass className="h-3 w-3" />
-                  <span>Waiting: {counters.waiting || 0}</span>
+                <Badge variant="warning" className="flex items-center justify-center space-x-1 text-xs px-2 py-1">
+                  <Hourglass className="h-2.5 w-2.5" />
+                  <span className="text-xs">Waiting: {counters.waiting || 0}</span>
                 </Badge>
-                <Badge variant="secondary" className="flex items-center space-x-1">
-                  <Clock className="h-3 w-3" />
-                  <span>Delayed: {counters.delayed || 0}</span>
+                <Badge variant="secondary" className="flex items-center justify-center space-x-1 text-xs px-2 py-1">
+                  <Clock className="h-2.5 w-2.5" />
+                  <span className="text-xs">Delayed: {counters.delayed || 0}</span>
                 </Badge>
-                <Badge variant="default" className="flex items-center space-x-1">
-                  <CheckCircle className="h-3 w-3" />
-                  <span>Completed: {counters.completed || 0}</span>
+                <Badge variant="default" className="flex items-center justify-center space-x-1 text-xs px-2 py-1">
+                  <CheckCircle className="h-2.5 w-2.5" />
+                  <span className="text-xs">Complete: {counters.completed || 0}</span>
                 </Badge>
-                <Badge variant="error" className="flex items-center space-x-1">
-                  <XCircle className="h-3 w-3" />
-                  <span>Failed: {counters.failed || 0}</span>
+                <Badge variant="error" className="flex items-center justify-center space-x-1 text-xs px-2 py-1">
+                  <XCircle className="h-2.5 w-2.5" />
+                  <span className="text-xs">Failed: {counters.failed || 0}</span>
                 </Badge>
-                <Badge variant="info" className="flex items-center space-x-1">
-                  <Clock className="h-3 w-3" />
-                  <span>Prioritized: {counters.prioritized || 0}</span>
+                <Badge variant="info" className="flex items-center justify-center space-x-1 text-xs px-2 py-1">
+                  <Clock className="h-2.5 w-2.5" />
+                  <span className="text-xs">Priority: {counters.prioritized || 0}</span>
                 </Badge>
               </div>
             </div>

@@ -1,7 +1,7 @@
-import { AlertTriangle, Clock, Home, Plus, RefreshCw, Settings, FileText, Building2, Play, Globe, Eye, List, XCircle, Activity, Upload, ExternalLink, Cog } from "lucide-react";
+import { AlertTriangle, Clock, Home, Plus, RefreshCw, Settings, FileText, Building2, Play, Globe, Eye, List, XCircle, Activity, Upload, ExternalLink, Cog, Server } from "lucide-react";
 
 export const navItems = [
-  { to: "/", icon: Home, label: "Dashboard" },
+  { to: "/", icon: Home, label: "Home" },
   { to: "/pending-queue", icon: Clock, label: "Pending Queue" },
   { to: "/failed-queue", icon: AlertTriangle, label: "Failed Queue" },
   { to: "/watchlist-brands", icon: Eye, label: "Watchlist Status" },
@@ -9,9 +9,10 @@ export const navItems = [
   { to: "/add-brands", icon: Building2, label: "Add Brands" },
   { to: "/queue-management", icon: Settings, label: "Q Management" },
   { to: "/scraper-controls", icon: Play, label: "Scraper Controls" },
-  { to: "/proxies", icon: Globe, label: "Proxy Controls" },
   { to: "/scraped-brands", icon: FileText, label: "Scraped Brands" },
   { to: "/pipeline-status", icon: Activity, label: "Pipeline Status" },
+  { to: "/proxies", icon: Globe, label: "Proxy Controls" },
+  { to: "/ip-stats", icon: Server, label: "IP Stats" },
   { to: "/settings", icon: Cog, label: "Settings" }
 ];
 

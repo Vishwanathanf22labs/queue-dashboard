@@ -8,10 +8,11 @@ class ScrapedBrandsService {
    * @param {string} date - Date in YYYY-MM-DD format (optional, defaults to current date)
    * @returns {Object} - Paginated results with brands data
    */
-  static async getScrapedBrands(page = 1, limit = 10, date = null, sortBy = 'normal', sortOrder = 'desc') {
+  static async getScrapedBrands(page = 1, limit = 10, date = null, sortBy = 'normal', sortOrder = 'desc', environment = 'production') {
     try {
-      // Require models dynamically to get the latest version
-      const { Brand, BrandsDailyStatus, WatchList } = require('../models');
+      // Get models for the specified environment
+      const { getModels } = require('../models');
+      const { Brand, BrandsDailyStatus, WatchList } = getModels(environment);
       
       // Use provided date if given, otherwise use current date
       let targetDate;
@@ -224,10 +225,11 @@ class ScrapedBrandsService {
    * @param {string} date - Date in YYYY-MM-DD format (optional, defaults to current date)
    * @returns {Object} - Search results
    */
-  static async searchScrapedBrands(query, date = null) {
+  static async searchScrapedBrands(query, date = null, environment = 'production') {
     try {
-      // Require models dynamically to get the latest version
-      const { Brand, BrandsDailyStatus, WatchList } = require('../models');
+      // Get models for the specified environment
+      const { getModels } = require('../models');
+      const { Brand, BrandsDailyStatus, WatchList } = getModels(environment);
       
       // Use provided date if given, otherwise use current date
       let targetDate;
@@ -372,10 +374,11 @@ class ScrapedBrandsService {
    * @param {string} date - Date in YYYY-MM-DD format (optional, defaults to current date)
    * @returns {Object} - Statistics summary
    */
-  static async getScrapedBrandsStats(date = null) {
+  static async getScrapedBrandsStats(date = null, environment = 'production') {
     try {
-      // Require models dynamically to get the latest version
-      const { Brand, BrandsDailyStatus, WatchList } = require('../models');
+      // Get models for the specified environment
+      const { getModels } = require('../models');
+      const { Brand, BrandsDailyStatus, WatchList } = getModels(environment);
       
       // Use provided date if given, otherwise use current date
       let targetDate;

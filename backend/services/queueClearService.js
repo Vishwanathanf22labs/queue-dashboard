@@ -3,20 +3,20 @@ const logger = require("../utils/logger");
 const { QUEUES } = require("../config/constants");
 
 // Function to get dynamic Redis keys
-function getRedisKeys() {
-  return require("../config/constants").REDIS_KEYS;
+function getRedisKeys(environment = 'production') {
+  return require("../config/constants").getRedisKeys(environment);
 }
 
-async function clearAllQueues() {
+async function clearAllQueues(environment = 'production') {
   try {
-    const REDIS_KEYS = getRedisKeys();
+    const REDIS_KEYS = getRedisKeys(environment);
     
     logger.info("Clearing all queues (regular and watchlist pending and failed) and reenqueue list");
 
     // Get both Redis instances
-    const regularRedis = getQueueRedis('regular');
-    const watchlistRedis = getQueueRedis('watchlist');
-    const globalRedis = getGlobalRedis();
+    const regularRedis = getQueueRedis('regular', environment);
+    const watchlistRedis = getQueueRedis('watchlist', environment);
+    const globalRedis = getGlobalRedis(environment);
 
     // Get counts from all queues
     const regularPendingCount = await regularRedis.zcard(REDIS_KEYS.REGULAR.PENDING_BRANDS);
@@ -63,13 +63,13 @@ async function clearAllQueues() {
   }
 }
 
-async function clearPendingQueue(queueType = 'regular') {
+async function clearPendingQueue(queueType = 'regular', environment = 'production') {
   try {
-    const REDIS_KEYS = getRedisKeys();
+    const REDIS_KEYS = getRedisKeys(environment);
     
     logger.info(`Clearing entire ${queueType} pending queue`);
 
-    const redis = getQueueRedis(queueType);
+    const redis = getQueueRedis(queueType, environment);
     const queueKey = REDIS_KEYS[queueType.toUpperCase()].PENDING_BRANDS;
     const pendingCount = await redis.zcard(queueKey);
 
@@ -90,13 +90,13 @@ async function clearPendingQueue(queueType = 'regular') {
   }
 }
 
-async function clearFailedQueue(queueType = 'regular') {
+async function clearFailedQueue(queueType = 'regular', environment = 'production') {
   try {
-    const REDIS_KEYS = getRedisKeys();
+    const REDIS_KEYS = getRedisKeys(environment);
     
     logger.info(`Clearing entire ${queueType} failed queue`);
 
-    const redis = getQueueRedis(queueType);
+    const redis = getQueueRedis(queueType, environment);
     const queueKey = REDIS_KEYS[queueType.toUpperCase()].FAILED_BRANDS;
     const failedCount = await redis.llen(queueKey);
 
@@ -117,13 +117,13 @@ async function clearFailedQueue(queueType = 'regular') {
   }
 }
 
-async function clearWatchlistPendingQueue() {
+async function clearWatchlistPendingQueue(environment = 'production') {
   try {
-    const REDIS_KEYS = getRedisKeys();
+    const REDIS_KEYS = getRedisKeys(environment);
     
     logger.info("Clearing entire watchlist pending queue");
 
-    const redis = getQueueRedis('watchlist');
+    const redis = getQueueRedis('watchlist', environment);
     const queueKey = REDIS_KEYS.WATCHLIST.PENDING_BRANDS;
     const pendingCount = await redis.zcard(queueKey);
 
@@ -144,13 +144,13 @@ async function clearWatchlistPendingQueue() {
   }
 }
 
-async function clearWatchlistFailedQueue() {
+async function clearWatchlistFailedQueue(environment = 'production') {
   try {
-    const REDIS_KEYS = getRedisKeys();
+    const REDIS_KEYS = getRedisKeys(environment);
     
     logger.info("Clearing entire watchlist failed queue");
 
-    const redis = getQueueRedis('watchlist');
+    const redis = getQueueRedis('watchlist', environment);
     const queueKey = REDIS_KEYS.WATCHLIST.FAILED_BRANDS;
     const failedCount = await redis.llen(queueKey);
 

@@ -8,8 +8,9 @@ function getModels() {
 }
 
 // Function to get dynamic Redis keys
-function getRedisKeys() {
-  return require("../config/constants").REDIS_KEYS;
+function getRedisKeys(environment = null) {
+  const { getRedisKeys } = require("../config/constants");
+  return getRedisKeys(environment);
 }
 
 /**
@@ -25,10 +26,11 @@ async function getReenqueueData(
   page = PAGINATION.DEFAULT_PAGE,
   limit = PAGINATION.DEFAULT_LIMIT,
   search = null,
-  namespace = null
+  namespace = null,
+  environment = 'production'
 ) {
   try {
-    const REDIS_KEYS = getRedisKeys();
+    const REDIS_KEYS = getRedisKeys(environment);
     const reenqueueKey = REDIS_KEYS.GLOBAL.REENQUEUE_KEY;
     
     if (!reenqueueKey) {
@@ -47,19 +49,23 @@ async function getReenqueueData(
     const validPage = Math.max(1, parseInt(page));
     const validLimit = Math.max(1, parseInt(limit));
 
+    // Get environment-specific Redis connection
+    const { getGlobalRedis } = require("../utils/redisSelector");
+    const redis = getGlobalRedis(environment);
+    
     // Check if Redis connection is alive and reconnect if needed
-    if (globalRedis.status !== 'ready' && globalRedis.status !== 'connecting') {
-      logger.warn(`Global Redis connection status: ${globalRedis.status}, attempting to reconnect...`);
+    if (redis.status !== 'ready' && redis.status !== 'connecting') {
+      logger.warn(`Global Redis connection status: ${redis.status}, attempting to reconnect...`);
       try {
         // If connection is closed, try to reconnect
-        if (globalRedis.status === 'close' || globalRedis.status === 'end') {
-          await globalRedis.connect();
-          logger.info("Global Redis reconnected successfully");
+        if (redis.status === 'close' || redis.status === 'end') {
+          await redis.connect();
+          logger.info(`Global Redis [${environment}] reconnected successfully`);
         } else {
           // For other statuses, wait a bit and check again
           await new Promise(resolve => setTimeout(resolve, 1000));
-          if (globalRedis.status !== 'ready') {
-            throw new Error(`Redis connection is not ready (status: ${globalRedis.status})`);
+          if (redis.status !== 'ready') {
+            throw new Error(`Redis connection is not ready (status: ${redis.status})`);
           }
         }
       } catch (reconnectError) {
@@ -69,7 +75,7 @@ async function getReenqueueData(
     }
 
     // Get all items from the reenqueue list
-    const allItems = await globalRedis.lrange(reenqueueKey, 0, -1);
+    const allItems = await redis.lrange(reenqueueKey, 0, -1);
     
     // Parse all items and collect page IDs
     const parsedItems = [];
@@ -108,7 +114,8 @@ async function getReenqueueData(
     // If we have IDs but no page_ids, fetch page_ids from database
     if (itemIds.length > 0 && parsedItems.some(item => !item.page_id)) {
       try {
-        const { Brand } = getModels(); // Use dynamic model import
+        const { getModels } = require("../models");
+        const { Brand } = getModels(environment); // Use environment-specific model
         const brands = await Brand.findAll({
           where: { id: itemIds },
           attributes: ["id", "page_id"],
@@ -145,7 +152,8 @@ async function getReenqueueData(
     // Batch fetch brand names from database
     if (pageIds.length > 0) {
       try {
-        const { Brand } = getModels(); // Use dynamic model import
+        const { getModels } = require("../models");
+        const { Brand } = getModels(environment); // Use environment-specific model
         const brands = await Brand.findAll({
           where: { page_id: pageIds },
           attributes: ["name", "actual_name", "page_id"],

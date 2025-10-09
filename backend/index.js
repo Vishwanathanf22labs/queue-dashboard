@@ -8,6 +8,8 @@ const madanglesRoutes = require("./routes/madanglesRoutes");
 const scrapedBrandsRoutes = require("./routes/scrapedBrandsRoutes");
 const environmentRoutes = require("./routes/environmentRoutes");
 const settingsRoutes = require("./routes/settingsRoutes");
+const ipStatsRoutes = require("./routes/ipStatsRoutes");
+const environmentMiddleware = require("./middleware/environmentMiddleware");
 
 const { sequelize } = require("./config/database");
 const { globalRedis, watchlistRedis, regularRedis } = require("./config/redis");
@@ -26,6 +28,7 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static("public"));
+app.use(environmentMiddleware);
 
 sequelize
   .authenticate()
@@ -43,6 +46,7 @@ app.use("/api/madangles", madanglesRoutes);
 app.use("/api/scraped-brands", scrapedBrandsRoutes);
 app.use("/api/environment", environmentRoutes);
 app.use("/api/queue/settings", settingsRoutes);
+app.use("/api/ip-stats", ipStatsRoutes);
 
 
 const server = app.listen(PORT, () => {

@@ -32,6 +32,13 @@ const Settings = () => {
   // Local loading state for immediate feedback
   const [isTogglingEnvironment, setIsTogglingEnvironment] = useState(false);
 
+  // Read-only fields (visible but not editable)
+  const readOnlyFields = [
+    'MAX_CONCURRENCY',
+    'BRAND_PROCESSING_CONCURRENCY',
+    'TYPESENSE_PROCESS_CONCURRENCY'
+  ];
+
   // Field groups for organized display
   const fieldGroups = {
     'Processing and Holding Timing': [
@@ -83,7 +90,10 @@ const Settings = () => {
       const groupFields = fieldGroups[editingGroup];
       const newFormData = {};
       groupFields.forEach(key => {
-        newFormData[key] = '';
+        // Exclude read-only fields from form data
+        if (!readOnlyFields.includes(key)) {
+          newFormData[key] = '';
+        }
       });
       setFormData(newFormData);
       setErrors({});
@@ -152,9 +162,9 @@ const Settings = () => {
       const groupFields = fieldGroups[groupName];
       const updates = {};
 
-      // Get only non-empty values from form data
+      // Get only non-empty values from form data (excluding read-only fields)
       groupFields.forEach(key => {
-        if (formData[key] && formData[key].trim() !== '') {
+        if (!readOnlyFields.includes(key) && formData[key] && formData[key].trim() !== '') {
           updates[key] = formData[key];
         }
       });
@@ -339,23 +349,29 @@ const Settings = () => {
 
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-            {fields.map(key => (
-              <div key={key} className="space-y-1 sm:space-y-2">
-                <label className="block text-xs sm:text-sm font-medium text-gray-700">
-                  {key.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
-                </label>
-                {isEditing ? (
-                  <div className="space-y-1">
-                    {renderField(key)}
-                    {errors[key] && (
-                      <p className="text-xs sm:text-sm text-red-600">{errors[key]}</p>
+            {fields.map(key => {
+              const isReadOnly = readOnlyFields.includes(key);
+              return (
+                <div key={key} className="space-y-1 sm:space-y-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700">
+                    {key.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
+                    {isReadOnly && (
+                      <span className="ml-2 text-xs text-gray-500 italic">(Read-only)</span>
                     )}
-                  </div>
-                ) : (
-                  renderCurrentValue(key)
-                )}
-              </div>
-            ))}
+                  </label>
+                  {isEditing && !isReadOnly ? (
+                    <div className="space-y-1">
+                      {renderField(key)}
+                      {errors[key] && (
+                        <p className="text-xs sm:text-sm text-red-600">{errors[key]}</p>
+                      )}
+                    </div>
+                  ) : (
+                    renderCurrentValue(key)
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </Card>
@@ -383,7 +399,7 @@ const Settings = () => {
     <div className="space-y-4 sm:space-y-6 lg:space-y-8">
       {/* Header */}
       <div className="mb-4 sm:mb-6 lg:mb-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
           <div className="flex items-center space-x-4">
             <div>
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Settings</h1>
@@ -391,50 +407,56 @@ const Settings = () => {
             </div>
           </div>
 
-          <div className="flex items-center space-x-3">
-            {isAdmin ? (
-              <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-green-100 text-green-800 rounded-lg">
-                <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="text-xs sm:text-sm font-medium">Admin Mode</span>
-              </div>
-            ) : (
-              <button
-                onClick={onAdminLogin}
-                className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
-              >
-                <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="text-xs sm:text-sm font-medium">Admin Access Required</span>
-              </button>
-            )}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+            {/* Admin Badge - Full width on mobile */}
+            <div className="w-full sm:w-auto">
+              {isAdmin ? (
+                <div className="flex items-center justify-center sm:justify-start space-x-2 px-3 py-2 bg-green-100 text-green-800 rounded-lg">
+                  <Shield className="h-4 w-4" />
+                  <span className="text-sm font-medium">Admin Mode</span>
+                </div>
+              ) : (
+                <button
+                  onClick={onAdminLogin}
+                  className="flex items-center justify-center sm:justify-start space-x-2 px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors cursor-pointer w-full"
+                >
+                  <Shield className="h-4 w-4" />
+                  <span className="text-sm font-medium">Admin Access Required</span>
+                </button>
+              )}
+            </div>
 
-            <RefreshControl
-              isRefreshing={isRefreshing}
-              refreshInterval={refreshInterval}
-              onManualRefresh={handleRefresh}
-              onIntervalChange={setIntervalValue}
-            />
+            {/* Refresh Control - Full width on mobile */}
+            <div className="w-full sm:w-auto">
+              <RefreshControl
+                isRefreshing={isRefreshing}
+                refreshInterval={refreshInterval}
+                onManualRefresh={handleRefresh}
+                onIntervalChange={setIntervalValue}
+              />
+            </div>
           </div>
         </div>
       </div>
 
       {/* Environment Toggle */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-medium text-gray-900">Environment</h3>
-            <p className="text-sm text-gray-600 mt-1">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
+          <div className="flex-1">
+            <h3 className="text-base sm:text-lg font-medium text-gray-900">Environment</h3>
+            <p className="text-xs sm:text-sm text-gray-600 mt-1">
               Switch between Production and Stage environments
             </p>
           </div>
-          <div className="flex items-center space-x-3">
-            <span className="text-sm font-medium text-gray-700">Production</span>
+          <div className="flex items-center justify-end space-x-2 sm:space-x-3">
+            <span className="text-xs sm:text-sm font-medium text-gray-700">Production</span>
             <Toggle
               isOn={currentEnvironment === 'stage'}
               onToggle={isAdmin ? handleEnvironmentToggle : undefined}
               disabled={!isAdmin}
               size="md"
             />
-            <span className="text-sm font-medium text-gray-700">Stage</span>
+            <span className="text-xs sm:text-sm font-medium text-gray-700">Stage</span>
           </div>
         </div>
       </div>

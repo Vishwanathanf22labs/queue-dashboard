@@ -3,6 +3,7 @@ import { useEffect, lazy, Suspense } from 'react';
 import Layout from './components/layout/Layout';
 import LoadingSpinner from './components/ui/LoadingSpinner';
 import useAdminStore from './stores/adminStore';
+import useScrollToTop from './hooks/useScrollToTop';
 
 // Dynamic imports for better code splitting
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -13,6 +14,7 @@ const QueueManagement = lazy(() => import('./pages/QueueManagement'));
 const ScraperControlsPage = lazy(() => import('./pages/ScraperControls'));
 const PipelineStatusPage = lazy(() => import('./pages/PipelineStatusPage'));
 const Proxies = lazy(() => import('./pages/Proxies'));
+const IpStats = lazy(() => import('./pages/IpStats'));
 const ScrapedBrands = lazy(() => import('./pages/ScrapedBrands'));
 const WatchlistBrands = lazy(() => import('./pages/WatchlistBrands'));
 const WatchlistQueues = lazy(() => import('./pages/WatchlistQueues'));
@@ -33,6 +35,8 @@ function App() {
     }
   }, [location.pathname, checkAdminStatus]);
 
+  useScrollToTop();
+  
   return (
     <Layout>
       <Routes>
@@ -79,6 +83,11 @@ function App() {
         <Route path="/proxies" element={
           <Suspense fallback={<LoadingSpinner />}>
             <Proxies />
+          </Suspense>
+        } />
+        <Route path="/ip-stats" element={
+          <Suspense fallback={<LoadingSpinner />}>
+            <IpStats />
           </Suspense>
         } />
         <Route path="/scraped-brands" element={

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { navItems } from '../../constants/data';
+
 import Button from '../ui/Button';
 
 const Sidebar = () => {
@@ -84,7 +85,7 @@ const Sidebar = () => {
 
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-[9998] md:hidden touch-none"
+          className="fixed inset-0 bg-white bg-opacity-90 z-[9998] md:hidden touch-none"
           onClick={closeMobileMenu}
           style={{
             position: 'fixed',
@@ -102,7 +103,13 @@ const Sidebar = () => {
       <div className={`fixed left-0 bottom-0 top-0 min-h-screen w-64 bg-gray-900 shadow-lg z-[9999] transform transition-transform duration-300 ease-in-out flex flex-col ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}>
         <div className="flex items-center justify-center h-16 bg-gray-800 flex-shrink-0">
-          <h1 className="text-xl font-bold text-yellow-400">Queue Dashboard</h1>
+          <Link to="/" onClick={closeMobileMenu}>
+            <img 
+              src="./madAngleLogoUpdated.svg" 
+              alt="Madangles Dashboard" 
+              className="h-10 w-auto cursor-pointer hover:opacity-80 transition-opacity mt-3"
+            />
+          </Link>
         </div>
 
         <div

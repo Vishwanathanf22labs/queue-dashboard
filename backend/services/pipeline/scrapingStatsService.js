@@ -5,14 +5,15 @@ const { getCacheKey, getCachedData, setCachedData } = require("../utils/cacheUti
 /**
  * Get scraping statistics
  */
-async function getScrapingStats(date = null) {
+async function getScrapingStats(date = null, environment = 'production') {
   try {
     // Require models dynamically to get the latest version
-    const { Brand, BrandsDailyStatus } = require("../../models");
+    const { getModels } = require("../../models");
+    const { Brand, BrandsDailyStatus } = getModels(environment);
     
     const targetDate = date || new Date().toISOString().split("T")[0];
     const cacheKey = getCacheKey("stats", targetDate);
-    const cached = getCachedData(cacheKey);
+    const cached = await getCachedData(cacheKey, environment);
     if (cached) return cached;
 
     const totalBrands = await Brand.count({
@@ -173,7 +174,7 @@ async function getScrapingStats(date = null) {
       },
     };
 
-    setCachedData(cacheKey, result);
+    await setCachedData(cacheKey, result, 300, environment);
     return result;
   } catch (error) {
     console.error("Error getting scraping stats:", error);

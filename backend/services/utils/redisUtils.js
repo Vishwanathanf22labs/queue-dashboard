@@ -1,64 +1,18 @@
-const Redis = require("ioredis");
 const { getQueueRedis } = require("../../utils/redisSelector");
-const { getRedisConfig } = require("../../config/environmentConfig");
 
-// Connect to separate Redis instances for watchlist and regular Bull queues
-let watchlistRedis = null;
-let regularRedis = null;
+// Use the existing connection pool instead of creating new connections
+function getWatchlistRedis(environment = 'production') {
+  return getQueueRedis('watchlist', environment);
+}
 
-try {
-  // Get Redis configurations based on current environment
-  const watchlistRedisConfig = getRedisConfig('watchlist');
-  const regularRedisConfig = getRedisConfig('regular');
-
-  // Watchlist Redis connection
-  watchlistRedis = new Redis({
-    host: watchlistRedisConfig.host,
-    port: watchlistRedisConfig.port,
-    password: watchlistRedisConfig.password,
-    maxRetriesPerRequest: 3,
-    retryDelayOnFailover: 100,
-    enableReadyCheck: false,
-  });
-
-  watchlistRedis.on("error", (err) => {
-    console.warn("Watchlist Redis connection error:", err.message);
-    watchlistRedis = null;
-  });
-
-  watchlistRedis.on("connect", () => {
-    console.log("Watchlist Redis connected successfully");
-  });
-
-  // Regular Redis connection
-  regularRedis = new Redis({
-    host: regularRedisConfig.host,
-    port: regularRedisConfig.port,
-    password: regularRedisConfig.password,
-    maxRetriesPerRequest: 3,
-    retryDelayOnFailover: 100,
-    enableReadyCheck: false,
-  });
-
-  regularRedis.on("error", (err) => {
-    console.warn("Regular Redis connection error:", err.message);
-    regularRedis = null;
-  });
-
-  regularRedis.on("connect", () => {
-    console.log("Regular Redis connected successfully");
-  });
-} catch (error) {
-  console.warn("Failed to initialize Redis connections:", error.message);
-  watchlistRedis = null;
-  regularRedis = null;
+function getRegularRedis(environment = 'production') {
+  return getQueueRedis('regular', environment);
 }
 
 // Redis Bull queue data functions
-async function getTypesenseBullQueueData(queueType = 'regular') {
+async function getTypesenseBullQueueData(queueType = 'regular', environment = 'production') {
   try {
-    const redis = queueType === 'watchlist' ? watchlistRedis : regularRedis;
-    if (!redis) return new Map();
+    const redis = getQueueRedis(queueType, environment);
 
     // Get Ad Update Bull queue data (for Typesense indexing)
     const allQueueKeys = await redis.keys("bull:ad-update:*");
@@ -96,10 +50,9 @@ async function getTypesenseBullQueueData(queueType = 'regular') {
   }
 }
 
-async function getTypesenseFailedQueueData(queueType = 'regular') {
+async function getTypesenseFailedQueueData(queueType = 'regular', environment = 'production') {
   try {
-    const redis = queueType === 'watchlist' ? watchlistRedis : regularRedis;
-    if (!redis) return new Map();
+    const redis = getQueueRedis(queueType, environment);
 
     // Get Ad Update failed queue data
     const allFailedKeys = await redis.keys("bull:ad-update:failed:*");
@@ -137,10 +90,9 @@ async function getTypesenseFailedQueueData(queueType = 'regular') {
   }
 }
 
-async function getFileUploadBullQueueData(queueType = 'regular') {
+async function getFileUploadBullQueueData(queueType = 'regular', environment = 'production') {
   try {
-    const redis = queueType === 'watchlist' ? watchlistRedis : regularRedis;
-    if (!redis) return new Map();
+    const redis = getQueueRedis(queueType, environment);
 
     // Get brand processing Bull queue data (for file upload)
     const allQueueKeys = await redis.keys("bull:brand-processing:*");

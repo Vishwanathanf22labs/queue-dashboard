@@ -73,14 +73,18 @@ const ProcessingStatus = ({
 
   const nonWatchlistProcessingBrands = getNonWatchlistCurrentlyProcessing();
 
+  // Calculate total count (regular + watchlist currently processing)
+  const totalCurrentlyProcessingCount = currentlyProcessing ? 
+    (Array.isArray(currentlyProcessing) ? currentlyProcessing.length : 1) : 0;
+
   // Check if we should show waiting message (when scraper is running but no brand processing)
   // Show waiting when scraper is running and card is empty, regardless of queue count
   const shouldShowWaiting = scraperStatus === 'running' && (!currentlyProcessing || currentlyProcessing.length === 0);
 
   // Determine if status badge should be visible based on scraper status
   const shouldShowStatusBadge = () => {
-    // Hide badge only when status is cooldown(WL) 
-    if (scraperStatus === 'cooldown(WL)' || scraperStatus === 'cooldown (WL)') {
+    if (scraperStatus === 'cooldown(WL)' || scraperStatus === 'cooldown (WL)' || 
+        scraperStatus === 'stopped(cooldown WL)') {
       return false;
     }
     
@@ -114,7 +118,7 @@ const ProcessingStatus = ({
             {/* Header with count */}
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-gray-600">
-                {Array.isArray(currentlyProcessing) ? currentlyProcessing.length : 1} brand{(Array.isArray(currentlyProcessing) ? currentlyProcessing.length : 1) !== 1 ? 's' : ''} processing
+                {totalCurrentlyProcessingCount} brand{totalCurrentlyProcessingCount !== 1 ? 's' : ''} processing
               </span>
             </div>
 

@@ -6,14 +6,14 @@ const proxySwitch = require("./proxy/proxySwitchService");
 
 module.exports = {
   // CRUD Operations
-  addProxy: (ip, port, country, username, password, type, namespace, userAgent, viewport, version) => 
-    proxyCRUD.addProxy(ip, port, country, username, password, type, namespace, userAgent, viewport, version),
-  removeProxy: proxyCRUD.removeProxy,
-  updateProxy: proxyCRUD.updateProxy,
+  addProxy: (ip, port, country, username, password, type, namespace, userAgent, viewport, version, environment = 'production') => 
+    proxyCRUD.addProxy(ip, port, country, username, password, type, namespace, userAgent, viewport, version, environment),
+  removeProxy: (proxyKey, environment = 'production') => proxyCRUD.removeProxy(proxyKey, environment),
+  updateProxy: (proxyKey, updates, environment = 'production') => proxyCRUD.updateProxy(proxyKey, updates, environment),
   clearAllProxies: proxyCRUD.clearAllProxies,
   
   // Query Operations
-  getProxies: proxyQuery.getProxies,
+  getProxies: (page, limit, filter, search, environment = 'production') => proxyQuery.getProxies(page, limit, filter, search, environment),
   getAvailableProxies: proxyQuery.getAvailableProxies,
   getLastMonthProxies: proxyQuery.getLastMonthProxies,
   getNextProxy: proxyQuery.getNextProxy,
@@ -22,7 +22,7 @@ module.exports = {
   searchProxies: proxyQuery.searchProxies,
   
   // Health Operations
-  updateProxyStatus: proxyHealth.updateProxyStatus,
+  updateProxyStatus: (proxyKey, isWorking, environment = 'production') => proxyHealth.updateProxyStatus(proxyKey, isWorking, environment),
   checkProxyHealth: proxyHealth.checkProxyHealth,
   getSystemHealth: proxyHealth.getSystemHealth,
   bulkUpdateStatus: proxyHealth.bulkUpdateStatus,

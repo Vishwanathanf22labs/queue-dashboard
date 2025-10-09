@@ -121,7 +121,7 @@ async function addProxy(req, res) {
       });
     }
 
-    const result = await proxyManagementService.addProxy(ip, port, country, username, password, type, namespace, userAgent, viewport, version);
+    const result = await proxyManagementService.addProxy(ip, port, country, username, password, type, namespace, userAgent, viewport, version, req.environment);
     
     if (result.success) {
       res.status(201).json(result);
@@ -217,7 +217,7 @@ async function updateProxy(req, res) {
       userAgent,
       viewport,
       version
-    });
+    }, req.environment);
     
     if (result.success) {
       res.status(200).json(result);
@@ -247,7 +247,7 @@ async function removeProxy(req, res) {
       });
     }
 
-    const result = await proxyManagementService.removeProxy(proxyId);
+    const result = await proxyManagementService.removeProxy(proxyId, req.environment);
     
     if (result.success) {
       res.status(200).json(result);
@@ -296,7 +296,7 @@ async function getProxies(req, res) {
       });
     }
 
-    const result = await proxyManagementService.getProxies(page, limit, filter, search);
+    const result = await proxyManagementService.getProxies(page, limit, filter, search, req.environment);
     res.status(200).json(result);
 
   } catch (error) {
@@ -312,7 +312,7 @@ async function getProxies(req, res) {
 
 async function getProxyStats(req, res) {
   try {
-    const result = await proxyManagementService.getProxyStats();
+    const result = await proxyManagementService.getProxyStats(req.environment);
     res.status(200).json(result);
 
   } catch (error) {
@@ -327,7 +327,7 @@ async function getProxyStats(req, res) {
 
 async function getProxyManagementStats(req, res) {
   try {
-    const result = await proxyManagementService.getProxyManagementStats();
+    const result = await proxyManagementService.getProxyManagementStats(req.environment);
     res.status(200).json(result);
 
   } catch (error) {
@@ -381,7 +381,7 @@ async function updateProxyStatus(req, res) {
       });
     }
 
-    const result = await proxyManagementService.updateProxyStatus(proxyId, isWorking);
+    const result = await proxyManagementService.updateProxyStatus(proxyId, isWorking, req.environment);
     
     if (result.success) {
       res.status(200).json(result);

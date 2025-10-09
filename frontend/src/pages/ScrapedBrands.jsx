@@ -527,29 +527,34 @@ const ScrapedBrands = () => {
 
         {/* Sorting Buttons */}
         {!showSearchResults && (
-          <div className="mb-6 flex flex-wrap gap-2">
-            <span className="text-sm font-medium text-gray-700 self-center">Sort by:</span>
-            <SortButton
-              label="Normal"
-              sortBy="normal"
-              currentSortBy={sortBy}
-              currentSortOrder={sortOrder}
-              onSortChange={handleSortChange}
-            />
-            <SortButton
-              label="Active Ads"
-              sortBy="active_ads"
-              currentSortBy={sortBy}
-              currentSortOrder={sortOrder}
-              onSortChange={handleSortChange}
-            />
-            <SortButton
-              label="Inactive Ads"
-              sortBy="inactive_ads"
-              currentSortBy={sortBy}
-              currentSortOrder={sortOrder}
-              onSortChange={handleSortChange}
-            />
+          <div className="mb-6 flex flex-nowrap gap-1 overflow-x-auto">
+            <span className="text-xs font-medium text-gray-700 self-center flex-shrink-0 mr-1">Sort by:</span>
+            <div className="flex gap-1 flex-nowrap min-w-0">
+              <SortButton
+                label="Normal"
+                sortBy="normal"
+                currentSortBy={sortBy}
+                currentSortOrder={sortOrder}
+                onSortChange={handleSortChange}
+                className="text-xs px-1.5 py-1 whitespace-nowrap flex-shrink-0"
+              />
+              <SortButton
+                label="Active"
+                sortBy="active_ads"
+                currentSortBy={sortBy}
+                currentSortOrder={sortOrder}
+                onSortChange={handleSortChange}
+                className="text-xs px-1.5 py-1 whitespace-nowrap flex-shrink-0"
+              />
+              <SortButton
+                label="Inactive"
+                sortBy="inactive_ads"
+                currentSortBy={sortBy}
+                currentSortOrder={sortOrder}
+                onSortChange={handleSortChange}
+                className="text-xs px-1.5 py-1 whitespace-nowrap flex-shrink-0"
+              />
+            </div>
           </div>
         )}
 

@@ -388,6 +388,12 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
 
   return (
     <div className="space-y-6">
+      <div>
+        <h3 className="text-sm sm:text-base md:text-lg font-medium text-gray-900 mb-2">Initial Scraping</h3>
+        <p className="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">
+          Upload a CSV file with brand data to initiate initial scraping process and add scraped brands to the regular pending queue or watchlist pending queue
+        </p>
+      </div>
 
       {/* File Upload Area */}
       <div>

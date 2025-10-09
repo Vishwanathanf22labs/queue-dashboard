@@ -258,7 +258,7 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
   return (
     <div className="space-y-4 sm:space-y-6">
       <div>
-        <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">All Brands Scrapped Queue</h2>
+        <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">Regular Brands Scrapped Queue</h2>
       </div>
 
       {/* Stats Cards */}
@@ -412,48 +412,48 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
           <>
             {/* Mobile Sorting Controls */}
             <div className="md:hidden mb-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-medium text-gray-700">Sort by:</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => handleSortChange('normal', sortBy === 'normal' && sortOrder === 'desc' ? 'asc' : 'desc')}
-                  className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    sortBy === 'normal' 
-                      ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  <ChevronUp className={`h-3 w-3 ${sortBy === 'normal' && sortOrder === 'asc' ? 'text-blue-600' : 'text-gray-400'}`} />
-                  <ChevronDown className={`h-3 w-3 -mt-1 ${sortBy === 'normal' && sortOrder === 'desc' ? 'text-blue-600' : 'text-gray-400'}`} />
-                  <span>Normal</span>
-                </button>
-                
-                <button
-                  onClick={() => handleSortChange('total_ads', sortBy === 'total_ads' && sortOrder === 'desc' ? 'asc' : 'desc')}
-                  className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    sortBy === 'total_ads' 
-                      ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  <ChevronUp className={`h-3 w-3 ${sortBy === 'total_ads' && sortOrder === 'asc' ? 'text-blue-600' : 'text-gray-400'}`} />
-                  <ChevronDown className={`h-3 w-3 -mt-1 ${sortBy === 'total_ads' && sortOrder === 'desc' ? 'text-blue-600' : 'text-gray-400'}`} />
-                  <span>Ads Count</span>
-                </button>
-                
-                <button
-                  onClick={() => handleSortChange('created_at', sortBy === 'created_at' && sortOrder === 'desc' ? 'asc' : 'desc')}
-                  className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    sortBy === 'created_at' 
-                      ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  <ChevronUp className={`h-3 w-3 ${sortBy === 'created_at' && sortOrder === 'asc' ? 'text-blue-600' : 'text-gray-400'}`} />
-                  <ChevronDown className={`h-3 w-3 -mt-1 ${sortBy === 'created_at' && sortOrder === 'desc' ? 'text-blue-600' : 'text-gray-400'}`} />
-                  <span>Created Date</span>
-                </button>
+              <div className="flex flex-nowrap gap-1 overflow-x-auto">
+                <span className="text-xs font-medium text-gray-700 self-center flex-shrink-0 mr-1">Sort by:</span>
+                <div className="flex gap-0.5 flex-nowrap min-w-0">
+                  <button
+                    onClick={() => handleSortChange('normal', sortBy === 'normal' && sortOrder === 'desc' ? 'asc' : 'desc')}
+                    className={`flex items-center space-x-0.5 px-1.5 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
+                      sortBy === 'normal' 
+                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <ChevronUp className={`h-2 w-2 ${sortBy === 'normal' && sortOrder === 'asc' ? 'text-blue-600' : 'text-gray-400'}`} />
+                    <ChevronDown className={`h-2 w-2 -mt-1 ${sortBy === 'normal' && sortOrder === 'desc' ? 'text-blue-600' : 'text-gray-400'}`} />
+                    <span>Normal</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => handleSortChange('total_ads', sortBy === 'total_ads' && sortOrder === 'desc' ? 'asc' : 'desc')}
+                    className={`flex items-center space-x-0.5 px-1.5 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
+                      sortBy === 'total_ads' 
+                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <ChevronUp className={`h-2 w-2 ${sortBy === 'total_ads' && sortOrder === 'asc' ? 'text-blue-600' : 'text-gray-400'}`} />
+                    <ChevronDown className={`h-2 w-2 -mt-1 ${sortBy === 'total_ads' && sortOrder === 'desc' ? 'text-blue-600' : 'text-gray-400'}`} />
+                    <span>Ads Count</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => handleSortChange('created_at', sortBy === 'created_at' && sortOrder === 'desc' ? 'asc' : 'desc')}
+                    className={`flex items-center space-x-0.5 px-1.5 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
+                      sortBy === 'created_at' 
+                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <ChevronUp className={`h-2 w-2 ${sortBy === 'created_at' && sortOrder === 'asc' ? 'text-blue-600' : 'text-gray-400'}`} />
+                    <ChevronDown className={`h-2 w-2 -mt-1 ${sortBy === 'created_at' && sortOrder === 'desc' ? 'text-blue-600' : 'text-gray-400'}`} />
+                    <span>Created Date</span>
+                  </button>
+                </div>
               </div>
             </div>
 

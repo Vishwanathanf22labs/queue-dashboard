@@ -219,12 +219,18 @@ const WatchlistQueues = () => {
        render: (value, row) => {
          const brandName = value || row.brand_name || row.name || row.brandName || 'Unknown Brand';
          const pageId = row.page_id || 'N/A';
+         const score = row.score || 'N/A';
          return (
            <div className="flex items-center">
              <Users className="hidden sm:block h-4 w-4 text-gray-400 mr-2" />
              <div className="flex items-center space-x-2 flex-1">
                <div className="text-xs font-medium text-gray-900 max-w-[80px] sm:max-w-none truncate">
-                 {brandName}
+                 <span title={`Score: ${score}`}>
+                   {brandName}
+                   {score !== 'N/A' && (
+                     <span className="text-gray-400 font-medium ml-1">({score})</span>
+                   )}
+                 </span>
                </div>
                {pageId && pageId !== 'N/A' && (
                  <button
@@ -853,31 +859,42 @@ const WatchlistQueues = () => {
           <p className="text-sm text-gray-600">Manage watchlist pending and failed brands</p>
         </div>
         
-        <div className="flex items-center space-x-3">
-          {activeTab === 'failed' && !isAdmin && (reenqueuePagination.total_items || 0) > 0 ? (
-            <button
-              onClick={onAdminLogin}
-              className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
-            >
-              <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="text-xs sm:text-sm font-medium">Admin Access Required</span>
-            </button>
-          ) : activeTab === 'failed' && isAdmin && (reenqueuePagination.total_items || 0) > 0 ? (
-            <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-green-100 text-green-800 rounded-lg">
-              <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="text-xs sm:text-sm font-medium">Admin Mode</span>
-            </div>
-          ) : null}
+        <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-3">
+          {activeTab === 'failed' && (
+            <>
+              {isAdmin ? (
+                <div className="flex items-center justify-center space-x-2 px-3 py-2 bg-green-100 text-green-800 rounded-lg">
+                  <Shield className="h-4 w-4" />
+                  <span className="text-sm font-medium">Admin Mode</span>
+                </div>
+              ) : (
+                <button
+                  onClick={onAdminLogin}
+                  className="flex items-center justify-center space-x-2 px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
+                >
+                  <Shield className="h-4 w-4" />
+                  <span className="text-sm font-medium">Admin Access Required</span>
+                </button>
+              )}
+            </>
+          )}
+
+          <RefreshControl
+            isRefreshing={isRefreshing}
+            refreshInterval={refreshInterval}
+            onManualRefresh={handleRefresh}
+            onIntervalChange={setIntervalValue}
+          />
         </div>
       </div>
 
       {/* Tabs */}
       <Card>
         <div className="flex items-center justify-between">
-          <div className="flex space-x-1">
+          <div className="flex space-x-3">
             <button
               onClick={() => handleTabChange('pending')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === 'pending'
                   ? 'bg-purple-100 text-purple-700 border border-purple-200'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -887,41 +904,16 @@ const WatchlistQueues = () => {
             </button>
             <button
               onClick={() => handleTabChange('failed')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === 'failed'
                   ? 'bg-orange-100 text-orange-700 border border-orange-200'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
-              <XCircle className="h-4 w-4" />
               Failed Queue
             </button>
           </div>
           
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-600">Items per page:</span>
-              <CustomDropdown
-                options={[
-                  { value: 10, label: '10' },
-                  { value: 25, label: '25' },
-                  { value: 50, label: '50' },
-                  { value: 100, label: '100' }
-                ]}
-                value={itemsPerPage}
-                onChange={handleItemsPerPageChange}
-                placeholder="Select items per page"
-                className="w-20"
-              />
-            </div>
-            
-            <RefreshControl
-              isRefreshing={isRefreshing}
-              refreshInterval={refreshInterval}
-              onManualRefresh={handleRefresh}
-              onIntervalChange={setIntervalValue}
-            />
-          </div>
         </div>
       </Card>
 
@@ -937,17 +929,10 @@ const WatchlistQueues = () => {
       </div>
 
       {/* Tab-specific Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className={`rounded-lg p-3 text-center ${activeTab === 'pending' ? 'bg-purple-100' : 'bg-red-100'}`}>
-          <div className="flex items-center justify-center gap-2 mb-1">
-            {activeTab === 'pending' ? (
-              <Clock className="h-4 w-4 text-purple-700" />
-            ) : (
-              <XCircle className="h-4 w-4 text-red-700" />
-            )}
-            <span className="text-sm font-medium text-gray-700">
-              Total {activeTab === 'pending' ? 'Pending' : 'Failed'} Brands
-            </span>
+          <div className="text-sm font-medium text-gray-700 mb-1">
+            Total {activeTab === 'pending' ? 'Pending' : 'Failed'} Brands
           </div>
           <div className={`text-lg font-semibold ${activeTab === 'pending' ? 'text-purple-700' : 'text-red-700'}`}>
             {originalTotals.total_items || pagination?.total_items || 0}
@@ -991,6 +976,22 @@ const WatchlistQueues = () => {
                 total: originalTotals.total_items || pagination?.total_items || 0,
                 showing: brands?.length || 0
               }}
+            />
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-600">Items per page:</span>
+            <CustomDropdown
+              options={[
+                { value: 10, label: '10' },
+                { value: 25, label: '25' },
+                { value: 50, label: '50' },
+                { value: 100, label: '100' }
+              ]}
+              value={itemsPerPage}
+              onChange={handleItemsPerPageChange}
+              placeholder="Select items per page"
+              className="w-20"
             />
           </div>
         </div>
@@ -1055,6 +1056,7 @@ const WatchlistQueues = () => {
              const brandName = brand.brand_name || brand.name || brand.brandName || 'Unknown Brand';
              const brandId = brand.brand_id || brand.id || brand.queue_id || brand.brandId || 'N/A';
              const pageId = brand.page_id || brand.pageId || 'N/A';
+             const score = brand.score || 'N/A';
              const isPending = activeTab === 'pending';
 
              return (
@@ -1069,7 +1071,12 @@ const WatchlistQueues = () => {
                            {position}
                          </span>
                        </div>
-                       <h3 className="font-semibold text-gray-900 text-lg">{brandName}</h3>
+                       <h3 className="font-semibold text-gray-900 text-lg" title={`Score: ${score}`}>
+                         {brandName}
+                         {score !== 'N/A' && (
+                           <span className="text-gray-400 font-medium ml-1">({score})</span>
+                         )}
+                       </h3>
                      </div>
                      <div className="flex items-center space-x-2">
                        <Badge variant={isPending ? "info" : "error"}>
@@ -1183,39 +1190,44 @@ const WatchlistQueues = () => {
        {activeTab === 'failed' && reenqueueItems && reenqueueItems.length > 0 && (
          <>
            <Card id="reenqueue-table-section" className="mt-6 mb-4">
-             <div className="mb-4 flex items-center justify-between">
-               <div>
-                 <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                   <AlertCircle className="h-5 w-5 text-orange-600" />
-                   Reenqueue List ({reenqueuePagination.total_items || 0})
-                 </h2>
-                 <p className="text-sm text-gray-600 mt-1">
-                   Brands waiting to be requeued for processing
-                 </p>
-               </div>
-               <div className="flex items-center gap-3">
-                 <Button
-                   onClick={handleRequeueAll}
-                   disabled={!isAdmin}
-                   size="md"
-                   variant="primary"
-                   className="flex items-center gap-2 px-4 py-2 font-medium"
-                   title={!isAdmin ? 'Admin access required' : 'Requeue all brands'}
-                 >
-                   <RotateCcw className="h-4 w-4" />
-                   Requeue All
-                 </Button>
-                 <Button
-                   onClick={handleDeleteAllClick}
-                   disabled={!isAdmin}
-                   size="md"
-                   variant="danger"
-                   className="flex items-center gap-2 px-4 py-2 font-medium"
-                   title={!isAdmin ? 'Admin access required' : 'Delete all brands'}
-                 >
-                   <Trash2 className="h-4 w-4" />
-                   Delete All
-                 </Button>
+             <div className="mb-4">
+               {/* Header Section */}
+               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
+                 <div className="flex-1">
+                   <h2 className="text-base sm:text-lg font-semibold text-gray-900 flex items-center gap-2">
+                     <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
+                     Reenqueue List ({reenqueuePagination.total_items || 0})
+                   </h2>
+                   <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                     Brands waiting to be requeued for processing
+                   </p>
+                 </div>
+                 
+                 {/* Action Buttons */}
+                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                   <Button
+                     onClick={handleRequeueAll}
+                     disabled={!isAdmin}
+                     size="sm"
+                     variant="primary"
+                     className="flex items-center justify-center gap-2 px-3 py-2 text-xs sm:text-sm font-medium w-full sm:w-auto"
+                     title={!isAdmin ? 'Admin access required' : 'Requeue all brands'}
+                   >
+                     <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4" />
+                     Requeue All
+                   </Button>
+                   <Button
+                     onClick={handleDeleteAllClick}
+                     disabled={!isAdmin}
+                     size="sm"
+                     variant="danger"
+                     className="flex items-center justify-center gap-2 px-3 py-2 text-xs sm:text-sm font-medium w-full sm:w-auto"
+                     title={!isAdmin ? 'Admin access required' : 'Delete all brands'}
+                   >
+                     <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                     Delete All
+                   </Button>
+                 </div>
                </div>
              </div>
              {reenqueueLoading && reenqueueItems.length === 0 ? (
@@ -1224,12 +1236,120 @@ const WatchlistQueues = () => {
                  <p className="text-sm text-gray-500 mt-2">Loading reenqueue data...</p>
                </div>
              ) : (
-               <Table
-                 data={reenqueueItems}
-                 columns={reenqueueColumns}
-                 emptyMessage="No items in reenqueue list"
-                 className="shadow-md rounded-lg"
-               />
+               <>
+                 {/* Desktop Table View */}
+                 <div className="hidden md:block">
+                   <Table
+                     data={reenqueueItems}
+                     columns={reenqueueColumns}
+                     emptyMessage="No items in reenqueue list"
+                     className="shadow-md rounded-lg"
+                   />
+                 </div>
+
+                 {/* Mobile Cards View */}
+                 <div className="md:hidden space-y-3">
+                   {reenqueueItems && reenqueueItems.length > 0 ? (
+                     reenqueueItems.map((item, index) => {
+                       const position = (reenqueueCurrentPage - 1) * reenqueueItemsPerPage + index + 1;
+                       const brandName = item.brand_name || 'Unknown Brand';
+                       const brandId = item.id || 'N/A';
+                       const pageId = item.page_id || 'N/A';
+                       const coverage = item.coverage || 'N/A';
+
+                       return (
+                         <Card key={`${brandId}-${index}`} className="p-4 relative pb-16">
+                           <div className="space-y-3">
+                             {/* Header with Brand Name and Position */}
+                             <div className="flex items-start justify-between">
+                               <div className="flex-1 pr-3">
+                                 <div className="flex items-center space-x-2 mb-1">
+                                   <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                     <span className="text-xs font-medium text-purple-600">
+                                       {position}
+                                     </span>
+                                   </div>
+                                   <h3 className="font-semibold text-gray-900 text-base sm:text-lg leading-tight">
+                                     {brandName}
+                                   </h3>
+                                 </div>
+                               </div>
+                               <div className="text-right flex-shrink-0">
+                                 <div className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md">
+                                   <div className="text-sm font-bold">{coverage}</div>
+                                   <div className="text-xs text-blue-600">Coverage</div>
+                                 </div>
+                               </div>
+                             </div>
+
+                             {/* Details Grid */}
+                             <div className="grid grid-cols-2 gap-4 text-sm">
+                               <div>
+                                 <span className="text-gray-500">Brand ID:</span>
+                                 <span className="ml-2 font-medium text-gray-900">{brandId}</span>
+                               </div>
+                               <div>
+                                 <span className="text-gray-500">Page ID:</span>
+                                 <span className="ml-2 font-medium text-gray-900">{pageId}</span>
+                               </div>
+                             </div>
+
+                             {/* External Link Icon - Bottom Right */}
+                             {pageId && pageId !== 'N/A' && (
+                               <button
+                                 onClick={() => {
+                                   const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id=${pageId}`;
+                                   window.open(url, '_blank', 'noopener,noreferrer');
+                                 }}
+                                 className="absolute bottom-3 right-3 p-1.5 text-gray-400 hover:text-blue-600 transition-colors bg-white rounded-full shadow-sm border border-gray-200"
+                                 title="View in Facebook Ad Library"
+                               >
+                                 <ExternalLink className="h-3 w-3" />
+                               </button>
+                             )}
+
+                             {/* Action Buttons - Bottom Left */}
+                             <div className="absolute bottom-3 left-3 flex items-center gap-2">
+                               <Button
+                                 onClick={() => handleRequeueSingle(item.id)}
+                                 disabled={!isAdmin}
+                                 size="sm"
+                                 variant="success"
+                                 className="px-3 py-1.5 text-xs font-medium rounded-md hover:bg-green-600 transition-colors"
+                                 title={!isAdmin ? 'Admin access required' : 'Requeue to Watchlist Pending'}
+                               >
+                                 <RotateCcw className="h-3 w-3 mr-1" />
+                                 Requeue
+                               </Button>
+                               <Button
+                                 onClick={() => handleDeleteSingle(item.id)}
+                                 disabled={!isAdmin}
+                                 size="sm"
+                                 variant="danger"
+                                 className="px-3 py-1.5 text-xs font-medium rounded-md hover:bg-red-600 transition-colors"
+                                 title={!isAdmin ? 'Admin access required' : 'Delete from List'}
+                               >
+                                 <Trash2 className="h-3 w-3 mr-1" />
+                                 Delete
+                               </Button>
+                             </div>
+                           </div>
+                         </Card>
+                       );
+                     })
+                   ) : (
+                     <div className="text-center py-6 sm:py-8">
+                       <AlertCircle className="h-8 w-8 sm:h-12 sm:w-12 text-gray-300 mx-auto mb-2 sm:mb-3" />
+                       <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">
+                         No items in reenqueue list
+                       </h3>
+                       <p className="text-sm sm:text-base text-gray-500">
+                         All watchlist brands have been processed or requeued
+                       </p>
+                     </div>
+                   )}
+                 </div>
+               </>
              )}
            </Card>
 

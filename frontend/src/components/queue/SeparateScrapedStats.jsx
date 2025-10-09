@@ -36,6 +36,24 @@ const SeparateScrapedStats = () => {
 
   const watchlistStats = separateScrapedStats?.watchlist || [];
   const regularStats = separateScrapedStats?.regular || [];
+  const getCurrentDateTotals = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const todayWatchlistStats = watchlistStats.find(stat => stat.date === today);
+    const todayRegularStats = regularStats.find(stat => stat.date === today);
+    const totalBrandsScraped = (todayWatchlistStats?.brands_scraped || 0) + (todayRegularStats?.brands_scraped || 0);
+    const totalBrandsProcessed = (todayWatchlistStats?.brands_processed || 0) + (todayRegularStats?.brands_processed || 0);
+    const totalFailed = (todayWatchlistStats?.brands_scrapped_failed || 0) + (todayRegularStats?.brands_scrapped_failed || 0);
+    const totalAdsProcessed = (todayWatchlistStats?.ads_processed || 0) + (todayRegularStats?.ads_processed || 0);
+    
+    return {
+      brandsScraped: totalBrandsScraped,
+      brandsProcessed: totalBrandsProcessed,
+      failed: totalFailed,
+      adsProcessed: totalAdsProcessed
+    };
+  };
+
+  const currentDateTotals = getCurrentDateTotals();
 
   const columns = [
     {
@@ -166,6 +184,60 @@ const SeparateScrapedStats = () => {
           />
         </div>
       </div>
+
+      <Card>
+        <div className="p-4 sm:p-6">
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">Today's Summary</h3>
+            <p className="text-sm text-gray-600">
+              Combined totals for {new Date().toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="text-center p-4 bg-purple-50 rounded-lg border border-purple-200">
+              <div className="text-2xl sm:text-3xl font-bold text-purple-600 mb-1">
+                {currentDateTotals.brandsScraped}
+              </div>
+              <div className="text-xs sm:text-sm text-purple-700 font-medium">
+                Total Brands Scraped
+              </div>
+            </div>
+            
+            <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
+              <div className="text-2xl sm:text-3xl font-bold text-green-600 mb-1">
+                {currentDateTotals.brandsProcessed}
+              </div>
+              <div className="text-xs sm:text-sm text-green-700 font-medium">
+                Total Brands Processed
+              </div>
+            </div>
+            
+            <div className="text-center p-4 bg-red-50 rounded-lg border border-red-200">
+              <div className="text-2xl sm:text-3xl font-bold text-red-600 mb-1">
+                {currentDateTotals.failed}
+              </div>
+              <div className="text-xs sm:text-sm text-red-700 font-medium">
+                Total Failed
+              </div>
+            </div>
+            
+            <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="text-2xl sm:text-3xl font-bold text-blue-600 mb-1">
+                {currentDateTotals.adsProcessed}
+              </div>
+              <div className="text-xs sm:text-sm text-blue-700 font-medium">
+                Total Ads Processed
+              </div>
+            </div>
+          </div>
+        </div>
+      </Card>
 
       {separateScrapedStatsLoading ? (
         <Card>

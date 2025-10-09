@@ -9,10 +9,10 @@ async function getConfigSettings(req, res) {
   try {
     logger.info("Getting config settings from Redis");
 
-    const redis = getGlobalRedis();
+    const redis = getGlobalRedis(req.environment);
     
     // Get all config values from Redis hash
-    const configData = await redis.hgetall('config');
+    const configData = await redis.hgetall('metadata');
     
     // Get allowed keys for frontend
     const allowedKeys = getAllowedConfigKeys();
@@ -61,12 +61,12 @@ async function updateConfigSettings(req, res) {
       });
     }
 
-    const redis = getGlobalRedis();
+    const redis = getGlobalRedis(req.environment);
     
     // Update each key-value pair in Redis
     const updateResults = {};
     for (const [key, value] of Object.entries(updates)) {
-      await redis.hset('config', key, value);
+      await redis.hset('metadata', key, value);
       updateResults[key] = value;
     }
 

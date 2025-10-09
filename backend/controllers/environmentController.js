@@ -9,13 +9,12 @@ const { reinitializeDatabase } = require("../config/database");
 const { reinitializeModels } = require("../models");
 const { reinitializeRedis } = require("../config/redis");
 
-/**
- * Get current environment information
- */
+
 const getCurrentEnvironmentInfo = async (req, res) => {
   try {
-    const currentEnv = getCurrentEnvironment();
-    const config = getCurrentConfig();
+
+    const currentEnv = req.environment || 'production';
+    const config = require("../config/environmentConfig").getConfig(currentEnv);
     const availableEnvs = getAvailableEnvironments();
 
     res.json({
@@ -23,6 +22,7 @@ const getCurrentEnvironmentInfo = async (req, res) => {
       data: {
         currentEnvironment: currentEnv,
         availableEnvironments: availableEnvs,
+        multiEnvironmentEnabled: true,
         config: {
           database: {
             host: config.DB_HOST,
@@ -68,9 +68,7 @@ const getCurrentEnvironmentInfo = async (req, res) => {
   }
 };
 
-/**
- * Switch to a different environment
- */
+
 const switchEnvironment = async (req, res) => {
   try {
     const { environment } = req.body;
@@ -90,136 +88,56 @@ const switchEnvironment = async (req, res) => {
       });
     }
 
-    const currentEnv = getCurrentEnvironment();
-    if (environment === currentEnv) {
-      return res.json({
-        success: true,
-        message: `Already using ${environment} environment`,
-        data: { currentEnvironment: environment }
-      });
-    }
+   
+    const config = require("../config/environmentConfig").getConfig(environment);
 
-    // Switch environment
-    setCurrentEnvironment(environment);
-    
-    // Reinitialize database connection with new environment settings
-    try {
-      await reinitializeDatabase();
-      logger.info(`Database reconnected for environment: ${environment}`);
-      
-      // Reinitialize models with new database connection
-      await reinitializeModels();
-      logger.info(`Models reinitialized for environment: ${environment}`);
-    } catch (dbError) {
-      logger.error(`Failed to reconnect database for environment ${environment}:`, dbError);
-      // Continue with the switch even if database reconnection fails
-    }
-    
-    // Reinitialize Redis connections with new environment settings
-    try {
-      await reinitializeRedis();
-      logger.info(`Redis connections reinitialized for environment: ${environment}`);
-    } catch (redisError) {
-      logger.error(`Failed to reconnect Redis for environment ${environment}:`, redisError);
-      // Continue with the switch even if Redis reconnection fails
-    }
-    
-    // Clear all service caches to ensure fresh data from new environment
-    try {
-      const { clearAllCaches: clearQueueProcessingCaches } = require("../services/queueProcessingService");
-      const { clearAllCaches: clearQueueOverviewCaches } = require("../services/queueOverviewService");
-      const { reinitializeCacheRedisClient } = require("../services/utils/cacheUtils");
-      
-      clearQueueProcessingCaches();
-      clearQueueOverviewCaches();
-      reinitializeCacheRedisClient();
-      
-      // Clear ad update processing service cache
-      try {
-        const { clearAdUpdateCache } = require("../services/adUpdateProcessingService");
-        clearAdUpdateCache();
-        logger.info(`Ad update processing cache cleared for environment: ${environment}`);
-      } catch (adUpdateError) {
-        logger.warn(`Failed to clear ad update processing cache:`, adUpdateError.message);
-      }
-      
-      logger.info(`All service caches cleared for environment: ${environment}`);
-    } catch (cacheError) {
-      logger.error(`Failed to clear service caches for environment ${environment}:`, cacheError);
-      // Continue with the switch even if cache clearing fails
-    }
-    
-    // Wait a moment for everything to be ready
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const newConfig = getCurrentConfig();
-
-    logger.info(`Environment switched from ${currentEnv} to ${environment}`);
-
-    // Test database connection with new environment
-    let dbTestResult = null;
-    try {
-      const { Brand } = require("../models");
-      const activeBrandsCount = await Brand.count({ where: { status: "Active" } });
-      const totalBrandsCount = await Brand.count();
-      dbTestResult = { 
-        activeBrandsCount, 
-        totalBrandsCount,
-        success: true 
-      };
-      logger.info(`Database test successful - Active brands: ${activeBrandsCount}, Total brands: ${totalBrandsCount}`);
-    } catch (testError) {
-      logger.error("Database test failed:", testError);
-      dbTestResult = { error: testError.message, success: false };
-    }
+    logger.info(`Environment switch requested to ${environment} (client-side only)`);
 
     res.json({
       success: true,
-      message: `Successfully switched to ${environment} environment`,
+      message: `Environment selection confirmed: ${environment}. This is now a per-user setting.`,
       data: {
-        previousEnvironment: currentEnv,
         currentEnvironment: environment,
-        dbTest: dbTestResult,
         config: {
           database: {
-            host: newConfig.DB_HOST,
-            port: newConfig.DB_PORT,
-            name: newConfig.DB_NAME
+            host: config.DB_HOST,
+            port: config.DB_PORT,
+            name: config.DB_NAME
           },
           redis: {
             global: {
-              host: newConfig.REDIS_HOST,
-              port: newConfig.REDIS_PORT
+              host: config.REDIS_HOST,
+              port: config.REDIS_PORT
             },
             watchlist: {
-              host: newConfig.WATCHLIST_REDIS_QUEUE_HOST,
-              port: newConfig.WATCHLIST_REDIS_QUEUE_PORT
+              host: config.WATCHLIST_REDIS_QUEUE_HOST,
+              port: config.WATCHLIST_REDIS_QUEUE_PORT
             },
             regular: {
-              host: newConfig.REGULAR_REDIS_QUEUE_HOST,
-              port: newConfig.REGULAR_REDIS_QUEUE_PORT
+              host: config.REGULAR_REDIS_QUEUE_HOST,
+              port: config.REGULAR_REDIS_QUEUE_PORT
             },
             cache: {
-              host: newConfig.CACHE_REDIS_HOST,
-              port: newConfig.CACHE_REDIS_PORT
+              host: config.CACHE_REDIS_HOST,
+              port: config.CACHE_REDIS_PORT
             }
           },
           queues: {
-            pending: newConfig.PENDING_BRANDS_QUEUE,
-            failed: newConfig.FAILED_BRANDS_QUEUE,
-            processing: newConfig.CURRENTLY_PROCESSING
+            pending: config.PENDING_BRANDS_QUEUE,
+            failed: config.FAILED_BRANDS_QUEUE,
+            processing: config.CURRENTLY_PROCESSING
           },
           scraper: {
-            url: newConfig.MADANGLES_SCRAPER_URL
+            url: config.MADANGLES_SCRAPER_URL
           }
         }
       }
     });
   } catch (error) {
-    logger.error("Error switching environment:", error);
+    logger.error("Error in switchEnvironment:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to switch environment",
+      message: "Failed to process environment switch",
       error: error.message
     });
   }

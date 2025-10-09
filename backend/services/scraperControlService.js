@@ -7,17 +7,17 @@ function getRedisKeys() {
   return require("../config/constants").REDIS_KEYS;
 }
 
-async function getScraperStatus() {
+async function getScraperStatus(environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys();
     
     
     // First check the manual scraper status from Redis
-    const manualStatus = await getGlobalRedis().get(REDIS_KEYS.GLOBAL.SCRAPER_STATUS);
+    const manualStatus = await getGlobalRedis(environment).get(REDIS_KEYS.GLOBAL.SCRAPER_STATUS);
     
     // Get start and stop times from Redis
-    const startTime = await getGlobalRedis().get(REDIS_KEYS.GLOBAL.SCRAPER_START_TIME);
-    const stopTime = await getGlobalRedis().get(REDIS_KEYS.GLOBAL.SCRAPER_STOP_TIME);
+    const startTime = await getGlobalRedis(environment).get(REDIS_KEYS.GLOBAL.SCRAPER_START_TIME);
+    const stopTime = await getGlobalRedis(environment).get(REDIS_KEYS.GLOBAL.SCRAPER_STOP_TIME);
     
     
     if (manualStatus) {
@@ -29,7 +29,7 @@ async function getScraperStatus() {
     }
     
     // If no manual status, check if there are any brands currently processing
-    const currentlyProcessingBrands = await getGlobalRedis().lrange(REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING, 0, -1);
+    const currentlyProcessingBrands = await getGlobalRedis(environment).lrange(REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING, 0, -1);
     
     let status = 'stopped'; // Default to stopped to match your scraper logic
     // Preserve the original stop time from Redis - don't overwrite it
@@ -102,13 +102,13 @@ async function getScraperStatus() {
   }
 }
 
-async function startScraper() {
+async function startScraper(environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys();
     
     
     // Check if scraper is already running
-    const currentStatus = await getScraperStatus();
+    const currentStatus = await getScraperStatus(environment);
     
     if (currentStatus.status === 'running') {
       return {
@@ -125,8 +125,8 @@ async function startScraper() {
     
     // Set scraper status to running and store start time in Redis
     await Promise.all([
-      getGlobalRedis().set(REDIS_KEYS.GLOBAL.SCRAPER_STATUS, 'running'),
-      getGlobalRedis().set(REDIS_KEYS.GLOBAL.SCRAPER_START_TIME, currentTime)
+      getGlobalRedis(environment).set(REDIS_KEYS.GLOBAL.SCRAPER_STATUS, 'running'),
+      getGlobalRedis(environment).set(REDIS_KEYS.GLOBAL.SCRAPER_START_TIME, currentTime)
     ]);
     
     // Keep the previous stop time (don't delete it)
@@ -152,13 +152,13 @@ async function startScraper() {
   }
 }
 
-async function stopScraper() {
+async function stopScraper(environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys();
     
     
     // Check if scraper is running
-    const currentStatus = await getScraperStatus();
+    const currentStatus = await getScraperStatus(environment);
     
     if (currentStatus.status === 'stopped' || currentStatus.status === 'not_running') {
       return {
@@ -175,12 +175,12 @@ async function stopScraper() {
     
     // Set scraper status to stopped and store stop time in Redis
     await Promise.all([
-      getGlobalRedis().set(REDIS_KEYS.GLOBAL.SCRAPER_STATUS, 'stopped'),
-      getGlobalRedis().set(REDIS_KEYS.GLOBAL.SCRAPER_STOP_TIME, currentTime)
+      getGlobalRedis(environment).set(REDIS_KEYS.GLOBAL.SCRAPER_STATUS, 'stopped'),
+      getGlobalRedis(environment).set(REDIS_KEYS.GLOBAL.SCRAPER_STOP_TIME, currentTime)
     ]);
     
     // Optionally, you can also clear the currently processing queue
-    // await getGlobalRedis().del(REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING);
+    // await getGlobalRedis(environment).del(REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING);
     
     logger.info('Scraper stopped successfully');
     const result = {
@@ -203,19 +203,20 @@ async function stopScraper() {
   }
 }
 
+async function getBrandTiming(environment = 'production') {
+  try {
+    // Read all fields from the brand_timing hash (strings returned)
+    const data = await getGlobalRedis(environment).hgetall('brand_timing');
+    return data || {};
+  } catch (error) {
+    logger.error('Error fetching brand_timing hash:', error);
+    return {};
+  }
+}
+
 module.exports = {
   getScraperStatus,
   startScraper,
   stopScraper,
-  // Read-only helper to fetch brand timing hash from Redis
-  async getBrandTiming() {
-    try {
-      // Read all fields from the brand_timing hash (strings returned)
-      const data = await getGlobalRedis().hgetall('brand_timing');
-      return data || {};
-    } catch (error) {
-      logger.error('Error fetching brand_timing hash:', error);
-      return {};
-    }
-  }
+  getBrandTiming
 };

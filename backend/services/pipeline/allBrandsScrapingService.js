@@ -16,22 +16,23 @@ const pLimit = require('p-limit').default;
 /**
  * Get brand IDs for a page - OPTIMIZED with cursor-based pagination
  */
-async function getBrandIdsForPage(page, perPage, lastId, date, sortBy, sortOrder) {
+async function getBrandIdsForPage(page, perPage, lastId, date, sortBy, sortOrder, environment = 'production') {
   // Require models dynamically to get the latest version
-  const { Brand, BrandsDailyStatus, Ad, AdMediaItem, WatchList } = require("../../models");
+  const { getModels } = require("../../models");
+  const { Brand, BrandsDailyStatus, Ad, AdMediaItem, WatchList } = getModels(environment);
   
   const startDate = new Date(date + "T00:00:00.000Z");
   const endDate = new Date(date + "T23:59:59.999Z");
   
   // Get watchlist brand IDs
-  let watchlistBrandIds = await getCachedData('watchlist_brands');
+  let watchlistBrandIds = await getCachedData('watchlist_brands', environment);
   if (!watchlistBrandIds) {
     const watchlistRecords = await WatchList.findAll({
       attributes: ["brand_id"],
       raw: true
     });
     watchlistBrandIds = watchlistRecords.map(record => record.brand_id);
-    await setCachedData('watchlist_brands', watchlistBrandIds, 180);
+    await setCachedData('watchlist_brands', watchlistBrandIds, 180, environment);
   }
 
   // OPTIMIZED: Use cursor-based pagination for better performance
@@ -167,9 +168,10 @@ async function getBrandIdsForPage(page, perPage, lastId, date, sortBy, sortOrder
 /**
  * Get total count of brands for a date - OPTIMIZED
  */
-async function getTotalBrandsCount(date) {
+async function getTotalBrandsCount(date, environment = 'production') {
   // Require models dynamically to get the latest version
-  const { Brand, BrandsDailyStatus, Ad, AdMediaItem, WatchList } = require("../../models");
+  const { getModels } = require("../../models");
+  const { Brand, BrandsDailyStatus, Ad, AdMediaItem, WatchList } = getModels(environment);
   
   const startDate = new Date(date + "T00:00:00.000Z");
   const endDate = new Date(date + "T23:59:59.999Z");
@@ -190,9 +192,10 @@ async function getTotalBrandsCount(date) {
 /**
  * Batch fetch all required data for multiple brands
  */
-async function batchFetchBrandData(brandIds, date) {
+async function batchFetchBrandData(brandIds, date, environment = 'production') {
   // Require models dynamically to get the latest version
-  const { Brand, BrandsDailyStatus, Ad, AdMediaItem, WatchList } = require("../../models");
+  const { getModels } = require("../../models");
+  const { Brand, BrandsDailyStatus, Ad, AdMediaItem, WatchList } = getModels(environment);
   
   const startDate = new Date(date + "T00:00:00.000Z");
   const endDate = new Date(date + "T23:59:59.999Z");
@@ -253,9 +256,9 @@ async function batchFetchBrandData(brandIds, date) {
     
     // Get queue data
     Promise.all([
-      getTypesenseBullQueueData('regular'),
-      getTypesenseFailedQueueData('regular'),
-      getFileUploadBullQueueData('regular')
+      getTypesenseBullQueueData('regular', environment),
+      getTypesenseFailedQueueData('regular', environment),
+      getFileUploadBullQueueData('regular', environment)
     ]).then(([bull, failed, upload]) => ({ bull, failed, upload }))
   ]);
 
@@ -304,9 +307,12 @@ async function fetchQueueVersionsForBrands(redis, brandIds) {
 /**
  * Main optimized function - Get scraping status for all brands with batched queries
  */
-async function getAllBrandsScrapingStatus(page = 1, perPage = 10, date = null, sortBy = 'normal', sortOrder = 'desc', lastId = null) {
+async function getAllBrandsScrapingStatus(page = 1, perPage = 10, date = null, sortBy = 'normal', sortOrder = 'desc', lastId = null, environment = 'production') {
+  console.log(`[PIPELINE SERVICE DEBUG] getAllBrandsScrapingStatus called with environment: ${environment}`);
   // Require models dynamically to get the latest version
-  const { Brand, BrandsDailyStatus, Ad, AdMediaItem, WatchList } = require("../../models");
+  const { getModels } = require("../../models");
+  const { Brand, BrandsDailyStatus, Ad, AdMediaItem, WatchList } = getModels(environment);
+  console.log(`[PIPELINE SERVICE DEBUG] Using models for environment: ${environment}`);
   
   const startTime = Date.now();
   
@@ -329,10 +335,10 @@ async function getAllBrandsScrapingStatus(page = 1, perPage = 10, date = null, s
     }
 
     // Get brand IDs for this page
-    const brandIds = await getBrandIdsForPage(page, perPage, lastId, targetDate, sortBy, sortOrder);
+    const brandIds = await getBrandIdsForPage(page, perPage, lastId, targetDate, sortBy, sortOrder, environment);
     
     if (brandIds.length === 0) {
-      const totalBrands = await getTotalBrandsCount(targetDate);
+      const totalBrands = await getTotalBrandsCount(targetDate, environment);
       const result = {
         brands: [],
         date: targetDate,
@@ -350,17 +356,17 @@ async function getAllBrandsScrapingStatus(page = 1, perPage = 10, date = null, s
     }
 
     // Batch fetch all data
-    const { brands, dailyStatuses, adsStats, mediaStats, queueData } = await batchFetchBrandData(brandIds, targetDate);
+    const { brands, dailyStatuses, adsStats, mediaStats, queueData } = await batchFetchBrandData(brandIds, targetDate, environment);
     
     // Get watchlist brand IDs
-    let watchlistBrandIds = await getCachedData('watchlist_brands');
+    let watchlistBrandIds = await getCachedData('watchlist_brands', environment);
     if (!watchlistBrandIds) {
       const watchlistRecords = await WatchList.findAll({
         attributes: ["brand_id"], 
         raw: true
       });
       watchlistBrandIds = watchlistRecords.map(record => record.brand_id);
-      await setCachedData('watchlist_brands', watchlistBrandIds, 180);
+      await setCachedData('watchlist_brands', watchlistBrandIds, 180, environment);
     }
 
     // Create lookup maps
@@ -386,7 +392,7 @@ async function getAllBrandsScrapingStatus(page = 1, perPage = 10, date = null, s
       )
     )).filter(status => status !== null); // Filter out null values
 
-    const totalBrands = await getTotalBrandsCount(targetDate);
+    const totalBrands = await getTotalBrandsCount(targetDate, environment);
     
     const result = {
       brands: statuses,
@@ -524,9 +530,12 @@ async function processBrandStatus(brandId, targetDate, brandMap, dailyStatusMap,
 /**
  * Get overall pipeline statistics - separate endpoint with caching
  */
-async function getOverallPipelineStats(date = null) {
+async function getOverallPipelineStats(date = null, environment = 'production') {
+  console.log(`[PIPELINE SERVICE DEBUG] getOverallPipelineStats called with environment: ${environment}`);
   // Require models dynamically to get the latest version
-  const { Brand, BrandsDailyStatus, Ad, AdMediaItem, WatchList } = require("../../models");
+  const { getModels } = require("../../models");
+  const { Brand, BrandsDailyStatus, Ad, AdMediaItem, WatchList } = getModels(environment);
+  console.log(`[PIPELINE SERVICE DEBUG] Using models for environment: ${environment}`);
   
   const startTime = Date.now();
   
@@ -537,7 +546,7 @@ async function getOverallPipelineStats(date = null) {
     
     // Check cache first
     const cacheKey = getCacheKey("overall_stats", targetDate);
-    const cached = await getCachedData(cacheKey);
+    const cached = await getCachedData(cacheKey, environment);
     if (cached) {
       return { ...cached, fromCache: true };
     }
@@ -545,7 +554,7 @@ async function getOverallPipelineStats(date = null) {
     // ETag will be generated later after we have the stats
 
     // Get total brands count
-    const totalBrands = await getTotalBrandsCount(targetDate);
+    const totalBrands = await getTotalBrandsCount(targetDate, environment);
 
     // OPTIMIZED: Single comprehensive query for all stats
     const overallStatsQuery = await BrandsDailyStatus.sequelize.query(`
@@ -663,7 +672,7 @@ async function getOverallPipelineStats(date = null) {
 
     // Cache result and ETag
     await Promise.all([
-      setCachedData(cacheKey, result, 300), // 5 minutes cache
+      setCachedData(cacheKey, result, 300, environment), // 5 minutes cache
       setPipelineETag(targetDate, 'overall_stats', '1', etag, 'normal', 'desc', null, 300)
     ]);
 
@@ -678,9 +687,10 @@ async function getOverallPipelineStats(date = null) {
 /**
  * Search brands pipeline status - optimized version
  */
-async function searchBrandsPipelineStatus(query, date = null) {
+async function searchBrandsPipelineStatus(query, date = null, environment = 'production') {
   // Require models dynamically to get the latest version
-  const { Brand, BrandsDailyStatus, Ad, AdMediaItem, WatchList } = require("../../models");
+  const { getModels } = require("../../models");
+  const { Brand, BrandsDailyStatus, Ad, AdMediaItem, WatchList } = getModels(environment);
   
   const startTime = Date.now();
   
@@ -691,13 +701,13 @@ async function searchBrandsPipelineStatus(query, date = null) {
     const endDate = new Date(targetDate + "T23:59:59.999Z");
 
     // Get watchlist IDs from cache
-    let watchlistBrandIds = await getCachedData('watchlist_brands');
+    let watchlistBrandIds = await getCachedData('watchlist_brands', environment);
     if (!watchlistBrandIds) {
       const watchlistRecords = await WatchList.findAll({
         attributes: ["brand_id"], raw: true
       });
       watchlistBrandIds = watchlistRecords.map(record => record.brand_id);
-      await setCachedData('watchlist_brands', watchlistBrandIds, 180);
+      await setCachedData('watchlist_brands', watchlistBrandIds, 180, environment);
     }
 
     const isNumericQuery = !isNaN(query) && !isNaN(parseInt(query));
@@ -745,7 +755,7 @@ async function searchBrandsPipelineStatus(query, date = null) {
 
     // Process search results with batched queries
     const brandIds = searchResults.map(result => result.brand_id);
-    const { brands, dailyStatuses, adsStats, mediaStats, queueData } = await batchFetchBrandData(brandIds, targetDate);
+    const { brands, dailyStatuses, adsStats, mediaStats, queueData } = await batchFetchBrandData(brandIds, targetDate, environment);
 
     // Create lookup maps
     const brandMap = new Map(brands.map(brand => [brand.id, brand]));

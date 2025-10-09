@@ -6,7 +6,7 @@ const logger = require("../utils/logger");
 
 async function getQueueOverview(req, res) {
   try {
-    const queueData = await queueService.getQueueOverview();
+    const queueData = await queueService.getQueueOverview(req.environment);
     res.status(200).json(queueData);
   } catch (error) {
     logger.error("Error in getQueueOverview:", error);
@@ -25,7 +25,8 @@ async function getPendingBrands(req, res) {
       parseInt(page),
       parseInt(limit),
       search,
-      queueType
+      queueType,
+      req.environment
     );
 
     res.status(200).json({
@@ -50,7 +51,8 @@ async function getFailedBrands(req, res) {
       parseInt(page),
       parseInt(limit),
       search,
-      queueType
+      queueType,
+      req.environment
     );
 
     res.status(200).json({
@@ -70,7 +72,7 @@ async function getFailedBrands(req, res) {
 
 async function getCurrentlyProcessing(req, res) {
   try {
-    const currentlyProcessing = await queueService.getCurrentlyProcessing();
+    const currentlyProcessing = await queueService.getCurrentlyProcessing(req.environment);
     res.status(200).json({
       success: true,
       data: currentlyProcessing,
@@ -89,7 +91,7 @@ async function getCurrentlyProcessing(req, res) {
 async function getNextBrand(req, res) {
   try {
     const { queueType = 'regular' } = req.query;
-    const nextBrands = await queueService.getNextBrand(queueType);
+    const nextBrands = await queueService.getNextBrand(queueType, req.environment);
     res.status(200).json({
       success: true,
       data: nextBrands,
@@ -127,7 +129,7 @@ async function getNextWatchlistBrand(req, res) {
 
 async function getQueueStats(req, res) {
   try {
-    const stats = await queueService.getQueueStatistics();
+    const stats = await queueService.getQueueStatistics(req.environment);
     res.status(200).json({
       success: true,
       data: stats,
@@ -155,7 +157,8 @@ async function getBrandProcessingQueue(req, res) {
       sortBy,
       sortOrder,
       ifNoneMatch,
-      search
+      search,
+      req.environment
     );
 
     // Handle ETag caching
@@ -191,7 +194,8 @@ async function getWatchlistBrandsQueue(req, res) {
       sortBy,
       sortOrder,
       ifNoneMatch,
-      search
+      search,
+      req.environment
     );
 
     // Handle ETag caching
@@ -222,9 +226,9 @@ async function getBrandsScrapedStats(req, res) {
 
     let stats;
     if (days) {
-      stats = await queueService.getBrandsScrapedStatsForDays(parseInt(days));
+      stats = await queueService.getBrandsScrapedStatsForDays(parseInt(days), req.environment);
     } else {
-      stats = await queueService.getBrandsScrapedStats(date);
+      stats = await queueService.getBrandsScrapedStats(date, req.environment);
     }
 
     res.status(200).json(stats);
@@ -244,9 +248,9 @@ async function getSeparateBrandsScrapedStats(req, res) {
 
     let stats;
     if (days) {
-      stats = await queueService.getSeparateBrandsScrapedStatsForDays(parseInt(days));
+      stats = await queueService.getSeparateBrandsScrapedStatsForDays(parseInt(days), req.environment);
     } else {
-      stats = await queueService.getSeparateBrandsScrapedStats(date);
+      stats = await queueService.getSeparateBrandsScrapedStats(date, req.environment);
     }
 
     res.status(200).json(stats);
@@ -298,7 +302,8 @@ async function getWatchlistBrands(req, res) {
     const watchlistBrands = await queueService.getWatchlistBrands(
       parseInt(page),
       parseInt(limit),
-      search
+      search,
+      req.environment
     );
 
     res.status(200).json({
@@ -322,7 +327,8 @@ async function getWatchlistPendingBrands(req, res) {
     const watchlistPendingBrands = await queueService.getWatchlistPendingBrands(
       parseInt(page),
       parseInt(limit),
-      search
+      search,
+      req.environment
     );
 
     res.status(200).json({
@@ -346,7 +352,8 @@ async function getWatchlistFailedBrands(req, res) {
     const watchlistFailedBrands = await queueService.getWatchlistFailedBrands(
       parseInt(page),
       parseInt(limit),
-      search
+      search,
+      req.environment
     );
 
     res.status(200).json({
@@ -371,7 +378,7 @@ async function changeBrandScore(req, res) {
     if (!queueType || !brandName || newScore === undefined || newScore === null) {
       return res.status(400).json({
         success: false,
-        message: "Queue type, brand name, and new score are required",
+        message: "Queue type, brand identifier, and new score are required",
         timestamp: new Date().toISOString(),
       });
     }
@@ -392,7 +399,7 @@ async function changeBrandScore(req, res) {
       });
     }
 
-    const result = await queueService.changeBrandScore(queueType, brandName, parseFloat(newScore));
+    const result = await queueService.changeBrandScore(queueType, brandName, parseFloat(newScore), req.environment);
 
     res.status(200).json({
       success: true,
@@ -417,7 +424,8 @@ async function getReenqueueData(req, res) {
       parseInt(page),
       parseInt(limit),
       search,
-      namespace
+      namespace,
+      req.environment
     );
 
     res.status(200).json({
@@ -442,7 +450,8 @@ async function getAllBrandProcessingJobs(req, res) {
     
     const processingData = await queueService.getAllBrandProcessingJobs(
       queueType,
-      ifNoneMatch
+      ifNoneMatch,
+      req.environment
     );
 
     // Handle ETag caching
@@ -504,7 +513,8 @@ async function getAdUpdateQueue(req, res) {
       sortBy,
       sortOrder,
       ifNoneMatch,
-      search
+      search,
+      req.environment
     );
 
     // Handle ETag caching
@@ -572,7 +582,8 @@ async function getAllAdUpdateJobs(req, res) {
     
     const allJobsData = await adUpdateProcessingService.getAllAdUpdateJobs(
       queueType,
-      ifNoneMatch
+      ifNoneMatch,
+      req.environment
     );
 
     // Handle ETag caching
@@ -601,19 +612,24 @@ async function invalidateQueueCache(req, res) {
   try {
     logger.info("Cache invalidation request received");
     
-    // Invalidate all queue caches
-    await cacheUtils.invalidateQueueCache();
-    
+    // Respond immediately to prevent frontend hanging
     res.status(200).json({
       success: true,
-      message: "Queue cache invalidated successfully",
+      message: "Queue cache invalidation started",
       timestamp: new Date().toISOString(),
     });
+    
+    // Invalidate all queue caches asynchronously (fire and forget)
+    // This runs in the background without blocking the response
+    cacheUtils.invalidateQueueCache().catch(error => {
+      logger.error("Background cache invalidation error:", error);
+    });
+    
   } catch (error) {
     logger.error("Error in invalidateQueueCache:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to invalidate cache",
+      message: "Failed to start cache invalidation",
       error: error.message,
     });
   }

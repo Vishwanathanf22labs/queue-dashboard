@@ -2,17 +2,17 @@ const { getGlobalRedis, getWatchlistRedisInstance, getRegularRedisInstance } = r
 const logger = require("../utils/logger");
 const { REDIS_KEYS, MILLISECONDS_PER_DAY } = require("../config/constants");
 
-// Fix the getBrandsScrapedStats function to read from the correct Redis keys
-async function getBrandsScrapedStats(date = null) {
+
+async function getBrandsScrapedStats(date = null, environment = 'production') {
   try {
     const targetDate = date || new Date().toISOString().split("T")[0];
     const statsKey = `${REDIS_KEYS.GLOBAL.STATS_PREFIX}${targetDate}`;
 
-    logger.info(`Looking for stats key: ${statsKey}`);
+    logger.info(`Looking for stats key: ${statsKey} [${environment}]`);
 
-    const allStats = await getGlobalRedis().hgetall(statsKey);
+    const allStats = await getGlobalRedis(environment).hgetall(statsKey);
 
-    logger.info(`Stats data for ${statsKey}:`, allStats);
+    logger.info(`Stats data for ${statsKey} [${environment}]:`, allStats);
 
     // Return all the stats fields from your Redis
     const brandsStats = {
@@ -30,7 +30,8 @@ async function getBrandsScrapedStats(date = null) {
   }
 }
 
-async function getBrandsScrapedStatsForDays(days = 7) {
+
+async function getBrandsScrapedStatsForDays(days = 7, environment = 'production') {
   try {
     const today = new Date();
     const dateStrings = [];
@@ -42,7 +43,7 @@ async function getBrandsScrapedStatsForDays(days = 7) {
     }
 
     // 🚀 OPTIMIZATION 2: Use Redis pipeline for batch operations
-    const pipeline = getGlobalRedis().pipeline();
+    const pipeline = getGlobalRedis(environment).pipeline();
     dateStrings.forEach((dateString) => {
       const statsKey = `${REDIS_KEYS.GLOBAL.STATS_PREFIX}${dateString}`;
       pipeline.hgetall(statsKey);
@@ -74,15 +75,19 @@ async function getBrandsScrapedStatsForDays(days = 7) {
   }
 }
 
-// Get separate stats for watchlist and regular brands
-async function getSeparateBrandsScrapedStats(date = null) {
+/**
+ * Get separate stats for watchlist and regular brands
+ * @param {string} date - Date in YYYY-MM-DD format (optional, defaults to today)
+ * @param {string} environment - 'production' or 'stage' (defaults to 'production')
+ */
+async function getSeparateBrandsScrapedStats(date = null, environment = 'production') {
   try {
     const targetDate = date || new Date().toISOString().split("T")[0];
     
-    // Get stats from both Redis instances
+    // Get stats from both Redis instances for the specified environment
     const [watchlistStats, regularStats] = await Promise.all([
-      getStatsFromRedis(getWatchlistRedisInstance(), targetDate, 'watchlist'),
-      getStatsFromRedis(getRegularRedisInstance(), targetDate, 'regular')
+      getStatsFromRedis(getWatchlistRedisInstance(environment), targetDate, 'watchlist'),
+      getStatsFromRedis(getRegularRedisInstance(environment), targetDate, 'regular')
     ]);
 
     return {
@@ -96,7 +101,8 @@ async function getSeparateBrandsScrapedStats(date = null) {
   }
 }
 
-async function getSeparateBrandsScrapedStatsForDays(days = 7) {
+
+async function getSeparateBrandsScrapedStatsForDays(days = 7, environment = 'production') {
   try {
     const today = new Date();
     const dateStrings = [];
@@ -107,10 +113,10 @@ async function getSeparateBrandsScrapedStatsForDays(days = 7) {
       dateStrings.push(date.toISOString().split("T")[0]);
     }
 
-    // Get stats for all dates from both Redis instances
+    // Get stats for all dates from both Redis instances for the specified environment
     const [watchlistStats, regularStats] = await Promise.all([
-      getStatsForDaysFromRedis(getWatchlistRedisInstance(), dateStrings, 'watchlist'),
-      getStatsForDaysFromRedis(getRegularRedisInstance(), dateStrings, 'regular')
+      getStatsForDaysFromRedis(getWatchlistRedisInstance(environment), dateStrings, 'watchlist'),
+      getStatsForDaysFromRedis(getRegularRedisInstance(environment), dateStrings, 'regular')
     ]);
 
     return {

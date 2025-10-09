@@ -160,10 +160,8 @@ const Dashboard = () => {
     }
   };
 
-  // Calculate completed count using frontend logic (same as Watchlist Status page)
-  const watchlistCompletedCount = watchlistBrands?.brands 
-    ? watchlistBrands.brands.filter(b => determineScraperStatus(b) === 'completed').length
-    : (overview?.watchlist_stats?.completed_count || 0); // Fallback to backend count
+
+  const watchlistCompletedCount = overview?.watchlist_stats?.completed_count || 0;
 
   // Total ads counts are now provided by individual queue APIs
 
@@ -298,9 +296,6 @@ const Dashboard = () => {
       const promises = [
         fetchBrandProcessingQueue(regularBrandsPage, 10, regularBrandsSortBy, regularBrandsSortOrder, regularBrandsSearch),
         fetchWatchlistBrandsQueue(watchlistPage, 10, watchlistSortBy, watchlistSortOrder, watchlistBrandsSearch),
-        fetchWatchlistBrands(1, 10000), // Fetch all watchlist brands for completed count calculation
-        fetchWatchlistPendingBrands(1, 10000), // Fetch pending brands for completed count calculation
-        fetchWatchlistFailedBrands(1, 10000), // Fetch failed brands for completed count calculation
         fetchAllRegularBrandProcessingJobs(),
         fetchAllWatchlistBrandProcessingJobs(),
         fetchAdUpdateQueue(regularAdUpdatePage, 10, regularAdUpdateSortBy, regularAdUpdateSortOrder, regularAdSearch),
@@ -389,7 +384,7 @@ const Dashboard = () => {
       setSearchStates(prev => ({
         ...prev,
         regularBrands: { ...prev.regularBrands, isSearching: true }
-      }));
+      }));w
 
       debounceTimers.current.regularBrands = setTimeout(async () => {
         searchRefs.current.regularBrands = value;

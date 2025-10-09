@@ -82,7 +82,7 @@ const AddBrands = () => {
 
         <Card className="mb-4 sm:mb-6">
           <div className="border-b border-gray-200">
-            <nav className="-mb-px flex flex-wrap space-x-2 sm:space-x-8">
+            <nav className="-mb-px flex flex-wrap gap-2 sm:gap-4">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
 
@@ -92,7 +92,7 @@ const AddBrands = () => {
                     variant={activeTab === tab.id ? 'tab-active' : 'tab'}
                     size="sm"
                     onClick={() => updateFormState({ activeTab: tab.id })}
-                    className="py-2 px-2 sm:px-1 text-xs sm:text-sm flex items-center space-x-1 sm:space-y-0 sm:space-x-2 whitespace-nowrap relative"
+                    className="py-2 px-3 text-xs sm:text-sm flex items-center space-x-1.5 whitespace-nowrap relative flex-1 sm:flex-none justify-center"
                   >
                     <Icon className="h-3 w-3 sm:h-4 sm:w-4" />
                     <span>{tab.label}</span>

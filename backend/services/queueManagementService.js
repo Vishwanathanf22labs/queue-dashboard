@@ -6,8 +6,8 @@ const { QUEUES } = require("../config/constants");
 const logger = require("../utils/logger");
 
 // Function to get dynamic Redis keys
-function getRedisKeys() {
-  return require("../config/constants").REDIS_KEYS;
+function getRedisKeys(environment = 'production') {
+  return require("../config/constants").getRedisKeys(environment);
 }
 
 async function getQueueStats() {
@@ -47,34 +47,35 @@ async function getQueueStats() {
   }
 }
 
-async function changeBrandScore(queueType, brandName, newScore) {
+async function changeBrandScore(queueType, brandName, newScore, environment = 'production') {
   try {
     // Require Brand model dynamically to get the latest version
-    const { Brand } = require("../models");
-    const REDIS_KEYS = getRedisKeys();
+    const { getModels } = require("../models");
+    const { Brand } = getModels(environment);
+    const REDIS_KEYS = getRedisKeys(environment);
     
     // Define queue configurations with new Redis structure
     const queueConfigs = {
       pending: {
-        redis: getQueueRedis('regular'),
+        redis: getQueueRedis('regular', environment),
         queueKey: REDIS_KEYS.REGULAR.PENDING_BRANDS,
         type: "sortedSet",
         description: "regular pending queue",
       },
       failed: {
-        redis: getQueueRedis('regular'),
+        redis: getQueueRedis('regular', environment),
         queueKey: REDIS_KEYS.REGULAR.FAILED_BRANDS,
         type: "list",
         description: "regular failed queue",
       },
       watchlist_pending: {
-        redis: getQueueRedis('watchlist'),
+        redis: getQueueRedis('watchlist', environment),
         queueKey: REDIS_KEYS.WATCHLIST.PENDING_BRANDS,
         type: "sortedSet",
         description: "watchlist pending queue",
       },
       watchlist_failed: {
-        redis: getQueueRedis('watchlist'),
+        redis: getQueueRedis('watchlist', environment),
         queueKey: REDIS_KEYS.WATCHLIST.FAILED_BRANDS,
         type: "list",
         description: "watchlist failed queue",
@@ -100,14 +101,24 @@ async function changeBrandScore(queueType, brandName, newScore) {
           if (brandData.id && brandData.page_id) {
             const brand = await Brand.findOne({ where: { id: brandData.id } });
 
-            if (brand && (brand.name || brand.actual_name)) {
-              // Case-insensitive and space-insensitive brand name matching
-              // Check both 'name' and 'actual_name' fields
-              const normalizedBrandName = brand.name ? brand.name.toLowerCase().replace(/\s+/g, '') : '';
-              const normalizedActualName = brand.actual_name ? brand.actual_name.toLowerCase().replace(/\s+/g, '') : '';
+            if (brand) {
               const normalizedSearchName = brandName.toLowerCase().replace(/\s+/g, '');
               
-              if (normalizedBrandName === normalizedSearchName || normalizedActualName === normalizedSearchName) {
+      
+              const normalizedBrandName = brand.name ? brand.name.toLowerCase().replace(/\s+/g, '') : '';
+              const normalizedActualName = brand.actual_name ? brand.actual_name.toLowerCase().replace(/\s+/g, '') : '';
+              
+        
+              const pageIdMatch = brand.page_id && brand.page_id.toString() === brandName;
+              
+             
+              const brandIdMatch = brand.id && brand.id.toString() === brandName;
+              
+
+              if (normalizedBrandName === normalizedSearchName || 
+                  normalizedActualName === normalizedSearchName ||
+                  pageIdMatch || 
+                  brandIdMatch) {
                 // Remove the old entry and add with new score
                 await config.redis.zrem(config.queueKey, member);
                 await config.redis.zadd(config.queueKey, newScore, member);
@@ -151,14 +162,20 @@ async function changeBrandScore(queueType, brandName, newScore) {
           if (brandData.id && brandData.page_id) {
             const brand = await Brand.findOne({ where: { id: brandData.id } });
 
-            if (brand && (brand.name || brand.actual_name)) {
-              // Case-insensitive and space-insensitive brand name matching
-              // Check both 'name' and 'actual_name' fields
-              const normalizedBrandName = brand.name ? brand.name.toLowerCase().replace(/\s+/g, '') : '';
-              const normalizedActualName = brand.actual_name ? brand.actual_name.toLowerCase().replace(/\s+/g, '') : '';
+            if (brand) {
               const normalizedSearchName = brandName.toLowerCase().replace(/\s+/g, '');
               
-              if (normalizedBrandName === normalizedSearchName || normalizedActualName === normalizedSearchName) {
+              const normalizedBrandName = brand.name ? brand.name.toLowerCase().replace(/\s+/g, '') : '';
+              const normalizedActualName = brand.actual_name ? brand.actual_name.toLowerCase().replace(/\s+/g, '') : '';
+              
+              const pageIdMatch = brand.page_id && brand.page_id.toString() === brandName;
+              
+              const brandIdMatch = brand.id && brand.id.toString() === brandName;
+              
+              if (normalizedBrandName === normalizedSearchName || 
+                  normalizedActualName === normalizedSearchName ||
+                  pageIdMatch || 
+                  brandIdMatch) {
                 brandMember = member;
                 currentIndex = i;
                 brandFound = true;
@@ -251,8 +268,10 @@ module.exports = {
   changeBrandScore,
   moveWatchlistFailedToPending: queueMoveService.moveWatchlistFailedToPending,
   moveWatchlistToPending: queueMoveService.moveWatchlistToPending,
+  moveIndividualWatchlistFailedToPending: queueMoveService.moveIndividualWatchlistFailedToPending,
   clearWatchlistPendingQueue: queueClearService.clearWatchlistPendingQueue,
   clearWatchlistFailedQueue: queueClearService.clearWatchlistFailedQueue,
   moveAllWatchlistPendingToFailed: queueMoveService.moveAllWatchlistPendingToFailed,
   moveAllWatchlistFailedToPending: queueMoveService.moveAllWatchlistFailedToPending,
+  cleanupWatchlistFailedQueue: queueMoveService.cleanupWatchlistFailedQueue,
 };

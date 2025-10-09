@@ -9,10 +9,10 @@ function getRedisKeys() {
 /**
  * Update proxy working status
  */
-async function updateProxyStatus(proxyKey, isWorking) {
+async function updateProxyStatus(proxyKey, isWorking, environment = 'production') {
   try {
     // Check if proxy exists
-    const existingProxy = await getGlobalRedis().hgetall(proxyKey);
+    const existingProxy = await getGlobalRedis(environment).hgetall(proxyKey);
     if (Object.keys(existingProxy).length === 0) {
       return {
         success: false,
@@ -53,7 +53,7 @@ async function updateProxyStatus(proxyKey, isWorking) {
     }
 
     // Update in Redis hash
-    await getGlobalRedis().hset(proxyKey, updateFields);
+    await getGlobalRedis(environment).hset(proxyKey, updateFields);
 
     return {
       success: true,

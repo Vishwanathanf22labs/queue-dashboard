@@ -36,7 +36,7 @@ async function addSingleBrand(req, res) {
       });
     }
 
-    const result = await queueService.addSingleBrandToQueue({ id, page_id, score: validScore }, queueType);
+    const result = await queueService.addSingleBrandToQueue({ id, page_id, score: validScore }, queueType, req.environment);
 
     res.status(201).json({
       success: true,
@@ -76,7 +76,7 @@ async function addAllBrands(req, res) {
       });
     }
 
-    const result = await queueService.addAllBrandsToQueue(status, queueType);
+    const result = await queueService.addAllBrandsToQueue(status, queueType, req.environment);
     
     res.json({
       success: true,
@@ -95,7 +95,7 @@ async function addAllBrands(req, res) {
 
 async function getBrandCounts(req, res) {
   try {
-    const result = await queueService.getBrandCountsByStatus();
+    const result = await queueService.getBrandCountsByStatus(req.environment);
     
     res.json({
       success: true,

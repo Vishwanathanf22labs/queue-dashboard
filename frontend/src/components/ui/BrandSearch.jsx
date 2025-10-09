@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, X, Check } from 'lucide-react';
 import useQueueStore from '../../stores/queueStore';
 import Button from './Button';
 
-const BrandSearch = ({ onBrandSelect, selectedBrand = null, disabled = false, onSearchAttempt = null }) => {
+const BrandSearch = forwardRef(({ onBrandSelect, selectedBrand = null, disabled = false, onSearchAttempt = null }, ref) => {
   const { searchBrands } = useQueueStore();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -22,6 +22,12 @@ const BrandSearch = ({ onBrandSelect, selectedBrand = null, disabled = false, on
   const dropdownRef = useRef(null);
 
   const { query, results, isSearching, showDropdown, selectedIndex, error } = searchState;
+
+  useImperativeHandle(ref, () => ({
+    clearSearch: () => {
+      clearSearch();
+    }
+  }));
 
   const updateSearchState = (updates) => {
     setSearchState(prev => ({ ...prev, ...updates }));
@@ -332,6 +338,8 @@ const BrandSearch = ({ onBrandSelect, selectedBrand = null, disabled = false, on
       )}
     </div>
   );
-};
+});
+
+BrandSearch.displayName = 'BrandSearch';
 
 export default BrandSearch;

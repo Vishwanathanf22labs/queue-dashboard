@@ -4,13 +4,13 @@ const { QUEUES, BATCH_SIZE } = require("../config/constants");
 const { Op } = require("sequelize");
 
 // Function to get dynamic Redis keys
-function getRedisKeys() {
-  return require("../config/constants").REDIS_KEYS;
+function getRedisKeys(environment = 'production') {
+  return require("../config/constants").getRedisKeys(environment);
 }
 
-async function getExistingPageIds(queueType = 'regular') {
-  const redis = getQueueRedis(queueType);
-  const REDIS_KEYS = getRedisKeys();
+async function getExistingPageIds(queueType = 'regular', environment = 'production') {
+  const redis = getQueueRedis(queueType, environment);
+  const REDIS_KEYS = getRedisKeys(environment);
   const queueKey = REDIS_KEYS[queueType.toUpperCase()].PENDING_BRANDS;
   const existingItems = await redis.zrange(queueKey, 0, -1, 'WITHSCORES');
   const existingPageIds = new Set();
@@ -31,11 +31,12 @@ async function getExistingPageIds(queueType = 'regular') {
   return existingPageIds;
 }
 
-async function addSingleBrandToQueue(brandData, queueType = 'regular') {
+async function addSingleBrandToQueue(brandData, queueType = 'regular', environment = 'production') {
   try {
     // Require Brand model dynamically to get the latest version
-    const { Brand } = require("../models");
-    const REDIS_KEYS = getRedisKeys();
+    const { getModels } = require("../models");
+    const { Brand } = getModels(environment);
+    const REDIS_KEYS = getRedisKeys(environment);
     
     const { id, page_id, score } = brandData;
 
@@ -51,7 +52,7 @@ async function addSingleBrandToQueue(brandData, queueType = 'regular') {
       throw new Error(`Brand with page_id ${page_id} not found in database`);
     }
 
-    const existingPageIds = await getExistingPageIds(queueType);
+    const existingPageIds = await getExistingPageIds(queueType, environment);
     const alreadyExists = existingPageIds.has(page_id);
 
     if (alreadyExists) {
@@ -65,7 +66,7 @@ async function addSingleBrandToQueue(brandData, queueType = 'regular') {
       page_id
     });
     
-    const redis = getQueueRedis(queueType);
+    const redis = getQueueRedis(queueType, environment);
     const queueKey = REDIS_KEYS[queueType.toUpperCase()].PENDING_BRANDS;
     
     // Use pipeline for consistency, even for single item
@@ -90,11 +91,12 @@ async function addSingleBrandToQueue(brandData, queueType = 'regular') {
   }
 }
 
-async function addBulkBrandsFromCSVToQueue(brandsData, queueType = 'regular') {
+async function addBulkBrandsFromCSVToQueue(brandsData, queueType = 'regular', environment = 'production') {
   try {
     // Require Brand model dynamically to get the latest version
-    const { Brand } = require("../models");
-    const REDIS_KEYS = getRedisKeys();
+    const { getModels } = require("../models");
+    const { Brand } = getModels(environment);
+    const REDIS_KEYS = getRedisKeys(environment);
     
     if (!Array.isArray(brandsData) || brandsData.length === 0) {
       throw new Error("brandsData must be a non-empty array");
@@ -117,7 +119,7 @@ async function addBulkBrandsFromCSVToQueue(brandsData, queueType = 'regular') {
 
     const existingPageIdsInDB = new Set(existingBrands.map((b) => b.page_id));
 
-    const redis = getQueueRedis(queueType);
+    const redis = getQueueRedis(queueType, environment);
     const queueKey = REDIS_KEYS[queueType.toUpperCase()].PENDING_BRANDS;
     const pipeline = redis.pipeline();
     let addedCount = 0;
@@ -196,10 +198,11 @@ async function addBulkBrandsFromCSVToQueue(brandsData, queueType = 'regular') {
   }
 }
 
-async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular') {
+async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular', environment = 'production') {
   try {
     // Require Brand model dynamically to get the latest version
-    const { Brand } = require("../models");
+    const { getModels } = require("../models");
+    const { Brand } = getModels(environment);
     
     // Build where clause
     const whereClause = {
@@ -323,15 +326,15 @@ async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular') {
       };
     }
 
-    const existingPageIds = await getExistingPageIds(queueType);
-    const REDIS_KEYS = getRedisKeys();
+    const existingPageIds = await getExistingPageIds(queueType, environment);
+    const REDIS_KEYS = getRedisKeys(environment);
 
     let addedCount = 0;
     let skippedCount = 0;
 
     const batchSize = BATCH_SIZE;
     const totalBrands = allBrands.length;
-    const redis = getQueueRedis(queueType);
+    const redis = getQueueRedis(queueType, environment);
     const queueKey = REDIS_KEYS[queueType.toUpperCase()].PENDING_BRANDS;
 
     for (let i = 0; i < totalBrands; i += batchSize) {
@@ -672,10 +675,11 @@ async function searchBrands(query, limit = 8) {
   }
 }
 
-async function getBrandCountsByStatus() {
+async function getBrandCountsByStatus(environment = 'production') {
   try {
     // Require Brand model dynamically to get the latest version
-    const { Brand } = require("../models");
+    const { getModels } = require("../models");
+    const { Brand } = getModels(environment);
     
     // Single optimized query using conditional aggregation for maximum performance
     const result = await Brand.sequelize.query(`
