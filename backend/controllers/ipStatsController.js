@@ -40,7 +40,8 @@ async function getIpStatsList(req, res) {
       limit,
       search,
       sortBy,
-      sortOrder
+      sortOrder,
+      req.environment
     );
 
     if (result.etag) {
@@ -71,7 +72,7 @@ async function getIpStatsDetail(req, res) {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
 
-    const ipStats = await ipStatsService.getIpStatsByIp(ip);
+    const ipStats = await ipStatsService.getIpStatsByIp(ip, req.environment);
 
     if (!ipStats) {
       return res.status(404).json({
@@ -80,7 +81,7 @@ async function getIpStatsDetail(req, res) {
       });
     }
 
-    const brandsResult = await ipStatsService.getBrandsByIp(ip, page, limit);
+    const brandsResult = await ipStatsService.getBrandsByIp(ip, page, limit, req.environment);
 
     return res.json({
       success: true,
@@ -102,7 +103,7 @@ async function getIpStatsDetail(req, res) {
 
 async function getIpStatsSummary(req, res) {
   try {
-    const summary = await ipStatsService.getIpStatsSummary();
+    const summary = await ipStatsService.getIpStatsSummary(req.environment);
 
     return res.json({
       success: true,
@@ -130,7 +131,7 @@ async function deleteIpStats(req, res) {
       });
     }
 
-    const result = await ipStatsService.deleteIpStats(ip);
+    const result = await ipStatsService.deleteIpStats(ip, req.environment);
 
     return res.json({
       success: true,
@@ -158,7 +159,7 @@ async function getIpBrands(req, res) {
 
     const clientETag = req.headers["if-none-match"];
 
-    const result = await ipStatsService.getBrandsByIp(ip, page, limit, search);
+    const result = await ipStatsService.getBrandsByIp(ip, page, limit, search, req.environment);
 
     if (result.etag) {
       res.set("ETag", result.etag);

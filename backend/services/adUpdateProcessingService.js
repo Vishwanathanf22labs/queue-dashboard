@@ -362,7 +362,8 @@ async function getAdUpdateQueue(
   sortBy = "normal",
   sortOrder = "desc",
   ifNoneMatch = null,
-  search = null
+  search = null,
+  environment = 'production'
 ) {
   const startTime = process.hrtime.bigint();
   
@@ -373,7 +374,7 @@ async function getAdUpdateQueue(
       PAGINATION.MAX_LIMIT
     );
 
-    const redis = getQueueRedis(queueType);
+    const redis = getQueueRedis(queueType, environment);
     
     if (!redis) {
       logger.error(`Redis not available for ${queueType}`);
@@ -567,10 +568,10 @@ async function getAdUpdateQueue(
 }
 
 // Get watchlist ad-update queue
-async function getWatchlistAdUpdateQueue(page, limit, sortBy, sortOrder, ifNoneMatch, search = null) {
+async function getWatchlistAdUpdateQueue(page, limit, sortBy, sortOrder, ifNoneMatch, search = null, environment = 'production') {
   try {
     // Use the new getAdUpdateQueue function with watchlist queue type
-    return await getAdUpdateQueue(page, limit, 'watchlist', sortBy, sortOrder, ifNoneMatch, search);
+    return await getAdUpdateQueue(page, limit, 'watchlist', sortBy, sortOrder, ifNoneMatch, search, environment);
   } catch (error) {
     logger.error("Error in getWatchlistAdUpdateQueue:", error);
     throw error;
@@ -578,12 +579,12 @@ async function getWatchlistAdUpdateQueue(page, limit, sortBy, sortOrder, ifNoneM
 }
 
 // Get ALL ad-update processing jobs without pagination (for dashboard cards)
-async function getAllAdUpdateJobs(queueType = 'regular', ifNoneMatch = null) {
+async function getAllAdUpdateJobs(queueType = 'regular', ifNoneMatch = null, environment = 'production') {
   try {
     const startTime = process.hrtime.bigint();
     
     // Generate cache key for all jobs
-    const cacheKey = `all_ad_update_jobs:${queueType}`;
+    const cacheKey = `all_ad_update_jobs:${queueType}:${environment}`;
     
     // Check cache first
     if (ifNoneMatch) {
@@ -600,7 +601,7 @@ async function getAllAdUpdateJobs(queueType = 'regular', ifNoneMatch = null) {
     }
     
     // Get Redis instance
-    const redis = getQueueRedis(queueType);
+    const redis = getQueueRedis(queueType, environment);
     if (!redis) {
       throw new Error(`Redis instance not available for queue type: ${queueType}`);
     }

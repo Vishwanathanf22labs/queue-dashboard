@@ -13,11 +13,12 @@ async function getTypesenseStatus(
   ads = null,
   bullJobData = null,
   failedJobData = null,
-  queueType = 'regular'
+  queueType = 'regular',
+  environment = 'production'
 ) {
   try {
     const cacheKey = getCacheKey("typesense", brandId, targetDate);
-    const cached = getCachedData(cacheKey);
+    const cached = await getCachedData(cacheKey, environment);
     if (cached) return cached;
 
     // FIXED: Count ads by typesense_updated_at on target date
@@ -44,7 +45,7 @@ async function getTypesenseStatus(
         adsInQueue: 0,
         adsFailed: 0,
       };
-      setCachedData(cacheKey, result);
+      await setCachedData(cacheKey, result, 300, environment);
       return result;
     }
 
@@ -78,7 +79,7 @@ async function getTypesenseStatus(
         adsInQueue: 0,
         adsFailed: 0,
       };
-      setCachedData(cacheKey, result);
+      await setCachedData(cacheKey, result, 300, environment);
       return result;
     }
 
@@ -88,8 +89,8 @@ async function getTypesenseStatus(
 
     // Get Redis data if not provided
     if (!bullJobData && !failedJobData) {
-      bullJobData = await getTypesenseBullQueueData(queueType);
-      failedJobData = await getTypesenseFailedQueueData(queueType);
+      bullJobData = await getTypesenseBullQueueData(queueType, environment);
+      failedJobData = await getTypesenseFailedQueueData(queueType, environment);
     }
 
     if (bullJobData || failedJobData) {
@@ -142,7 +143,7 @@ async function getTypesenseStatus(
         adsInQueue: adsInQueue,
         adsFailed: adsFailed,
       };
-      setCachedData(cacheKey, result);
+      await setCachedData(cacheKey, result, 300, environment);
       return result;
     }
 
@@ -167,7 +168,7 @@ async function getTypesenseStatus(
         adsInQueue: adsInQueue,
         adsFailed: adsFailed,
       };
-      setCachedData(cacheKey, result);
+      await setCachedData(cacheKey, result, 300, environment);
       return result;
     }
 
@@ -182,7 +183,7 @@ async function getTypesenseStatus(
       adsFailed: adsWithoutTypesenseCount,
     };
 
-    setCachedData(cacheKey, result);
+    await setCachedData(cacheKey, result, 300, environment);
     return result;
   } catch (error) {
     console.error("Error checking Typesense status:", error);

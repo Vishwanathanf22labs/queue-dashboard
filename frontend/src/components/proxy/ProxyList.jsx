@@ -321,45 +321,6 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
       <div className="block xl:hidden space-y-4">
         {proxies.map((proxy) => (
           <div key={proxy.id} className="relative bg-gray-50 rounded-lg p-4 border border-gray-200">
-            {proxy.is_locked ? (
-              <div
-                className={`absolute top-1 left-1 px-1 py-0.5 rounded z-10 text-xs font-medium bg-white border ${
-                  disabled 
-                    ? 'cursor-not-allowed opacity-50 text-gray-400 border-gray-300' 
-                    : 'cursor-pointer hover:bg-orange-100 text-orange-600 border-orange-200'
-                }`}
-                onClick={disabled ? undefined : () => handleUnlockProxy(proxy.id, proxy.lock_key)}
-                title={disabled ? 'Admin access required' : `Click to unlock proxy locked by ${proxy.lock_worker}`}
-              >
-                🔒 {(() => {
-                  if (!proxy.lock_worker) return 'WL-1';
-                  if (proxy.lock_worker.includes('non-watchlist')) {
-                    const match = proxy.lock_worker.match(/non-watchlist:(\d+)/);
-                    const number = match ? match[1] : '1';
-                    return `NWL-${number}`;
-                  } else if (proxy.lock_worker.includes('watchlist')) {
-                    const match = proxy.lock_worker.match(/watchlist:(\d+)/);
-                    const number = match ? match[1] : '1';
-                    return `WL-${number}`;
-                  } else {
-                    return 'WL-1';
-                  }
-                })()}
-              </div>
-            ) : (
-              <div
-                className={`absolute top-1 left-1 px-1 py-0.5 rounded z-10 text-xs font-medium bg-white border ${
-                  disabled 
-                    ? 'cursor-not-allowed opacity-50 text-gray-400 border-gray-300' 
-                    : 'cursor-pointer hover:bg-blue-100 text-blue-600 border-blue-200'
-                }`}
-                onClick={disabled ? undefined : () => handleLockIconClick(proxy)}
-                title={disabled ? 'Admin access required' : 'Click to lock proxy'}
-              >
-                🔓 Lock
-              </div>
-            )}
-
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
@@ -432,6 +393,40 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
               </div>
 
               <div className="flex items-center justify-center space-x-2 pt-2 border-t border-gray-200">
+                {/* Lock/Unlock Button */}
+                {proxy.is_locked ? (
+                  <Button
+                    onClick={disabled ? undefined : () => handleUnlockProxy(proxy.id, proxy.lock_key)}
+                    variant="outline"
+                    size="sm"
+                    className={`p-2 min-w-0 ${
+                      disabled 
+                        ? 'cursor-not-allowed opacity-50 border-gray-300' 
+                        : 'border-orange-500 text-orange-500 hover:bg-orange-50'
+                    }`}
+                    title={disabled ? 'Admin access required' : `Click to unlock proxy locked by ${proxy.lock_worker}`}
+                    disabled={disabled}
+                  >
+                    <Lock className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={disabled ? undefined : () => handleLockIconClick(proxy)}
+                    variant="outline"
+                    size="sm"
+                    className={`p-2 min-w-0 ${
+                      disabled 
+                        ? 'cursor-not-allowed opacity-50 border-gray-300' 
+                        : 'border-blue-500 text-blue-500 hover:bg-blue-50'
+                    }`}
+                    title={disabled ? 'Admin access required' : 'Click to lock proxy'}
+                    disabled={disabled}
+                  >
+                    <Unlock className="h-4 w-4" />
+                  </Button>
+                )}
+
+                {/* Edit Button */}
                 <Button
                   onClick={disabled ? undefined : () => handleEditProxy(proxy)}
                   variant="outline"
@@ -443,6 +438,7 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
                   <Edit className="h-4 w-4" />
                 </Button>
 
+                {/* Active/Inactive Button */}
                 <Button
                   onClick={disabled ? undefined : () => handleStatusUpdate(proxy.id, !proxy.is_working)}
                   disabled={disabled || updatingStatus === proxy.id}
@@ -459,6 +455,7 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
                   )}
                 </Button>
 
+                {/* Delete Button */}
                 <Button
                   onClick={disabled ? undefined : () => handleRemoveProxy(proxy.id)}
                   variant="outline"

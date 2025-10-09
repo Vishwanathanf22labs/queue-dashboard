@@ -4,8 +4,9 @@ const { QUEUES } = require("../config/constants");
 const watchlistRedisService = require("./watchlistRedisService");
 
 // Function to get dynamic Redis keys
-function getRedisKeys() {
-  return require("../config/constants").REDIS_KEYS;
+function getRedisKeys(environment = null) {
+  const { getRedisKeys } = require("../config/constants");
+  return getRedisKeys(environment);
 }
 
 // Cleanup function to remove completed/failed brands from currently processing queue
@@ -158,17 +159,23 @@ function startCleanupInterval() {
 startCleanupInterval();
 
 
-async function getQueueOverview() {
+async function getQueueOverview(environment = 'production') {
   try {
-    const REDIS_KEYS = getRedisKeys();
+    const REDIS_KEYS = getRedisKeys(environment);
     
-    // Get regular Redis instance
-    const regularRedis = getQueueRedis('regular');
-    const watchlistRedis = getQueueRedis('watchlist');
+    // Get Redis instances for the specified environment
+    const regularRedis = getQueueRedis('regular', environment);
+    const watchlistRedis = getQueueRedis('watchlist', environment);
+    
+    // Debug logging
+    logger.info(`Getting queue overview for environment: ${environment}`);
+    logger.info(`Using Redis keys - Regular Pending: ${REDIS_KEYS.REGULAR.PENDING_BRANDS}, Regular Failed: ${REDIS_KEYS.REGULAR.FAILED_BRANDS}`);
     
     // Get regular queue counts
     const regularPendingCount = await regularRedis.zcard(REDIS_KEYS.REGULAR.PENDING_BRANDS);
     const regularFailedCount = await regularRedis.llen(REDIS_KEYS.REGULAR.FAILED_BRANDS);
+    
+    logger.info(`Regular queue counts - Pending: ${regularPendingCount}, Failed: ${regularFailedCount}`);
     
     // Get watchlist queue counts
     const watchlistPendingCount = await watchlistRedis.zcard(REDIS_KEYS.WATCHLIST.PENDING_BRANDS);
@@ -176,8 +183,9 @@ async function getQueueOverview() {
 
     let activeBrandsCount = 0;
     try {
-      // Require Brand model dynamically to get the latest version
-      const { Brand } = require("../models");
+      // Get Brand model for the specified environment
+      const { getModels } = require("../models");
+      const { Brand } = getModels(environment);
       const activeBrands = await Brand.count({
         where: { status: "Active" },
       });
@@ -187,12 +195,12 @@ async function getQueueOverview() {
       activeBrandsCount = 0;
     }
 
-    const currentlyProcessing = await getCurrentlyProcessing();
+    const currentlyProcessing = await getCurrentlyProcessing(environment);
 
     // Get watchlist stats
     let watchlistStats = null;
     try {
-      watchlistStats = await watchlistRedisService.getWatchlistStats();
+      watchlistStats = await watchlistRedisService.getWatchlistStats(environment);
     } catch (watchlistError) {
       logger.error("Error getting watchlist stats:", watchlistError);
       watchlistStats = {
@@ -220,17 +228,21 @@ async function getQueueOverview() {
   }
 }
 
-async function getCurrentlyProcessing() {
+async function getCurrentlyProcessing(environment = 'production') {
   try {
-    const REDIS_KEYS = getRedisKeys();
+    const REDIS_KEYS = getRedisKeys(environment);
     // Get ALL currently processing brands from Redis key (cleanup runs automatically every 5 minutes)
-    const currentlyProcessingBrands = await getGlobalRedis().lrange(REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING, 0, -1);
+    const currentlyProcessingBrands = await getGlobalRedis(environment).lrange(REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING, 0, -1);
     
     if (!currentlyProcessingBrands || currentlyProcessingBrands.length === 0) {
       return null;
     }
 
     const results = [];
+    
+    // Get models for the specified environment
+    const { getModels } = require("../models");
+    const { WatchList } = getModels(environment);
     
     for (let i = 0; i < currentlyProcessingBrands.length; i++) {
       try {
@@ -239,8 +251,6 @@ async function getCurrentlyProcessing() {
         // Check if brand is in watchlist table
         let isInWatchlist = false;
         try {
-          // Require WatchList model dynamically
-          const { WatchList } = require("../models");
           const watchlistBrand = await WatchList.findOne({
             where: { brand_id: parseInt(processingData.brandId) },
             attributes: ['brand_id'],
@@ -253,8 +263,7 @@ async function getCurrentlyProcessing() {
         }
         
         // Get brand details from database
-        // Require Brand model dynamically
-        const { Brand } = require("../models");
+        const { Brand } = getModels(environment);
         const brand = await Brand.findOne({
           where: { id: parseInt(processingData.brandId) },
           attributes: ["name", "actual_name", "page_id", "status"],
@@ -500,13 +509,13 @@ async function getAllBrandProcessingJobs() {
   }
 }
 
-async function getQueueStatistics() {
+async function getQueueStatistics(environment = 'production') {
   try {
-    const REDIS_KEYS = getRedisKeys();
+    const REDIS_KEYS = getRedisKeys(environment);
     
     // Get regular Redis instance
-    const regularRedis = getQueueRedis('regular');
-    const watchlistRedis = getQueueRedis('watchlist');
+    const regularRedis = getQueueRedis('regular', environment);
+    const watchlistRedis = getQueueRedis('watchlist', environment);
     
     // Get regular queue counts
     const regularPendingCount = await regularRedis.zcard(REDIS_KEYS.REGULAR.PENDING_BRANDS);

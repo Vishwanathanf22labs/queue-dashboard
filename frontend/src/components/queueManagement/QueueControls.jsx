@@ -109,12 +109,12 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
       
       {/* Clear All Queues - Common */}
       <div className="mb-6">
-        <div className="flex justify-center gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
           <Button
             variant="danger"
             onClick={handleClearAllClick}
             disabled={disabled || isProcessingAction}
-            className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5 px-4"
+            className="flex items-center justify-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5 px-3 sm:px-4"
           >
             <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
             <span className="hidden sm:inline">Clear All Queues</span>
@@ -125,7 +125,7 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
             variant="danger"
             onClick={handleClearCurrentlyScrapingClick}
             disabled={disabled || isProcessingAction}
-            className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5 px-4"
+            className="flex items-center justify-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5 px-3 sm:px-4"
           >
             <X className="h-3 w-3 sm:h-4 sm:w-4" />
             <span className="hidden sm:inline">Clear Currently Scraping</span>
@@ -141,7 +141,7 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
               confirmAction: 'Clear Cache Only'
             })}
             disabled={disabled || isProcessingAction}
-            className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5 px-4"
+            className="flex items-center justify-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5 px-3 sm:px-4"
           >
             <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
             <span className="hidden sm:inline">Clear Cache Only</span>

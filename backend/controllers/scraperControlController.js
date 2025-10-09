@@ -2,7 +2,7 @@ const scraperControlService = require('../services/scraperControlService');
 
 async function getScraperStatus(req, res) {
   try {
-    const status = await scraperControlService.getScraperStatus();
+    const status = await scraperControlService.getScraperStatus(req.environment);
     res.status(200).json(status);
   } catch (error) {
     res.status(500).json({
@@ -13,7 +13,7 @@ async function getScraperStatus(req, res) {
 
 async function startScraper(req, res) {
   try {
-    const result = await scraperControlService.startScraper();
+    const result = await scraperControlService.startScraper(req.environment);
     const statusCode = result.success ? 200 : 400;
     res.status(statusCode).json(result);
   } catch (error) {
@@ -27,7 +27,7 @@ async function startScraper(req, res) {
 
 async function stopScraper(req, res) {
   try {
-    const result = await scraperControlService.stopScraper();
+    const result = await scraperControlService.stopScraper(req.environment);
     const statusCode = result.success ? 200 : 400;
     res.status(statusCode).json(result);
   } catch (error) {
@@ -41,7 +41,7 @@ async function stopScraper(req, res) {
 
 async function getBrandTiming(req, res) {
   try {
-    const data = await scraperControlService.getBrandTiming();
+    const data = await scraperControlService.getBrandTiming(req.environment);
     res.status(200).json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch brand timing' });

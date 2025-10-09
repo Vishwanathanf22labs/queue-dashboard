@@ -8,14 +8,15 @@ const { getFileUploadStatus } = require("./fileUploadService");
 /**
  * Get scraping status for a specific brand
  */
-async function getBrandScrapingStatus(brandId, date = null) {
+async function getBrandScrapingStatus(brandId, date = null, environment = 'production') {
   try {
     // Require models dynamically to get the latest version
-    const { Brand, BrandsDailyStatus, Ad, AdMediaItem } = require("../../models");
+    const { getModels } = require("../../models");
+    const { Brand, BrandsDailyStatus, Ad, AdMediaItem } = getModels(environment);
     
     const targetDate = date || new Date().toISOString().split("T")[0];
     const cacheKey = getCacheKey("brand", brandId, targetDate);
-    const cached = getCachedData(cacheKey);
+    const cached = await getCachedData(cacheKey, environment);
     if (cached) return cached;
 
     const brand = await Brand.findByPk(brandId);
@@ -94,9 +95,9 @@ async function getBrandScrapingStatus(brandId, date = null) {
         : [];
 
     // FIXED: Get all required Redis queue data
-    const bullJobData = await getTypesenseBullQueueData();
-    const failedJobData = await getTypesenseFailedQueueData();
-    const brandProcessingJobData = await getFileUploadBullQueueData();
+    const bullJobData = await getTypesenseBullQueueData('regular', environment);
+    const failedJobData = await getTypesenseFailedQueueData('regular', environment);
+    const brandProcessingJobData = await getFileUploadBullQueueData('regular', environment);
     // Media upload queue doesn't exist - only brand-processing queue is used
 
     // Get statuses with Redis queue checking for accurate status
@@ -161,7 +162,7 @@ async function getBrandScrapingStatus(brandId, date = null) {
       },
     };
 
-    setCachedData(cacheKey, result);
+    await setCachedData(cacheKey, result, 300, environment);
     return result;
   } catch (error) {
     console.error("Error getting brand scraping status:", error);

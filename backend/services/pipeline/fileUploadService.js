@@ -14,14 +14,16 @@ async function getFileUploadStatus(
   mediaItems = null,
   brand = null,
   brandProcessingJobData = null,
-  queueType = 'regular'
+  queueType = 'regular',
+  environment = 'production'
 ) {
   try {
     // Require models dynamically to get the latest version
-    const { Brand, Ad, AdMediaItem, BrandsDailyStatus } = require("../../models");
+    const { getModels } = require("../../models");
+    const { Brand, Ad, AdMediaItem, BrandsDailyStatus } = getModels(environment);
     
     const cacheKey = getCacheKey("fileupload", brandId, targetDate);
-    const cached = getCachedData(cacheKey);
+    const cached = await getCachedData(cacheKey, environment);
     if (cached) return cached;
 
     // NEW LOGIC: Use your exact query to get the total media items
@@ -51,7 +53,7 @@ async function getFileUploadStatus(
         mediaWithAllUrls: 0,
         totalMedia: 0,
       };
-      setCachedData(cacheKey, result);
+      await setCachedData(cacheKey, result, 300, environment);
       return result;
     }
 
@@ -85,7 +87,7 @@ async function getFileUploadStatus(
 
     // Get brand processing job data if not provided
     if (!brandProcessingJobData) {
-      brandProcessingJobData = await getFileUploadBullQueueData(queueType);
+      brandProcessingJobData = await getFileUploadBullQueueData(queueType, environment);
     }
     
     const brandHasProcessingJob = brandProcessingJobData
@@ -132,7 +134,7 @@ async function getFileUploadStatus(
       };
     }
 
-    setCachedData(cacheKey, result);
+    await setCachedData(cacheKey, result, 300, environment);
     return result;
   } catch (error) {
     console.error("Error checking file upload status:", error);

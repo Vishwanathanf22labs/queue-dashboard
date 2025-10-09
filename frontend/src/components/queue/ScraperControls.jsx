@@ -182,24 +182,13 @@ const ScraperControls = ({ disabled = false }) => {
       {/* Status Card */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className={`px-3 py-1 rounded-full text-sm font-medium ${statusInfo.bgColor} ${statusInfo.color}`}>
-              {statusInfo.text}
-            </div>
-            <div>
-              <h3 className="text-lg font-medium text-gray-900">Scraper Status</h3>
-              <p className="text-sm text-gray-600">{statusInfo.description}</p>
-            </div>
+          <div>
+            <h3 className="text-base sm:text-lg font-medium text-gray-900">Scraper Status</h3>
+            <p className="text-xs sm:text-sm text-gray-600">{statusInfo.description}</p>
           </div>
-          <button
-            onClick={fetchScraperStatus}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-            title="Refresh status"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
+          <div className={`px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-medium ${statusInfo.bgColor} ${statusInfo.color}`}>
+            {statusInfo.text}
+          </div>
         </div>
         
         {/* Timestamps */}
@@ -223,17 +212,8 @@ const ScraperControls = ({ disabled = false }) => {
 
       {/* Brand Timing Card */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-gray-900">Brand Timing</h3>
-          <button
-            onClick={fetchBrandTiming}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-            title="Refresh timing"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
+        <div className="mb-4">
+          <h3 className="text-base sm:text-lg font-medium text-gray-900">Brand Timing</h3>
         </div>
 
         {brandTimingLoading ? (
@@ -288,21 +268,21 @@ const ScraperControls = ({ disabled = false }) => {
       </div>
 
       {/* Control Buttons */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Scraper Controls</h3>
-        <div className="flex items-center space-x-4">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+        <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">Scraper Controls</h3>
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           <StartScraperButton
             onScraperStart={handleScraperStart}
             isDisabled={disabled || isRunning}
-            size="lg"
+            size="md"
           />
           <StopScraperButton
             onScraperStop={handleScraperStop}
             isDisabled={disabled || !isRunning}
-            size="lg"
+            size="md"
           />
         </div>
-        <div className="mt-4 text-sm text-gray-600">
+        <div className="mt-3 sm:mt-4 text-xs sm:text-sm text-gray-600">
           {isRunning ? (
             <p>Click "Stop Scraper" to halt the current scraping process.</p>
           ) : (

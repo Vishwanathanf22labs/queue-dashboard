@@ -36,7 +36,7 @@ class ScrapedBrandsController {
         });
       }
 
-      const result = await ScrapedBrandsService.getScrapedBrands(page, limit, date, sortBy, sortOrder);
+      const result = await ScrapedBrandsService.getScrapedBrands(page, limit, date, sortBy, sortOrder, req.environment);
 
       if (result.success) {
         res.status(200).json(result);
@@ -78,7 +78,7 @@ class ScrapedBrandsController {
         });
       }
 
-      const result = await ScrapedBrandsService.searchScrapedBrands(query.trim(), date);
+      const result = await ScrapedBrandsService.searchScrapedBrands(query.trim(), date, req.environment);
 
       if (result.success) {
         res.status(200).json(result);
@@ -111,7 +111,7 @@ class ScrapedBrandsController {
         });
       }
 
-      const result = await ScrapedBrandsService.getScrapedBrandsStats(date);
+      const result = await ScrapedBrandsService.getScrapedBrandsStats(date, req.environment);
 
       if (result.success) {
         res.status(200).json(result);

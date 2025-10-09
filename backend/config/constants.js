@@ -1,13 +1,13 @@
 const { getQueueConfig } = require("./environmentConfig");
 
 // Function to get dynamic queue config
-function getQueues() {
-  return getQueueConfig();
+function getQueues(environment = null) {
+  return getQueueConfig(environment);
 }
 
 // Function to get dynamic Redis keys
-function getRedisKeys() {
-  const queueConfig = getQueueConfig();
+function getRedisKeys(environment = null) {
+  const queueConfig = getQueueConfig(environment);
   return {
     // Global Redis Keys (Common)
     GLOBAL: {
@@ -51,6 +51,9 @@ module.exports = {
     return getQueues();
   },
 
+  // Get queue config for specific environment
+  getQueues,
+
   PAGINATION: {
     DEFAULT_PAGE: 1,
     DEFAULT_LIMIT: 10,
@@ -63,6 +66,9 @@ module.exports = {
   get REDIS_KEYS() {
     return getRedisKeys();
   },
+
+  // Get Redis keys for specific environment
+  getRedisKeys,
 
   JOB_FETCH_LIMIT: 1000, // Limit for fetching jobs from BullMQ
   MILLISECONDS_PER_DAY: 24 * 60 * 60 * 1000, // Milliseconds in a day

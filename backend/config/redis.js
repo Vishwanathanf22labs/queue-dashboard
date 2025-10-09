@@ -2,110 +2,128 @@ const Redis = require("ioredis");
 require("dotenv").config();
 const { getRedisConfig } = require("./environmentConfig");
 
-// Get Redis configurations based on current environment
-const globalRedisConfig = getRedisConfig('global');
-const watchlistRedisConfig = getRedisConfig('watchlist');
-const regularRedisConfig = getRedisConfig('regular');
 
-// Global Redis (Common) - currently_processing_brand, proxy, ips, scraper status
-const globalRedis = new Redis({
-  host: globalRedisConfig.host,
-  port: globalRedisConfig.port,
-  password: globalRedisConfig.password,
-  maxRetriesPerRequest: 3,
-  retryDelayOnFailover: 100,
-  enableReadyCheck: false,
+const connections = {
+  production: {
+    global: null,
+    watchlist: null,
+    regular: null
+  },
+  stage: {
+    global: null,
+    watchlist: null,
+    regular: null
+  }
+};
+
+
+function createRedisConnection(type, environment) {
+  const config = getRedisConfig(type, environment);
+  
+  const redis = new Redis({
+    host: config.host,
+    port: config.port,
+    password: config.password,
+    maxRetriesPerRequest: 3,
+    retryDelayOnFailover: 100,
+    enableReadyCheck: false,
+    connectTimeout: 10000, // 10 second connection timeout
+    commandTimeout: 5000,
+    lazyConnect: false, // Connect immediately
+    enableOfflineQueue: true, // Queue commands while connecting
+    family: 4,
+    keepAlive: true,
+    maxClients: 100, 
+  });
+
+
+  redis.on("connect", () => {
+    console.log(`${type} Redis connected [${environment}]: ${config.host}:${config.port}`);
+  });
+
+  redis.on("error", (err) => {
+    console.error(` ${type} Redis error [${environment}]:`, err.message);
+  });
+
+  redis.on("ready", () => {
+    console.log(`${type} Redis ready [${environment}]`);
+  });
+
+  redis.on("close", () => {
+    console.log(`${type} Redis connection closed [${environment}]`);
+  });
+
+  redis.on("reconnecting", () => {
+    console.log(`${type} Redis reconnecting [${environment}]...`);
+  });
+
+  return redis;
+}
+
+function getRedisConnection(type, environment = 'production') {
+  if (!connections[environment]) {
+    throw new Error(`Invalid environment: ${environment}`);
+  }
+  
+  // Check if connection exists and is still connected
+  if (!connections[environment][type] || connections[environment][type].status !== 'ready') {
+    // Close existing connection if it exists but is not ready
+    if (connections[environment][type]) {
+      try {
+        connections[environment][type].disconnect();
+        console.log(`Closed stale ${type} Redis connection [${environment}]`);
+      } catch (error) {
+        console.warn(`Error closing stale ${type} Redis connection:`, error.message);
+      }
+    }
+    connections[environment][type] = createRedisConnection(type, environment);
+  }
+  
+  return connections[environment][type];
+}
+
+
+console.log("Initializing Redis connections for all environments...");
+const environments = ['production', 'stage'];
+const types = ['global', 'watchlist', 'regular'];
+
+environments.forEach(env => {
+  types.forEach(type => {
+    getRedisConnection(type, env);
+  });
 });
 
-// Watchlist Redis - watchlist pending_queue, watchlist failed_queue, watchlist brand processing, watchlist typesense, watchlist stats
-const watchlistRedis = new Redis({
-  host: watchlistRedisConfig.host,
-  port: watchlistRedisConfig.port,
-  password: watchlistRedisConfig.password,
-  maxRetriesPerRequest: 3,
-  retryDelayOnFailover: 100,
-  enableReadyCheck: false,
-});
 
-// Regular Redis - pending_queue, failed_queue, regular brand processing, regular typesense, regular stats
-const regularRedis = new Redis({
-  host: regularRedisConfig.host,
-  port: regularRedisConfig.port,
-  password: regularRedisConfig.password,
-  maxRetriesPerRequest: 3,
-  retryDelayOnFailover: 100,
-  enableReadyCheck: false,
-});
+const globalRedis = getRedisConnection('global', 'production');
+const watchlistRedis = getRedisConnection('watchlist', 'production');
+const regularRedis = getRedisConnection('regular', 'production');
 
 
-globalRedis.on("connect", () => {
-  console.log("Global Redis connected successfully");
-});
-
-globalRedis.on("error", (err) => {
-  console.error("Global Redis connection error:", err);
-});
-
-globalRedis.on("ready", () => {
-  console.log("Global Redis is ready for operations");
-});
-
-globalRedis.on("close", () => {
-  console.log("Global Redis connection closed");
-});
-
-globalRedis.on("reconnecting", () => {
-  console.log("Global Redis reconnecting...");
-});
-
-
-watchlistRedis.on("connect", () => {
-  console.log("Watchlist Redis connected successfully");
-});
-
-watchlistRedis.on("error", (err) => {
-  console.error("Watchlist Redis connection error:", err);
-});
-
-watchlistRedis.on("ready", () => {
-  console.log("Watchlist Redis is ready for operations");
-});
-
-watchlistRedis.on("close", () => {
-  console.log("Watchlist Redis connection closed");
-});
-
-watchlistRedis.on("reconnecting", () => {
-  console.log("Watchlist Redis reconnecting...");
-});
-
-
-regularRedis.on("connect", () => {
-  console.log("Regular Redis connected successfully");
-});
-
-regularRedis.on("error", (err) => {
-  console.error("Regular Redis connection error:", err);
-});
-
-regularRedis.on("ready", () => {
-  console.log("Regular Redis is ready for operations");
-});
-
-regularRedis.on("close", () => {
-  console.log("Regular Redis connection closed");
-});
-
-regularRedis.on("reconnecting", () => {
-  console.log("Regular Redis reconnecting...");
-});
+// Event listeners are already added in createRedisConnection function
+// No need for duplicate listeners here
 
 // Function to reinitialize Redis connections with current environment settings
 async function reinitializeRedis() {
   try {
+    console.log("Reinitializing Redis connections...");
     
-    // Close existing connections
-    if (globalRedis) {
+  
+    for (const env of ['production', 'stage']) {
+      for (const type of ['global', 'watchlist', 'regular']) {
+        if (connections[env] && connections[env][type]) {
+          try {
+            await connections[env][type].quit();
+            console.log(`Closed ${type} Redis connection [${env}]`);
+          } catch (closeError) {
+            console.log(`Error closing ${type} Redis connection [${env}] (expected):`, closeError.message);
+          }
+          connections[env][type] = null;
+        }
+      }
+    }
+    
+  
+    if (globalRedis && globalRedis.status !== 'end') {
       try {
         await globalRedis.quit();
         console.log("Previous global Redis connection closed");
@@ -114,7 +132,7 @@ async function reinitializeRedis() {
       }
     }
     
-    if (watchlistRedis) {
+    if (watchlistRedis && watchlistRedis.status !== 'end') {
       try {
         await watchlistRedis.quit();
         console.log("Previous watchlist Redis connection closed");
@@ -123,7 +141,7 @@ async function reinitializeRedis() {
       }
     }
     
-    if (regularRedis) {
+    if (regularRedis && regularRedis.status !== 'end') {
       try {
         await regularRedis.quit();
         console.log("Previous regular Redis connection closed");
@@ -132,8 +150,8 @@ async function reinitializeRedis() {
       }
     }
     
-    // Wait a moment for connections to fully close
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Wait longer for connections to fully close
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     // Get fresh Redis configurations based on current environment
     const globalRedisConfig = getRedisConfig('global');
@@ -145,33 +163,11 @@ async function reinitializeRedis() {
     console.log("  Watchlist Redis:", `${watchlistRedisConfig.host}:${watchlistRedisConfig.port}`);
     console.log("  Regular Redis:", `${regularRedisConfig.host}:${regularRedisConfig.port}`);
     
-    // Create new Redis instances (these will be exported)
-    const newGlobalRedis = new Redis({
-      host: globalRedisConfig.host,
-      port: globalRedisConfig.port,
-      password: globalRedisConfig.password,
-      maxRetriesPerRequest: 3,
-      retryDelayOnFailover: 100,
-      enableReadyCheck: false,
-    });
-    
-    const newWatchlistRedis = new Redis({
-      host: watchlistRedisConfig.host,
-      port: watchlistRedisConfig.port,
-      password: watchlistRedisConfig.password,
-      maxRetriesPerRequest: 3,
-      retryDelayOnFailover: 100,
-      enableReadyCheck: false,
-    });
-    
-    const newRegularRedis = new Redis({
-      host: regularRedisConfig.host,
-      port: regularRedisConfig.port,
-      password: regularRedisConfig.password,
-      maxRetriesPerRequest: 3,
-      retryDelayOnFailover: 100,
-      enableReadyCheck: false,
-    });
+    // Use the existing connection pool instead of creating new instances
+    // This prevents connection leaks
+    const newGlobalRedis = getRedisConnection('global', 'production');
+    const newWatchlistRedis = getRedisConnection('watchlist', 'production');
+    const newRegularRedis = getRedisConnection('regular', 'production');
     
     // Add event listeners
     newGlobalRedis.on("connect", () => {
@@ -210,10 +206,89 @@ async function reinitializeRedis() {
   }
 }
 
+// Connection monitoring and leak detection
+let connectionCount = 0;
+const MAX_CONNECTIONS = 50; // Maximum allowed connections
+
+function monitorConnections() {
+  connectionCount = 0;
+  for (const env of ['production', 'stage']) {
+    for (const type of ['global', 'watchlist', 'regular']) {
+      if (connections[env] && connections[env][type]) {
+        connectionCount++;
+      }
+    }
+  }
+  
+  if (connectionCount > MAX_CONNECTIONS) {
+    console.warn(`⚠️  High Redis connection count: ${connectionCount}/${MAX_CONNECTIONS}`);
+  }
+  
+  console.log(`📊 Redis connections: ${connectionCount} active`);
+}
+
+// Monitor connections every 30 seconds
+setInterval(monitorConnections, 30000);
+
+// Add global error handler to prevent unhandled error crashes
+process.on('unhandledRejection', (reason, promise) => {
+  if (reason && reason.message && reason.message.includes('max number of clients reached')) {
+    console.error('🚨 Redis max clients reached - connection pool exhausted');
+    console.error('This indicates a connection leak - check redisUtils.js');
+    console.error('Error details:', reason.message);
+    
+    // Log current connection count
+    monitorConnections();
+    
+    // Attempt to clean up stale connections
+    console.log('Attempting to clean up stale connections...');
+    for (const env of ['production', 'stage']) {
+      for (const type of ['global', 'watchlist', 'regular']) {
+        if (connections[env] && connections[env][type]) {
+          const redis = connections[env][type];
+          if (redis.status === 'end' || redis.status === 'close') {
+            connections[env][type] = null;
+            console.log(`Cleaned up stale ${type} connection [${env}]`);
+          }
+        }
+      }
+    }
+  }
+});
+
+// Graceful shutdown handler
+process.on('SIGINT', async () => {
+  console.log('🛑 Shutting down Redis connections...');
+  for (const env of ['production', 'stage']) {
+    for (const type of ['global', 'watchlist', 'regular']) {
+      if (connections[env] && connections[env][type]) {
+        try {
+          await connections[env][type].quit();
+          console.log(`✅ Closed ${type} Redis connection [${env}]`);
+        } catch (error) {
+          console.error(`❌ Error closing ${type} Redis connection [${env}]:`, error.message);
+        }
+      }
+    }
+  }
+  process.exit(0);
+});
+
+// Export functions with singleton pattern
 module.exports = {
-  globalRedis,
-  watchlistRedis,
-  regularRedis,
-  redis: globalRedis,
-  reinitializeRedis
+  get globalRedis() {
+    return getRedisConnection('global', 'production');
+  },
+  get watchlistRedis() {
+    return getRedisConnection('watchlist', 'production');
+  },
+  get regularRedis() {
+    return getRedisConnection('regular', 'production');
+  },
+  get redis() {
+    return getRedisConnection('global', 'production');
+  },
+  getRedisConnection,
+  reinitializeRedis,
+  monitorConnections
 };

@@ -767,7 +767,8 @@ async function getBrandProcessingQueue(
   sortBy = "normal",
   sortOrder = "desc",
   ifNoneMatch = null,
-  search = null
+  search = null,
+  environment = 'production'
 ) {
   const startTime = process.hrtime.bigint();
   
@@ -784,7 +785,7 @@ async function getBrandProcessingQueue(
       queueType === "watchlist"
         ? watchlistBrandProcessingQueue
         : regularBrandProcessingQueue;
-    const redis = getQueueRedis(queueType);
+    const redis = getQueueRedis(queueType, environment);
 
     // Ensure queue and redis are available
     if (!queue) {
@@ -1095,11 +1096,12 @@ async function getWatchlistBrandsQueue(
   sortBy = 'normal',
   sortOrder = 'desc',
   ifNoneMatch = null,
-  search = null
+  search = null,
+  environment = 'production'
 ) {
   try {
     // Use the new getBrandProcessingQueue function with watchlist queue type
-    return await getBrandProcessingQueue(page, limit, 'watchlist', sortBy, sortOrder, ifNoneMatch, search);
+    return await getBrandProcessingQueue(page, limit, 'watchlist', sortBy, sortOrder, ifNoneMatch, search, environment);
   } catch (error) {
     logger.error("Error in getWatchlistBrandsQueue:", error);
     throw error;
@@ -1132,12 +1134,12 @@ function clearAllCaches() {
 }
 
 // Get ALL brand processing jobs without pagination (for dashboard cards)
-async function getAllBrandProcessingJobs(queueType = 'regular', ifNoneMatch = null) {
+async function getAllBrandProcessingJobs(queueType = 'regular', ifNoneMatch = null, environment = 'production') {
   try {
     const startTime = process.hrtime.bigint();
     
     // Generate cache key for all jobs
-    const cacheKey = `all_brand_processing_jobs:${queueType}`;
+    const cacheKey = `all_brand_processing_jobs:${queueType}:${environment}`;
     
     // Check cache first
     if (ifNoneMatch) {
@@ -1154,7 +1156,7 @@ async function getAllBrandProcessingJobs(queueType = 'regular', ifNoneMatch = nu
     }
     
     // Get Redis instance
-    const redis = getQueueRedis(queueType);
+    const redis = getQueueRedis(queueType, environment);
     if (!redis) {
       throw new Error(`Redis instance not available for queue type: ${queueType}`);
     }
@@ -1309,8 +1311,9 @@ async function getAllBrandProcessingJobs(queueType = 'regular', ifNoneMatch = nu
     
     if (missingBrandIds.length > 0) {
       logger.info(`Force refreshing brand cache for ${missingBrandIds.length} missing brands: ${missingBrandIds.join(', ')}`);
-      // Require Brand model dynamically
-      const { Brand, Ad } = require("../models");
+      // Get Brand model for the specified environment
+      const { getModels } = require("../models");
+      const { Brand, Ad } = getModels(environment);
       const missingBrands = await Brand.findAll({
         where: { id: { [Op.in]: missingBrandIds } },
         attributes: ["id", "actual_name", "page_id", "category"],
@@ -1345,7 +1348,8 @@ async function getAllBrandProcessingJobs(queueType = 'regular', ifNoneMatch = nu
     
     // Also add newly fetched brands to the map
     if (missingBrandIds.length > 0) {
-      const { Brand } = require("../models");
+      const { getModels } = require("../models");
+      const { Brand } = getModels(environment);
       const newlyFetchedBrands = await Brand.findAll({
         where: { id: { [Op.in]: missingBrandIds } },
         attributes: ["id", "actual_name", "page_id", "category"],

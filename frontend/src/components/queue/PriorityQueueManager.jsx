@@ -147,11 +147,11 @@ const PriorityQueueManager = ({ disabled = false }) => {
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <div className="mb-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
           Priority Queue Manager
         </h3>
-        <p className="text-sm text-gray-600">
-          {getDescription()}
+        <p className="text-xs sm:text-sm text-gray-600">
+          Manage the priority of brands by changing their score in the pending queue or adjusting their position in the failed queue
         </p>
       </div>
 

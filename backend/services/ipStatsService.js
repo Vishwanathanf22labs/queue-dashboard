@@ -1,6 +1,5 @@
 const { getGlobalRedis } = require("../utils/redisSelector");
 const logger = require("../utils/logger");
-const { Brand } = require("../models");
 const { Op } = require("sequelize");
 const {
   getCacheKey,
@@ -17,9 +16,9 @@ const {
   setIpBrandsETag,
 } = require("./utils/cacheUtils");
 
-async function getAllIpStats() {
+async function getAllIpStats(environment = 'production') {
   try {
-    const redis = getGlobalRedis();
+    const redis = getGlobalRedis(environment);
 
     const ipStatsKeys = await redis.keys("ip_stats:*");
 
@@ -56,7 +55,8 @@ async function getIpStatsWithPagination(
   limit = 10,
   search = "",
   sortBy = "totalAds",
-  sortOrder = "desc"
+  sortOrder = "desc",
+  environment = 'production'
 ) {
   try {
     const cached = await getIpStatsListCache(
@@ -64,7 +64,8 @@ async function getIpStatsWithPagination(
       limit,
       search,
       sortBy,
-      sortOrder
+      sortOrder,
+      environment
     );
     if (cached) {
       const cachedETag = await getIpStatsListETag(
@@ -72,12 +73,13 @@ async function getIpStatsWithPagination(
         limit,
         search,
         sortBy,
-        sortOrder
+        sortOrder,
+        environment
       );
       return { ...cached, etag: cachedETag, fromCache: true };
     }
 
-    const redis = getGlobalRedis();
+    const redis = getGlobalRedis(environment);
     const ipStatsKeys = await redis.keys("ip_stats:*");
 
     const hashKeys = ipStatsKeys.filter((key) => !key.includes(":brands"));
@@ -144,8 +146,8 @@ async function getIpStatsWithPagination(
     });
 
     await Promise.all([
-      setIpStatsListCache(page, limit, result, search, sortBy, sortOrder, 300),
-      setIpStatsListETag(page, limit, etag, search, sortBy, sortOrder, 300),
+      setIpStatsListCache(page, limit, result, search, sortBy, sortOrder, 300, environment),
+      setIpStatsListETag(page, limit, etag, search, sortBy, sortOrder, 300, environment),
     ]);
 
     return { ...result, etag, fromCache: false };
@@ -155,9 +157,9 @@ async function getIpStatsWithPagination(
   }
 }
 
-async function getIpStatsByIp(ip) {
+async function getIpStatsByIp(ip, environment = 'production') {
   try {
-    const redis = getGlobalRedis();
+    const redis = getGlobalRedis(environment);
     const key = `ip_stats:${ip}`;
 
     const stats = await redis.hgetall(key);
@@ -180,7 +182,7 @@ async function getIpStatsByIp(ip) {
   }
 }
 
-async function getBrandsByIp(ip, page = 1, limit = 10, search = "") {
+async function getBrandsByIp(ip, page = 1, limit = 10, search = "", environment = 'production') {
   try {
     const cached = await getIpBrandsCache(ip, page, limit, search);
     if (cached) {
@@ -188,7 +190,7 @@ async function getBrandsByIp(ip, page = 1, limit = 10, search = "") {
       return { ...cached, etag: cachedETag, fromCache: true };
     }
 
-    const redis = getGlobalRedis();
+    const redis = getGlobalRedis(environment);
     const brandsKey = `ip_stats:${ip}:brands`;
 
     const exists = await redis.exists(brandsKey);
@@ -227,6 +229,8 @@ async function getBrandsByIp(ip, page = 1, limit = 10, search = "") {
       }
 
       const brandIds = brandsData.map((b) => b.brandId);
+      const { getModels } = require("../models");
+      const { Brand } = getModels(environment);
       const brands = await Brand.findAll({
         where: { id: { [Op.in]: brandIds } },
         attributes: ["id", "actual_name", "name"],
@@ -304,8 +308,10 @@ async function getBrandsByIp(ip, page = 1, limit = 10, search = "") {
   }
 }
 
-async function getBrandNameFromDb(brandId) {
+async function getBrandNameFromDb(brandId, environment = 'production') {
   try {
+    const { getModels } = require("../models");
+    const { Brand } = getModels(environment);
     const brand = await Brand.findOne({
       where: { id: brandId },
       attributes: ["actual_name", "name"],
@@ -322,9 +328,9 @@ async function getBrandNameFromDb(brandId) {
   }
 }
 
-async function deleteIpStats(ip) {
+async function deleteIpStats(ip, environment = 'production') {
   try {
-    const redis = getGlobalRedis();
+    const redis = getGlobalRedis(environment);
     const statsKey = `ip_stats:${ip}`;
     const brandsKey = `ip_stats:${ip}:brands`;
 
@@ -344,9 +350,9 @@ async function deleteIpStats(ip) {
   }
 }
 
-async function getIpStatsSummary() {
+async function getIpStatsSummary(environment = 'production') {
   try {
-    const allStats = await getAllIpStats();
+    const allStats = await getAllIpStats(environment);
 
     const summary = {
       totalIps: allStats.length,

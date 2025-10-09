@@ -35,8 +35,8 @@ const DashboardHeader = ({
         <div className="pr-4 sm:pr-8 lg:pr-16 xl:pr-0">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-900">Madangles Queues</h1>
-              <p className="text-xs sm:text-sm lg:text-base text-gray-600">Monitor your brand processing queue</p>
+              <h1 className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-900">Dashboard</h1>
+              <p className="text-xs sm:text-sm lg:text-base text-gray-600">Manage your brands</p>
             </div>
             <div className="mt-2 sm:mt-0 sm:ml-4">
               <CooldownIndicator

@@ -24,7 +24,7 @@ const useEnvironmentStore = create(
 
       clearError: () => set({ error: null }),
 
-      // Environment change handler
+      // Environment change handler - Now client-side only, no backend switch
       changeEnvironment: async (environment) => {
         const { currentEnvironment } = get();
         
@@ -35,16 +35,28 @@ const useEnvironmentStore = create(
         try {
           set({ isLoading: true, error: null });
           
-          // Make API call to switch backend environment
-          const result = await environmentAPI.switch(environment);
-          
           // Add timestamp to prevent caching
           const timestamp = Date.now();
           localStorage.setItem('environment_switch_timestamp', timestamp.toString());
           
-          // Add a small delay to ensure backend environment switch is complete
-          await new Promise(resolve => setTimeout(resolve, 300));
+          // IMPORTANT: Manually save to localStorage BEFORE setting state
+          // This ensures the environment is saved before page reload
+          const existingStorage = localStorage.getItem('environment-storage');
+          let storageData = { state: { currentEnvironment: environment }, version: 0 };
           
+          if (existingStorage) {
+            try {
+              const parsed = JSON.parse(existingStorage);
+              storageData = { ...parsed, state: { ...parsed.state, currentEnvironment: environment } };
+            } catch (e) {
+              console.warn('Failed to parse existing environment storage:', e);
+            }
+          }
+          
+          localStorage.setItem('environment-storage', JSON.stringify(storageData));
+          console.log(`Environment manually saved to localStorage: ${environment}`);
+          
+          // Update state
           set({ 
             currentEnvironment: environment,
             isLoading: false,
@@ -52,7 +64,6 @@ const useEnvironmentStore = create(
           });
 
           // Clear all cached data from other stores
-          // Clear queue store data
           useQueueStore.getState().clearAllData();
           
           // Clear localStorage cache for ad-update queues (fixes stale data issue)
@@ -69,11 +80,11 @@ const useEnvironmentStore = create(
             console.warn('Failed to clear localStorage ad-update cache:', storageError);
           }
           
-          // Don't clear admin store data - admin login should persist across environments
-          // useAdminStore.getState().reset();
-
-          // Note: Dashboard component will automatically refresh data via useEffect
-          // when currentEnvironment changes, so no need to reload the page
+          // Force page reload to ensure all components fetch fresh data with new environment
+          console.log(`Reloading page with environment: ${environment}`);
+          setTimeout(() => {
+            window.location.reload();
+          }, 200);
           
         } catch (error) {
           console.error('Environment change error:', error);

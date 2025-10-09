@@ -2,11 +2,12 @@ const { getQueueRedis, getGlobalRedis } = require("../utils/redisSelector");
 const logger = require("../utils/logger");
 const { QUEUES, REDIS_KEYS } = require("../config/constants");
 
-async function removePendingBrand(brandId, queueType = 'regular') {
+async function removePendingBrand(brandId, queueType = 'regular', environment = 'production') {
   try {
     logger.info(`Removing brand with ID ${brandId} from ${queueType} pending queue`);
 
-    const redis = getQueueRedis(queueType);
+    const REDIS_KEYS = require("../config/constants").getRedisKeys(environment);
+    const redis = getQueueRedis(queueType, environment);
     const queueKey = REDIS_KEYS[queueType.toUpperCase()].PENDING_BRANDS;
     const pendingBrands = await redis.zrange(queueKey, 0, -1, 'WITHSCORES');
 
@@ -63,11 +64,12 @@ async function removePendingBrand(brandId, queueType = 'regular') {
   }
 }
 
-async function removeFailedBrand(brandId, queueType = 'regular') {
+async function removeFailedBrand(brandId, queueType = 'regular', environment = 'production') {
   try {
     logger.info(`Removing brand with ID ${brandId} from ${queueType} failed queue`);
 
-    const redis = getQueueRedis(queueType);
+    const REDIS_KEYS = require("../config/constants").getRedisKeys(environment);
+    const redis = getQueueRedis(queueType, environment);
     const queueKey = REDIS_KEYS[queueType.toUpperCase()].FAILED_BRANDS;
     const failedBrands = await redis.lrange(queueKey, 0, -1);
 

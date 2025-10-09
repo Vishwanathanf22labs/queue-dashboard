@@ -353,7 +353,10 @@ const EditBrandStatusForm = ({ disabled = false }) => {
   return (
     <div className="space-y-4 sm:space-y-6">
       <div>
-        <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">Edit Brand Status</h3>
+        <h3 className="text-sm sm:text-base md:text-lg font-medium text-gray-900 mb-2">Edit Brand Status</h3>
+        <p className="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">
+          Edit brand status in the database using searching functionality and CSV uploading for bulk operations
+        </p>
         <div className="space-y-3 sm:space-y-4">
           <div>
             <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2 sm:mb-3">

@@ -480,25 +480,25 @@ const WatchlistBrands = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Watchlist Brands</h1>
-          <p className="text-gray-600">Monitor all your watchlist brands and their scraping status</p>
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">Watchlist Brands</h1>
+          <p className="text-sm sm:text-base text-gray-600">Monitor all your watchlist brands and their scraping status</p>
         </div>
         
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-3">
           {!isAdmin ? (
             <button
               onClick={onAdminLogin}
-              className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
+              className="flex items-center justify-center space-x-2 px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors cursor-pointer"
             >
-              <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="text-xs sm:text-sm font-medium">Admin Access Required</span>
+              <Shield className="h-4 w-4" />
+              <span className="text-sm font-medium">Admin Access Required</span>
             </button>
           ) : (
-            <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-green-100 text-green-800 rounded-lg">
-              <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="text-xs sm:text-sm font-medium">Admin Mode</span>
+            <div className="flex items-center justify-center space-x-2 px-3 py-2 bg-green-100 text-green-800 rounded-lg">
+              <Shield className="h-4 w-4" />
+              <span className="text-sm font-medium">Admin Mode</span>
             </div>
           )}
 
@@ -515,60 +515,61 @@ const WatchlistBrands = () => {
       </div>
 
 
-      {/* Watchlist Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card>
+      {/* Status Cards - Mobile: 2 columns, Desktop: 3 columns */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4">
+        {/* Row 1 */}
+        <Card className="p-3 sm:p-4 md:p-6">
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-lg sm:text-xl md:text-2xl font-bold text-green-600">
               {allWatchlistBrands.filter(b => b.status === 'Active').length}
             </div>
-            <div className="text-sm text-gray-600">Watchlist Active</div>
+            <div className="text-xs sm:text-sm text-gray-600">Watchlist Active</div>
           </div>
         </Card>
-        <Card>
+        <Card className="p-3 sm:p-4 md:p-6">
           <div className="text-center">
-            <div className="text-2xl font-bold text-gray-600">
+            <div className="text-lg sm:text-xl md:text-2xl font-bold text-gray-600">
               {allWatchlistBrands.filter(b => b.status === 'Inactive').length}
             </div>
-            <div className="text-sm text-gray-600">Watchlist Inactive</div>
+            <div className="text-xs sm:text-sm text-gray-600">Watchlist Inactive</div>
           </div>
         </Card>
-        <Card>
+        
+        {/* Row 2 */}
+        <Card className="p-3 sm:p-4 md:p-6">
           <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">
+            <div className="text-lg sm:text-xl md:text-2xl font-bold text-blue-600">
               {allWatchlistBrands.length}
             </div>
-            <div className="text-sm text-gray-600">Watchlist Total</div>
+            <div className="text-xs sm:text-sm text-gray-600">Watchlist Total</div>
           </div>
         </Card>
-      </div>
-
-      {/* Processing Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
-                {allWatchlistBrands.filter(b => determineScraperStatus(b) === 'completed').length}
-              </div>
-              <div className="text-sm text-gray-600">Completed</div>
+        <Card className="p-3 sm:p-4 md:p-6">
+          <div className="text-center">
+            <div className="text-lg sm:text-xl md:text-2xl font-bold text-green-600">
+              {allWatchlistBrands.filter(b => determineScraperStatus(b) === 'completed').length}
             </div>
-          </Card>
-          <Card>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-600">
-                {allWatchlistBrands.filter(b => determineScraperStatus(b) === 'waiting').length}
-              </div>
-              <div className="text-sm text-gray-600">Waiting</div>
+            <div className="text-xs sm:text-sm text-gray-600">Completed</div>
+          </div>
+        </Card>
+        
+        {/* Row 3 */}
+        <Card className="p-3 sm:p-4 md:p-6">
+          <div className="text-center">
+            <div className="text-lg sm:text-xl md:text-2xl font-bold text-yellow-600">
+              {allWatchlistBrands.filter(b => determineScraperStatus(b) === 'waiting').length}
             </div>
-          </Card>
-          <Card>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">
-                {allWatchlistBrands.filter(b => determineScraperStatus(b) === 'failed').length}
-              </div>
-              <div className="text-sm text-gray-600">Failed</div>
+            <div className="text-xs sm:text-sm text-gray-600">Waiting</div>
+          </div>
+        </Card>
+        <Card className="p-3 sm:p-4 md:p-6">
+          <div className="text-center">
+            <div className="text-lg sm:text-xl md:text-2xl font-bold text-red-600">
+              {allWatchlistBrands.filter(b => determineScraperStatus(b) === 'failed').length}
             </div>
-          </Card>
+            <div className="text-xs sm:text-sm text-gray-600">Failed</div>
+          </div>
+        </Card>
       </div>
 
        {/* Load Active Watchlist Button */}

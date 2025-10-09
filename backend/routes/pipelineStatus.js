@@ -3,7 +3,6 @@ const router = express.Router();
 const {
   getBrandScrapingStatus,
   getAllBrandsScrapingStatus,
-  getAllBrandsScrapingStatusSeparate,
   getOverallPipelineStats,
   searchBrandsPipelineStatus,
 } = require("../services/pipeline");
@@ -24,7 +23,7 @@ router.get("/brand/:brandId", async (req, res) => {
       return res.status(400).json({ error: "Date must be in YYYY-MM-DD format" });
     }
     
-    const status = await getBrandScrapingStatus(parseInt(brandId), date);
+    const status = await getBrandScrapingStatus(parseInt(brandId), date, req.environment);
     res.json(status);
   } catch (error) {
     console.error("Error getting brand scraping status:", error);
@@ -35,6 +34,7 @@ router.get("/brand/:brandId", async (req, res) => {
 // Get scraping status for all brands - OPTIMIZED VERSION
 router.get("/all", async (req, res) => {
   try {
+    console.log(`[PIPELINE DEBUG] Environment: ${req.environment}`);
     const page = parseInt(req.query.page) || 1;
     const perPage = parseInt(req.query.perPage) || parseInt(req.query.limit) || 10;
     const { date, sortBy, sortOrder, lastId } = req.query;
@@ -69,7 +69,7 @@ router.get("/all", async (req, res) => {
     // Check for ETag support
     const clientETag = req.headers['if-none-match'];
     
-    const result = await getAllBrandsScrapingStatus(page, perPage, date, sortBy, sortOrder, lastId);
+    const result = await getAllBrandsScrapingStatus(page, perPage, date, sortBy, sortOrder, lastId, req.environment);
     
     // Handle ETag response
     if (result.statusCode === 304) {
@@ -115,7 +115,8 @@ router.get("/all/separate", async (req, res) => {
       return res.status(400).json({ error: "Date must be in YYYY-MM-DD format" });
     }
     
-    const result = await getAllBrandsScrapingStatusSeparate(page, limit, date);
+    // Use the main function since getAllBrandsScrapingStatusSeparate doesn't exist
+    const result = await getAllBrandsScrapingStatus(page, limit, date, 'normal', 'desc', null, req.environment);
     res.json(result);
   } catch (error) {
     console.error("Error getting all brands scraping status (separate):", error);
@@ -126,6 +127,7 @@ router.get("/all/separate", async (req, res) => {
 // Get overall pipeline statistics - separate endpoint with caching
 router.get("/overall-stats", async (req, res) => {
   try {
+    console.log(`[PIPELINE OVERALL STATS DEBUG] Environment: ${req.environment}`);
     const { date } = req.query;
     
     // Validate date format if provided
@@ -136,7 +138,7 @@ router.get("/overall-stats", async (req, res) => {
     // Check for ETag support
     const clientETag = req.headers['if-none-match'];
     
-    const result = await getOverallPipelineStats(date);
+    const result = await getOverallPipelineStats(date, req.environment);
     
     // Set ETag header if available
     if (result.etag) {
@@ -170,7 +172,7 @@ router.get("/search", async (req, res) => {
       return res.status(400).json({ success: false, error: 'Date must be in YYYY-MM-DD format' });
     }
     
-    const result = await searchBrandsPipelineStatus(query.trim(), date);
+    const result = await searchBrandsPipelineStatus(query.trim(), date, req.environment);
     
     if (result.success) {
       // Return the result directly as it already has the correct structure

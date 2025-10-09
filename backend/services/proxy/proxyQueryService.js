@@ -38,7 +38,7 @@ function formatDisabledTimestamp(disabledAt) {
 /**
  * Get all proxies with pagination and filters
  */
-async function getProxies(page = 1, limit = 10, filter = "all", search = "") {
+async function getProxies(page = 1, limit = 10, filter = "all", search = "", environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys();
     const PROXY_IPS_KEY = REDIS_KEYS.GLOBAL.PROXY_IPS;
@@ -47,12 +47,12 @@ async function getProxies(page = 1, limit = 10, filter = "all", search = "") {
     const end = start + limit - 1;
     
     // Get all proxy keys
-    const proxyKeys = await getGlobalRedis().keys(`${PROXY_IPS_KEY}:*`);
+    const proxyKeys = await getGlobalRedis(environment).keys(`${PROXY_IPS_KEY}:*`);
     
     // Get all proxy data from hashes
     let allProxies = [];
     for (const key of proxyKeys) {
-      const proxyData = await getGlobalRedis().hgetall(key);
+      const proxyData = await getGlobalRedis(environment).hgetall(key);
       if (Object.keys(proxyData).length > 0) {
         // Parse the proxy key to extract IP, port, username, password
         const keyParts = key.split(':');
@@ -472,19 +472,19 @@ async function getNextProxy() {
 /**
  * Get proxy statistics
  */
-async function getProxyStats() {
+async function getProxyStats(environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys();
     const PROXY_IPS_KEY = REDIS_KEYS.GLOBAL.PROXY_IPS;
     
     // Get all proxy keys
-    const proxyKeys = await getGlobalRedis().keys(`${PROXY_IPS_KEY}:*`);
+    const proxyKeys = await getGlobalRedis(environment).keys(`${PROXY_IPS_KEY}:*`);
     const totalProxies = proxyKeys.length;
     
     // Get all proxy data from hashes (same logic as getProxies)
     const allProxies = [];
     for (const key of proxyKeys) {
-      const proxyData = await getGlobalRedis().hgetall(key);
+      const proxyData = await getGlobalRedis(environment).hgetall(key);
       if (Object.keys(proxyData).length > 0) {
         // Parse the proxy key to extract IP, port, username, password
         const keyParts = key.split(':');
@@ -508,7 +508,7 @@ async function getProxyStats() {
     let lockedProxiesCount = 0;
     
     // Get all proxy lock keys to count locked proxies
-    const lockKeys = await getGlobalRedis().keys("proxy:lock:*");
+    const lockKeys = await getGlobalRedis(environment).keys("proxy:lock:*");
     
     allProxies.forEach(proxy => {
       if (proxy.active === "true") activeCount++;
@@ -630,10 +630,10 @@ async function searchProxies(query, criteria = "all") {
 /**
  * Get proxy management statistics (added/removed counts)
  */
-async function getProxyManagementStats() {
+async function getProxyManagementStats(environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys();
-    const stats = await getGlobalRedis().hgetall(REDIS_KEYS.GLOBAL.PROXY_STATS);
+    const stats = await getGlobalRedis(environment).hgetall(REDIS_KEYS.GLOBAL.PROXY_STATS);
     
     return {
       success: true,

@@ -120,7 +120,10 @@ const SingleBrandForm = ({ loading, isSubmitting, onSubmittingChange, disabled =
   return (
     <form onSubmit={handleSingleBrandSubmit} className="space-y-4 sm:space-y-6">
       <div>
-        <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">Add Single Brand</h3>
+        <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">Add Single Brand</h3>
+        <p className="text-sm text-gray-600 mb-3 sm:mb-4">
+          Add a brand to the regular pending queue or watchlist pending queue for scraping
+        </p>
         <div className="space-y-3 sm:space-y-4">
           <div>
             <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2 sm:mb-3">
@@ -137,7 +140,7 @@ const SingleBrandForm = ({ loading, isSubmitting, onSubmittingChange, disabled =
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 accent-blue-600"
                   disabled={disabled || isSubmitting || loading}
                 />
-                <span className="ml-2 text-base font-semibold text-gray-700">Regular Queue</span>
+                <span className="ml-2 text-sm font-medium text-gray-700">Regular Queue</span>
               </label>
               <label className="flex items-center">
                 <input
@@ -149,7 +152,7 @@ const SingleBrandForm = ({ loading, isSubmitting, onSubmittingChange, disabled =
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 accent-blue-600"
                   disabled={disabled || isSubmitting || loading}
                 />
-                <span className="ml-2 text-base font-semibold text-gray-700">Watchlist Queue</span>
+                <span className="ml-2 text-sm font-medium text-gray-700">Watchlist Queue</span>
               </label>
             </div>
           </div>

@@ -20,9 +20,9 @@ const Toggle = ({
   };
 
   const thumbPositionClasses = {
-    sm: isOn ? 'translate-x-4' : 'translate-x-0',
-    md: isOn ? 'translate-x-6' : 'translate-x-0',
-    lg: isOn ? 'translate-x-8' : 'translate-x-0'
+    sm: isOn ? 'translate-x-4' : 'translate-x-0.5',
+    md: isOn ? 'translate-x-6' : 'translate-x-0.5',
+    lg: isOn ? 'translate-x-8' : 'translate-x-0.5'
   };
 
   return (

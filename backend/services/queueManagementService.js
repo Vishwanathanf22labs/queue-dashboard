@@ -6,8 +6,8 @@ const { QUEUES } = require("../config/constants");
 const logger = require("../utils/logger");
 
 // Function to get dynamic Redis keys
-function getRedisKeys() {
-  return require("../config/constants").REDIS_KEYS;
+function getRedisKeys(environment = 'production') {
+  return require("../config/constants").getRedisKeys(environment);
 }
 
 async function getQueueStats() {
@@ -47,34 +47,35 @@ async function getQueueStats() {
   }
 }
 
-async function changeBrandScore(queueType, brandName, newScore) {
+async function changeBrandScore(queueType, brandName, newScore, environment = 'production') {
   try {
     // Require Brand model dynamically to get the latest version
-    const { Brand } = require("../models");
-    const REDIS_KEYS = getRedisKeys();
+    const { getModels } = require("../models");
+    const { Brand } = getModels(environment);
+    const REDIS_KEYS = getRedisKeys(environment);
     
     // Define queue configurations with new Redis structure
     const queueConfigs = {
       pending: {
-        redis: getQueueRedis('regular'),
+        redis: getQueueRedis('regular', environment),
         queueKey: REDIS_KEYS.REGULAR.PENDING_BRANDS,
         type: "sortedSet",
         description: "regular pending queue",
       },
       failed: {
-        redis: getQueueRedis('regular'),
+        redis: getQueueRedis('regular', environment),
         queueKey: REDIS_KEYS.REGULAR.FAILED_BRANDS,
         type: "list",
         description: "regular failed queue",
       },
       watchlist_pending: {
-        redis: getQueueRedis('watchlist'),
+        redis: getQueueRedis('watchlist', environment),
         queueKey: REDIS_KEYS.WATCHLIST.PENDING_BRANDS,
         type: "sortedSet",
         description: "watchlist pending queue",
       },
       watchlist_failed: {
-        redis: getQueueRedis('watchlist'),
+        redis: getQueueRedis('watchlist', environment),
         queueKey: REDIS_KEYS.WATCHLIST.FAILED_BRANDS,
         type: "list",
         description: "watchlist failed queue",
@@ -267,8 +268,10 @@ module.exports = {
   changeBrandScore,
   moveWatchlistFailedToPending: queueMoveService.moveWatchlistFailedToPending,
   moveWatchlistToPending: queueMoveService.moveWatchlistToPending,
+  moveIndividualWatchlistFailedToPending: queueMoveService.moveIndividualWatchlistFailedToPending,
   clearWatchlistPendingQueue: queueClearService.clearWatchlistPendingQueue,
   clearWatchlistFailedQueue: queueClearService.clearWatchlistFailedQueue,
   moveAllWatchlistPendingToFailed: queueMoveService.moveAllWatchlistPendingToFailed,
   moveAllWatchlistFailedToPending: queueMoveService.moveAllWatchlistFailedToPending,
+  cleanupWatchlistFailedQueue: queueMoveService.cleanupWatchlistFailedQueue,
 };

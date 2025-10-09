@@ -4,139 +4,91 @@ require("dotenv").config();
 const { Sequelize } = require("sequelize");
 const { getDatabaseConfig } = require("./environmentConfig");
 
-// Create a function to get database connection
-let sequelize = null;
+const connections = {
+  production: null,
+  stage: null
+};
 
-function getDatabaseConnection() {
-  if (!sequelize) {
-    // Get database configuration based on current environment
-    const dbConfig = getDatabaseConfig();
-    const {
-      host: dbHost,
-      user: myUser,
-      password,
-      database: mydb,
-      port: dbPort,
-    } = dbConfig;
 
-    // Debug: Log what we're getting (remove after fixing)
-    console.log("🔍 Debug - DB Config:", {
-      host: dbHost,
-      user: myUser,
-      password: password ? `***${password.length} chars***` : "❌ MISSING",
-      database: mydb,
-      port: dbPort,
-    });
+function createConnection(environment) {
+  const dbConfig = getDatabaseConfig(environment);
+  const {
+    host: dbHost,
+    user: myUser,
+    password,
+    database: mydb,
+    port: dbPort,
+  } = dbConfig;
 
-    // ✅ FIXED: Check if password exists before creating connection
-    if (!password) {
-      throw new Error(
-        `Database password is missing for the current environment. Please check your .env file.`
-      );
-    }
 
-    // Ensure password is a string (PostgreSQL requires string password)
-    const stringPassword = String(password);
-
-    // Validate other required fields
-    if (!dbHost || !myUser || !mydb || !dbPort) {
-      throw new Error(
-        `Database configuration is incomplete. Missing: ${[
-          !dbHost && "host",
-          !myUser && "user",
-          !mydb && "database",
-          !dbPort && "port",
-        ]
-          .filter(Boolean)
-          .join(", ")}`
-      );
-    }
-
-    sequelize = new Sequelize(mydb, myUser, stringPassword, {
-      host: dbHost,
-      port: parseInt(dbPort),
-      dialect: "postgres",
-      logging: false,
-      pool: {
-        max: 5,
-        min: 1,
-        acquire: 30000,
-        idle: 10000,
-      },
-    });
+  if (!password) {
+    throw new Error(
+      `Database password is missing for ${environment} environment. Please check your .env file.`
+    );
   }
-  return sequelize;
+
+  if (!dbHost || !myUser || !mydb || !dbPort) {
+    throw new Error(
+      `Database configuration is incomplete for ${environment}. Missing: ${[
+        !dbHost && "host",
+        !myUser && "user",
+        !mydb && "database",
+        !dbPort && "port",
+      ]
+        .filter(Boolean)
+        .join(", ")}`
+    );
+  }
+
+  const stringPassword = String(password);
+
+  return new Sequelize(mydb, myUser, stringPassword, {
+    host: dbHost,
+    port: parseInt(dbPort),
+    dialect: "postgres",
+    logging: false,
+    pool: {
+      max: 5,
+      min: 1,
+      acquire: 30000,
+      idle: 10000,
+    },
+  });
 }
 
-// Initialize the connection
-sequelize = getDatabaseConnection();
 
-sequelize
-  .authenticate()
-  .then(() => {
-    const dbConfig = getDatabaseConfig();
-    console.log(
-      `Database connected: ${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`
-    );
-  })
-  .catch((err) => {
-    console.error("Database connection failed:", err.message);
-  });
-
-// Function to reinitialize database connection for environment switch
-async function reinitializeDatabase() {
-  try {
-    // Close existing connection if it exists
-    if (sequelize) {
-      try {
-        // Check if connection is still active before closing
-        if (sequelize.connectionManager && sequelize.connectionManager.pool) {
-          await sequelize.close();
-          console.log("Previous database connection closed");
-        }
-      } catch (closeError) {
+function getDatabaseConnection(environment = 'production') {
+  if (!connections[environment]) {
+    connections[environment] = createConnection(environment);
+    
+    connections[environment]
+      .authenticate()
+      .then(() => {
+        const dbConfig = getDatabaseConfig(environment);
         console.log(
-          "Error closing previous connection (expected):",
-          closeError.message
+          `Database connected [${environment}]: ${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`
         );
-      }
-    }
-
-    // Clear the sequelize instance
-    sequelize = null;
-
-    // Wait longer for the connection to fully close and cleanup
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    // Create new connection with current environment settings
-    sequelize = getDatabaseConnection();
-
-    // Test the new connection with retry logic
-    let retries = 3;
-    while (retries > 0) {
-      try {
-        await sequelize.authenticate();
-        break;
-      } catch (authError) {
-        retries--;
-        if (retries === 0) {
-          throw authError;
-        }
-        console.log(`Database authentication failed, retrying... (${retries} attempts left)`);
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
-    }
-
-    const config = getDatabaseConfig();
-    console.log(
-      `Database reconnected to: ${config.host}:${config.port}/${config.database}`
-    );
-
-    return sequelize;
-  } catch (error) {
-    console.error("Database reconnection error:", error.message);
-    throw error;
+      })
+      .catch((err) => {
+        console.error(`Database connection failed [${environment}]:`, err.message);
+      });
   }
+  return connections[environment];
+}
+
+
+console.log("Initializing database connections for all environments...");
+getDatabaseConnection('production');
+getDatabaseConnection('stage');
+
+
+const sequelize = getDatabaseConnection('production');
+
+
+async function reinitializeDatabase() {
+
+  console.log("reinitializeDatabase called - No action needed (multi-environment support enabled)");
+  return sequelize;
 }
 
 module.exports = {

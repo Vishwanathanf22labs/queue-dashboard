@@ -2,20 +2,21 @@ const { getWatchlistRedisInstance } = require('../utils/redisSelector');
 const logger = require('../utils/logger');
 
 // Function to get dynamic Redis keys
-function getRedisKeys() {
-  return require('../config/constants').REDIS_KEYS;
+function getRedisKeys(environment = null) {
+  const { getRedisKeys } = require('../config/constants');
+  return getRedisKeys(environment);
 }
 
 /**
  * Get count of watchlist pending brands from Redis sorted set
  * @returns {Promise<number>} Count of pending brands
  */
-async function getWatchlistPendingCount() {
+async function getWatchlistPendingCount(environment = 'production') {
   try {
-    const REDIS_KEYS = getRedisKeys();
+    const REDIS_KEYS = getRedisKeys(environment);
     const key = REDIS_KEYS.WATCHLIST.PENDING_BRANDS;
-    const count = await getWatchlistRedisInstance().zcard(key);
-    logger.info(`Watchlist pending count: ${count}`);
+    const count = await getWatchlistRedisInstance(environment).zcard(key);
+    logger.info(`Watchlist pending count [${environment}]: ${count}`);
     return count;
   } catch (error) {
     logger.error('Error getting watchlist pending count:', error);
@@ -27,12 +28,12 @@ async function getWatchlistPendingCount() {
  * Get count of watchlist failed brands from Redis list
  * @returns {Promise<number>} Count of failed brands
  */
-async function getWatchlistFailedCount() {
+async function getWatchlistFailedCount(environment = 'production') {
   try {
-    const REDIS_KEYS = getRedisKeys();
+    const REDIS_KEYS = getRedisKeys(environment);
     const key = REDIS_KEYS.WATCHLIST.FAILED_BRANDS;
-    const count = await getWatchlistRedisInstance().llen(key);
-    logger.info(`Watchlist failed count: ${count}`);
+    const count = await getWatchlistRedisInstance(environment).llen(key);
+    logger.info(`Watchlist failed count [${environment}]: ${count}`);
     return count;
   } catch (error) {
     logger.error('Error getting watchlist failed count:', error);
@@ -44,13 +45,13 @@ async function getWatchlistFailedCount() {
  * Get count of watchlist completed brands (not in pending or failed queues)
  * @returns {Promise<number>} Count of completed brands
  */
-async function getWatchlistCompletedCount() {
+async function getWatchlistCompletedCount(environment = 'production') {
   try {
-    const REDIS_KEYS = getRedisKeys();
+    const REDIS_KEYS = getRedisKeys(environment);
     // Get current pending and failed page_ids from Redis
     const [pendingItems, failedItems] = await Promise.all([
-      getWatchlistRedisInstance().zrange(REDIS_KEYS.WATCHLIST.PENDING_BRANDS, 0, -1),
-      getWatchlistRedisInstance().lrange(REDIS_KEYS.WATCHLIST.FAILED_BRANDS, 0, -1)
+      getWatchlistRedisInstance(environment).zrange(REDIS_KEYS.WATCHLIST.PENDING_BRANDS, 0, -1),
+      getWatchlistRedisInstance(environment).lrange(REDIS_KEYS.WATCHLIST.FAILED_BRANDS, 0, -1)
     ]);
     
     // If both queues are empty, completed count is 0
@@ -63,7 +64,7 @@ async function getWatchlistCompletedCount() {
     const { getWatchlistBrands } = require('./queueReadService');
     
 
-    const watchlistData = await getWatchlistBrands(1, 10000, null, null);
+    const watchlistData = await getWatchlistBrands(1, 10000, null, environment, null);
     
     if (!watchlistData || !watchlistData.brands || watchlistData.brands.length === 0) {
       logger.info('No watchlist brands found');
@@ -125,12 +126,12 @@ async function getWatchlistCompletedCount() {
  * Get watchlist stats (pending, failed, and completed counts)
  * @returns {Promise<Object>} Object with pending, failed, and completed counts
  */
-async function getWatchlistStats() {
+async function getWatchlistStats(environment = 'production') {
   try {
     const [pendingCount, failedCount, completedCount] = await Promise.all([
-      getWatchlistPendingCount(),
-      getWatchlistFailedCount(),
-      getWatchlistCompletedCount()
+      getWatchlistPendingCount(environment),
+      getWatchlistFailedCount(environment),
+      getWatchlistCompletedCount(environment)
     ]);
 
     return {

@@ -205,7 +205,7 @@ export const queueAPI = {
   moveAllFailedToPending: () =>
     api.put("/queue/queue-management/failed/move-all-to-pending"),
   moveWatchlistFailedToPending: () =>
-    api.put("/queue/queue-management/watchlist/move-failed-to-pending"),
+    api.put("/queue/queue-management/watchlist/failed/move-all-to-pending"),
   moveWatchlistToPending: () =>
     api.put("/queue/queue-management/watchlist/move-to-pending"),
   moveIndividualWatchlistFailedToPending: (brandId) =>

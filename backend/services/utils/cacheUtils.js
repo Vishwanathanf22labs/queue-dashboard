@@ -9,21 +9,64 @@ const CACHE_TTL = 30000; // 30 seconds
 // Redis client setup - using dedicated cache Redis instance
 const { getRedisConfig } = require("../../config/environmentConfig");
 
-// Dynamic Redis client getter to ensure we always get the latest connection
+// Connection pool for cache Redis clients
+const cacheRedisClients = {
+  production: null,
+  stage: null,
+  default: null
+};
+
+// Initialize default cache Redis client
+function initializeCacheRedisClient() {
+  if (!cacheRedisClients.default) {
+    const cacheRedisConfig = getRedisConfig('cache');
+    cacheRedisClients.default = new Redis({
+      host: cacheRedisConfig.host,
+      port: cacheRedisConfig.port,
+      password: cacheRedisConfig.password,
+      maxRetriesPerRequest: 3,
+      retryDelayOnFailover: 100,
+      enableReadyCheck: false,
+      connectTimeout: 10000,
+      lazyConnect: false,
+      enableOfflineQueue: true,
+    });
+    console.log(`Cache Redis client initialized: ${cacheRedisConfig.host}:${cacheRedisConfig.port}`);
+  }
+  return cacheRedisClients.default;
+}
+
+// Dynamic Redis client getter - reuses existing connections
 function getCacheRedisClient() {
-  const cacheRedisConfig = getRedisConfig('cache');
-  return new Redis({
-    host: cacheRedisConfig.host,
-    port: cacheRedisConfig.port,
-    password: cacheRedisConfig.password,
-    maxRetriesPerRequest: 3,
-    retryDelayOnFailover: 100,
-    enableReadyCheck: false,
-  });
+  return initializeCacheRedisClient();
 }
 
 // Fallback static client for backward compatibility
 let redisClient = getCacheRedisClient();
+
+// Function to get cache Redis client with environment support - reuses connections
+function getCacheRedisClientWithEnvironment(environment = null) {
+  if (environment) {
+    // Check if we already have a client for this environment
+    if (!cacheRedisClients[environment]) {
+      const cacheRedisConfig = getRedisConfig('cache', environment);
+      cacheRedisClients[environment] = new Redis({
+        host: cacheRedisConfig.host,
+        port: cacheRedisConfig.port,
+        password: cacheRedisConfig.password,
+        maxRetriesPerRequest: 3,
+        retryDelayOnFailover: 100,
+        enableReadyCheck: false,
+        connectTimeout: 10000,
+        lazyConnect: false,
+        enableOfflineQueue: true,
+      });
+      console.log(`Cache Redis client initialized for ${environment}: ${cacheRedisConfig.host}:${cacheRedisConfig.port}`);
+    }
+    return cacheRedisClients[environment];
+  }
+  return getCacheRedisClient();
+}
 
 // Function to reinitialize cache Redis client for environment switching
 function reinitializeCacheRedisClient() {
@@ -48,10 +91,10 @@ function getCacheKey(prefix, ...args) {
   return `${prefix}:${args.join(":")}`;
 }
 
-async function getCachedData(key) {
+async function getCachedData(key, environment = null) {
   try {
     // Try Redis first with dynamic client
-    const client = getCacheRedisClient();
+    const client = getCacheRedisClientWithEnvironment(environment);
     const redisData = await client.get(key);
     if (redisData) {
       return JSON.parse(redisData);
@@ -69,10 +112,10 @@ async function getCachedData(key) {
   }
 }
 
-async function setCachedData(key, data, ttl = 180) {
+async function setCachedData(key, data, ttl = 180, environment = null) {
   try {
     const serialized = JSON.stringify(data);
-    const client = getCacheRedisClient();
+    const client = getCacheRedisClientWithEnvironment(environment);
     await client.setex(key, ttl, serialized);
     return true;
   } catch (error) {
@@ -141,24 +184,24 @@ async function setQueueETag(queueType, page, limit, etag, sortBy = 'normal', sor
   return await setCachedData(etagKey, etag, ttl);
 }
 
-async function getIpStatsListCache(page, limit, search = '', sortBy = 'totalAds', sortOrder = 'desc') {
+async function getIpStatsListCache(page, limit, search = '', sortBy = 'totalAds', sortOrder = 'desc', environment = null) {
   const key = getCacheKey("ip_stats_list", `p${page}`, `l${limit}`, `s${search}`, `sb${sortBy}`, `so${sortOrder}`);
-  return await getCachedData(key);
+  return await getCachedData(key, environment);
 }
 
-async function setIpStatsListCache(page, limit, data, search = '', sortBy = 'totalAds', sortOrder = 'desc', ttl = 300) {
+async function setIpStatsListCache(page, limit, data, search = '', sortBy = 'totalAds', sortOrder = 'desc', ttl = 300, environment = null) {
   const key = getCacheKey("ip_stats_list", `p${page}`, `l${limit}`, `s${search}`, `sb${sortBy}`, `so${sortOrder}`);
-  return await setCachedData(key, data, ttl);
+  return await setCachedData(key, data, ttl, environment);
 }
 
-async function getIpStatsListETag(page, limit, search = '', sortBy = 'totalAds', sortOrder = 'desc') {
+async function getIpStatsListETag(page, limit, search = '', sortBy = 'totalAds', sortOrder = 'desc', environment = null) {
   const etagKey = getCacheKey("ip_stats_list", `p${page}`, `l${limit}`, `s${search}`, `sb${sortBy}`, `so${sortOrder}`, "etag");
-  return await getCachedData(etagKey);
+  return await getCachedData(etagKey, environment);
 }
 
-async function setIpStatsListETag(page, limit, etag, search = '', sortBy = 'totalAds', sortOrder = 'desc', ttl = 300) {
+async function setIpStatsListETag(page, limit, etag, search = '', sortBy = 'totalAds', sortOrder = 'desc', ttl = 300, environment = null) {
   const etagKey = getCacheKey("ip_stats_list", `p${page}`, `l${limit}`, `s${search}`, `sb${sortBy}`, `so${sortOrder}`, "etag");
-  return await setCachedData(etagKey, etag, ttl);
+  return await setCachedData(etagKey, etag, ttl, environment);
 }
 
 async function getIpBrandsCache(ip, page, limit, search = '') {
@@ -199,16 +242,7 @@ async function invalidatePipelineCache(date) {
 
 async function invalidateQueueCache(queueType = null) {
   try {
-    // Clear Redis cache
-    const pattern = queueType ? `queue:${queueType}:*` : `queue:*`;
-    const client = getCacheRedisClient();
-    const keys = await client.keys(pattern);
-    
-    if (keys.length > 0) {
-      await client.del(keys);
-    }
-    
-    // Clear in-memory fallback cache
+    // Clear in-memory fallback cache first (instant)
     redisCache.clear();
     console.log('In-memory fallback cache cleared');
     
@@ -228,8 +262,32 @@ async function invalidateQueueCache(queueType = null) {
       console.warn('Error clearing service caches:', serviceError.message);
     }
     
+    // Clear Redis cache with timeout protection
+    const pattern = queueType ? `queue:${queueType}:*` : `queue:*`;
+    const client = getCacheRedisClient();
+    
+    // Wrap Redis operations in a timeout
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Redis operation timed out after 10 seconds')), 10000);
+    });
+    
+    const redisOperation = (async () => {
+      const keys = await client.keys(pattern);
+      if (keys.length > 0) {
+        console.log(`Deleting ${keys.length} cache keys with pattern: ${pattern}`);
+        await client.del(keys);
+        console.log('Redis cache keys deleted successfully');
+      } else {
+        console.log('No cache keys found to delete');
+      }
+    })();
+    
+    // Race between Redis operation and timeout
+    await Promise.race([redisOperation, timeoutPromise]);
+    
   } catch (error) {
-    console.error('Queue cache invalidation error:', error);
+    console.error('Queue cache invalidation error:', error.message);
+    // Don't throw - just log the error
   }
 }
 
@@ -287,6 +345,7 @@ const cacheUtilsExports = {
   invalidateIpStatsCache,
   reinitializeCacheRedisClient,
   getCacheRedisClient,
+  getCacheRedisClientWithEnvironment,
   clearInMemoryFallbackCache,
 };
 
