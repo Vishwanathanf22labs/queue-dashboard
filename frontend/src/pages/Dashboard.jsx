@@ -384,7 +384,7 @@ const Dashboard = () => {
       setSearchStates(prev => ({
         ...prev,
         regularBrands: { ...prev.regularBrands, isSearching: true }
-      }));w
+      }));
 
       debounceTimers.current.regularBrands = setTimeout(async () => {
         searchRefs.current.regularBrands = value;
