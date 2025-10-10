@@ -1,27 +1,30 @@
-const { globalRedis } = require("../config/redis");
-const { getQueueRedis } = require("../utils/redisSelector");
+const { getQueueRedis, getGlobalRedis } = require("../utils/redisSelector");
 const logger = require("../utils/logger");
 
 // Function to get dynamic Redis keys
-function getRedisKeys() {
-  return require("../config/constants").REDIS_KEYS;
+function getRedisKeys(environment = 'production') {
+  return require("../config/constants").getRedisKeys(environment);
 }
 
 /**
  * Requeue a single brand from reenqueue list to pending queue
  * @param {string} itemId - The id of the item to requeue
  * @param {string} namespace - 'watchlist' or 'non-watchlist'
+ * @param {string} environment - Environment ('production' or 'stage')
  * @returns {Object} - Success status
  */
-async function requeueSingleBrand(itemId, namespace) {
+async function requeueSingleBrand(itemId, namespace, environment = 'production') {
   try {
-    const REDIS_KEYS = getRedisKeys();
+    const REDIS_KEYS = getRedisKeys(environment);
     const reenqueueKey = REDIS_KEYS.GLOBAL.REENQUEUE_KEY;
     
     if (!reenqueueKey) {
       throw new Error("REENQUEUE_KEY is not configured");
     }
 
+    // Get global Redis connection dynamically
+    const globalRedis = getGlobalRedis(environment);
+    
     // Get all items from reenqueue list
     const allItems = await globalRedis.lrange(reenqueueKey, 0, -1);
     
@@ -66,7 +69,7 @@ async function requeueSingleBrand(itemId, namespace) {
 
     // Determine which queue to add to based on namespace
     const queueType = namespace === 'watchlist' ? 'watchlist' : 'regular';
-    const queueRedis = getQueueRedis(queueType);
+    const queueRedis = getQueueRedis(queueType, environment);
     const pendingQueueKey = queueType === 'watchlist' 
       ? REDIS_KEYS.WATCHLIST.PENDING_BRANDS 
       : REDIS_KEYS.REGULAR.PENDING_BRANDS;
@@ -98,23 +101,27 @@ async function requeueSingleBrand(itemId, namespace) {
 /**
  * Requeue all brands from reenqueue list to pending queue
  * @param {string} namespace - 'watchlist' or 'non-watchlist'
+ * @param {string} environment - Environment ('production' or 'stage')
  * @returns {Object} - Success status with count
  */
-async function requeueAllBrands(namespace) {
+async function requeueAllBrands(namespace, environment = 'production') {
   try {
-    const REDIS_KEYS = getRedisKeys();
+    const REDIS_KEYS = getRedisKeys(environment);
     const reenqueueKey = REDIS_KEYS.GLOBAL.REENQUEUE_KEY;
     
     if (!reenqueueKey) {
       throw new Error("REENQUEUE_KEY is not configured");
     }
 
+    // Get global Redis connection dynamically
+    const globalRedis = getGlobalRedis(environment);
+
     // Get all items from reenqueue list
     const allItems = await globalRedis.lrange(reenqueueKey, 0, -1);
     
     // Determine which queue to add to based on namespace
     const queueType = namespace === 'watchlist' ? 'watchlist' : 'regular';
-    const queueRedis = getQueueRedis(queueType);
+    const queueRedis = getQueueRedis(queueType, environment);
     const pendingQueueKey = queueType === 'watchlist' 
       ? REDIS_KEYS.WATCHLIST.PENDING_BRANDS 
       : REDIS_KEYS.REGULAR.PENDING_BRANDS;
@@ -184,16 +191,20 @@ async function requeueAllBrands(namespace) {
  * Delete a single brand from reenqueue list
  * @param {string} itemId - The id of the item to delete
  * @param {string} namespace - 'watchlist' or 'non-watchlist'
+ * @param {string} environment - Environment ('production' or 'stage')
  * @returns {Object} - Success status
  */
-async function deleteSingleBrand(itemId, namespace) {
+async function deleteSingleBrand(itemId, namespace, environment = 'production') {
   try {
-    const REDIS_KEYS = getRedisKeys();
+    const REDIS_KEYS = getRedisKeys(environment);
     const reenqueueKey = REDIS_KEYS.GLOBAL.REENQUEUE_KEY;
     
     if (!reenqueueKey) {
       throw new Error("REENQUEUE_KEY is not configured");
     }
+
+    // Get global Redis connection dynamically
+    const globalRedis = getGlobalRedis(environment);
 
     // Get all items from reenqueue list
     const allItems = await globalRedis.lrange(reenqueueKey, 0, -1);
@@ -235,16 +246,20 @@ async function deleteSingleBrand(itemId, namespace) {
 /**
  * Delete all brands from reenqueue list by namespace
  * @param {string} namespace - 'watchlist' or 'non-watchlist'
+ * @param {string} environment - Environment ('production' or 'stage')
  * @returns {Object} - Success status with count
  */
-async function deleteAllBrands(namespace) {
+async function deleteAllBrands(namespace, environment = 'production') {
   try {
-    const REDIS_KEYS = getRedisKeys();
+    const REDIS_KEYS = getRedisKeys(environment);
     const reenqueueKey = REDIS_KEYS.GLOBAL.REENQUEUE_KEY;
     
     if (!reenqueueKey) {
       throw new Error("REENQUEUE_KEY is not configured");
     }
+
+    // Get global Redis connection dynamically
+    const globalRedis = getGlobalRedis(environment);
 
     // Get all items from reenqueue list
     const allItems = await globalRedis.lrange(reenqueueKey, 0, -1);

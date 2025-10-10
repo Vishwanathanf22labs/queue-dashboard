@@ -7,6 +7,7 @@ const logger = require("../utils/logger");
 async function requeueSingleBrand(req, res) {
   try {
     const { itemId, namespace } = req.body;
+    const environment = req.environment || 'production';
 
     if (!itemId || !namespace) {
       return res.status(400).json({
@@ -22,7 +23,7 @@ async function requeueSingleBrand(req, res) {
       });
     }
 
-    const result = await queueReenqueueManagementService.requeueSingleBrand(itemId, namespace);
+    const result = await queueReenqueueManagementService.requeueSingleBrand(itemId, namespace, environment);
 
     res.status(200).json({
       success: true,
@@ -45,6 +46,7 @@ async function requeueSingleBrand(req, res) {
 async function requeueAllBrands(req, res) {
   try {
     const { namespace } = req.body;
+    const environment = req.environment || 'production';
 
     if (!namespace) {
       return res.status(400).json({
@@ -60,7 +62,7 @@ async function requeueAllBrands(req, res) {
       });
     }
 
-    const result = await queueReenqueueManagementService.requeueAllBrands(namespace);
+    const result = await queueReenqueueManagementService.requeueAllBrands(namespace, environment);
 
     res.status(200).json({
       success: true,
@@ -83,6 +85,7 @@ async function requeueAllBrands(req, res) {
 async function deleteSingleBrand(req, res) {
   try {
     const { itemId, namespace } = req.body;
+    const environment = req.environment || 'production';
 
     if (!itemId || !namespace) {
       return res.status(400).json({
@@ -98,7 +101,7 @@ async function deleteSingleBrand(req, res) {
       });
     }
 
-    const result = await queueReenqueueManagementService.deleteSingleBrand(itemId, namespace);
+    const result = await queueReenqueueManagementService.deleteSingleBrand(itemId, namespace, environment);
 
     res.status(200).json({
       success: true,
@@ -121,6 +124,7 @@ async function deleteSingleBrand(req, res) {
 async function deleteAllBrands(req, res) {
   try {
     const { namespace } = req.body;
+    const environment = req.environment || 'production';
 
     if (!namespace) {
       return res.status(400).json({
@@ -136,7 +140,7 @@ async function deleteAllBrands(req, res) {
       });
     }
 
-    const result = await queueReenqueueManagementService.deleteAllBrands(namespace);
+    const result = await queueReenqueueManagementService.deleteAllBrands(namespace, environment);
 
     res.status(200).json({
       success: true,
