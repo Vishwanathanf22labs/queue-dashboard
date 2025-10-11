@@ -1,36 +1,37 @@
 import { create } from "zustand";
 import { adminAPI } from "../services/api";
 
-// Load initial state from localStorage
 const getInitialState = () => {
   try {
-    const stored = localStorage.getItem('adminState');
+    const stored = localStorage.getItem("adminState");
     if (stored) {
       const parsed = JSON.parse(stored);
       return {
         isAdmin: parsed.isAdmin || false,
         isLoading: false,
-        error: null
+        error: null,
       };
     }
   } catch (error) {
-    console.error('Error loading admin state from localStorage:', error);
+    console.error("Error loading admin state from localStorage:", error);
   }
   return {
     isAdmin: false,
     isLoading: false,
-    error: null
+    error: null,
   };
 };
 
-// Save state to localStorage
 const saveToLocalStorage = (state) => {
   try {
-    localStorage.setItem('adminState', JSON.stringify({
-      isAdmin: state.isAdmin
-    }));
+    localStorage.setItem(
+      "adminState",
+      JSON.stringify({
+        isAdmin: state.isAdmin,
+      })
+    );
   } catch (error) {
-    console.error('Error saving admin state to localStorage:', error);
+    console.error("Error saving admin state to localStorage:", error);
   }
 };
 
@@ -63,7 +64,11 @@ const useAdminStore = create((set, get) => ({
       return isAdminStatus;
     } catch (error) {
       console.error("Error checking admin status:", error);
-      const newState = { isAdmin: false, isLoading: false, error: error.message };
+      const newState = {
+        isAdmin: false,
+        isLoading: false,
+        error: error.message,
+      };
       set(newState);
       saveToLocalStorage(newState);
       return false;
@@ -82,7 +87,11 @@ const useAdminStore = create((set, get) => ({
       console.error("Admin login error:", error);
       const errorMessage =
         error.response?.data?.message || error.message || "Login failed";
-      const newState = { isAdmin: false, isLoading: false, error: errorMessage };
+      const newState = {
+        isAdmin: false,
+        isLoading: false,
+        error: errorMessage,
+      };
       set(newState);
       saveToLocalStorage(newState);
       throw new Error(errorMessage);
@@ -98,7 +107,11 @@ const useAdminStore = create((set, get) => ({
       saveToLocalStorage(newState);
     } catch (error) {
       console.error("Admin logout error:", error);
-      const newState = { isAdmin: false, isLoading: false, error: error.message };
+      const newState = {
+        isAdmin: false,
+        isLoading: false,
+        error: error.message,
+      };
       set(newState);
       saveToLocalStorage(newState);
     }

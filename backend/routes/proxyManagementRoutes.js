@@ -22,7 +22,6 @@ const {
   unlockProxy
 } = require("../controllers/proxyManagementController");
 
-// Public routes (no authentication required)
 router.get("/list", getProxies);
 router.get("/stats", getProxyStats);
 router.get("/management-stats", getProxyManagementStats);
@@ -31,7 +30,6 @@ router.get("/available", getAvailableProxies);
 router.get("/last-month", getLastMonthProxies);
 router.get("/next", getNextProxy);
 
-// Admin routes (require authentication)
 router.post("/add", adminAuth, addProxy);
 router.put("/update/:proxyId", adminAuth, updateProxy);
 router.delete("/remove/:proxyId", adminAuth, removeProxy);
@@ -41,10 +39,9 @@ router.delete("/clear", adminAuth, clearAllProxies);
 router.post("/lock", adminAuth, lockProxy);
 router.post("/unlock", adminAuth, unlockProxy);
 
-// NEW: Scraper routes (no auth needed - scraper calls these)
-router.post("/scraper/failed/:proxyId", markProxyAsFailed);        // ← Scraper marks proxy as failed
-router.post("/scraper/working/:proxyId", markProxyAsWorking);      // ← Scraper marks proxy as working
-router.get("/scraper/next-working", getNextWorkingProxy);          // ← Scraper gets next working proxy
+router.post("/scraper/failed/:proxyId", markProxyAsFailed);
+router.post("/scraper/working/:proxyId", markProxyAsWorking);
+router.get("/scraper/next-working", getNextWorkingProxy);
 
 module.exports = router;
 

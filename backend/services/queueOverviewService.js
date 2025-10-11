@@ -3,13 +3,11 @@ const logger = require("../utils/logger");
 const { QUEUES } = require("../config/constants");
 const watchlistRedisService = require("./watchlistRedisService");
 
-// Function to get dynamic Redis keys
 function getRedisKeys(environment = null) {
   const { getRedisKeys } = require("../config/constants");
   return getRedisKeys(environment);
 }
 
-// Cleanup function to remove completed/failed brands from currently processing queue
 async function cleanupCompletedBrands() {
   try {
     const REDIS_KEYS = getRedisKeys();
@@ -27,27 +25,21 @@ async function cleanupCompletedBrands() {
         const processingData = JSON.parse(currentlyProcessingBrands[i]);
         const status = processingData.status?.toLowerCase();
         
-        // Remove completed/failed brands (they should not show in "currently scraping")
         if (status && (status === 'completed' || status === 'complete' || status === 'failed' || status === 'error')) {
           logger.info(`Cleanup: Removing ${status} brand ${processingData.brandId} from ${REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING} Redis key`);
           removedCount++;
         } else {
-          // Keep this brand in the list (running, processing, active, etc.)
           brandsToKeep.push(currentlyProcessingBrands[i]);
         }
       } catch (parseError) {
         logger.warn(`Cleanup: Error parsing brand data: ${parseError.message}`);
-        // If we can't parse, keep it to be safe
         brandsToKeep.push(currentlyProcessingBrands[i]);
       }
     }
 
-    // If we removed any brands, update the Redis key
     if (removedCount > 0) {
-      // Clear the current list
       await getGlobalRedis().del(REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING);
       
-      // Add back only the brands to keep
       if (brandsToKeep.length > 0) {
         await getGlobalRedis().rpush(REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING, ...brandsToKeep);
       }
@@ -59,7 +51,6 @@ async function cleanupCompletedBrands() {
   }
 }
 
-// Cleanup function to remove running brands from currently processing queue (every 4 hours)
 async function cleanupRunningBrands() {
   try {
     const REDIS_KEYS = getRedisKeys();
@@ -77,27 +68,21 @@ async function cleanupRunningBrands() {
         const processingData = JSON.parse(currentlyProcessingBrands[i]);
         const status = processingData.status?.toLowerCase();
         
-        // Remove running brands (keep completed, failed, and other statuses)
         if (status && (status === 'running' || status === 'processing' || status === 'active')) {
           logger.info(`Cleanup: Removing ${status} brand ${processingData.brandId} from ${REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING} Redis key (4-hour cleanup)`);
           removedCount++;
         } else {
-          // Keep this brand in the list (completed, failed, etc.)
           brandsToKeep.push(currentlyProcessingBrands[i]);
         }
       } catch (parseError) {
         logger.warn(`Cleanup: Error parsing brand data: ${parseError.message}`);
-        // If we can't parse, keep it to be safe
         brandsToKeep.push(currentlyProcessingBrands[i]);
       }
     }
 
-    // If we removed any brands, update the Redis key
     if (removedCount > 0) {
-      // Clear the current list
       await getGlobalRedis().del(REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING);
       
-      // Add back only the brands to keep
       if (brandsToKeep.length > 0) {
         await getGlobalRedis().rpush(REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING, ...brandsToKeep);
       }
@@ -109,13 +94,10 @@ async function cleanupRunningBrands() {
   }
 }
 
-// Start automatic cleanup interval when module loads
 let cleanupInterval = null;
 let runningCleanupInterval = null;
 
-// Function to start the cleanup intervals
 function startCleanupInterval() {
-  // Clear any existing intervals first
   if (cleanupInterval) {
     clearInterval(cleanupInterval);
     logger.info('Cleared existing cleanup interval');
@@ -126,36 +108,30 @@ function startCleanupInterval() {
     logger.info('Cleared existing running cleanup interval');
   }
   
-  // Start 4-minute interval for completed/failed brands
   cleanupInterval = setInterval(async () => {
     logger.info('Running scheduled cleanup of completed brands...');
     await cleanupCompletedBrands();
     
-    // Log next cleanup time
     const nextCleanup = new Date(Date.now() + 30 * 1000);
     logger.info(`Next cleanup scheduled for: ${nextCleanup.toLocaleString()}`);
-  }, 30 * 1000); // Every 30 seconds
+  }, 30 * 1000); 
   
-  // Start 4-hour interval for running brands
   runningCleanupInterval = setInterval(async () => {
     logger.info('Running scheduled cleanup of running brands...');
     await cleanupRunningBrands();
     
-    // Log next cleanup time
     const nextCleanup = new Date(Date.now() + 4 * 60 * 60 * 1000);
     logger.info(`Next 4-hour cleanup scheduled for: ${nextCleanup.toLocaleString()}`);
-  }, 4 * 60 * 60 * 1000); // Every 4 hours
+  }, 4 * 60 * 60 * 1000); 
   
   logger.info('Started automatic cleanup intervals: completed/failed brands (every 30 seconds), running brands (every 4 hours)');
   
-  // Log the first cleanup times
   const firstCleanup = new Date(Date.now() + 30 * 1000);
   const firstRunningCleanup = new Date(Date.now() + 4 * 60 * 60 * 1000);
   logger.info(`First cleanup scheduled for: ${firstCleanup.toLocaleString()}`);
   logger.info(`First 4-hour cleanup scheduled for: ${firstRunningCleanup.toLocaleString()}`);
 }
 
-// Start the interval
 startCleanupInterval();
 
 
@@ -163,27 +139,22 @@ async function getQueueOverview(environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys(environment);
     
-    // Get Redis instances for the specified environment
     const regularRedis = getQueueRedis('regular', environment);
     const watchlistRedis = getQueueRedis('watchlist', environment);
     
-    // Debug logging
     logger.info(`Getting queue overview for environment: ${environment}`);
     logger.info(`Using Redis keys - Regular Pending: ${REDIS_KEYS.REGULAR.PENDING_BRANDS}, Regular Failed: ${REDIS_KEYS.REGULAR.FAILED_BRANDS}`);
     
-    // Get regular queue counts
     const regularPendingCount = await regularRedis.zcard(REDIS_KEYS.REGULAR.PENDING_BRANDS);
     const regularFailedCount = await regularRedis.llen(REDIS_KEYS.REGULAR.FAILED_BRANDS);
     
     logger.info(`Regular queue counts - Pending: ${regularPendingCount}, Failed: ${regularFailedCount}`);
     
-    // Get watchlist queue counts
     const watchlistPendingCount = await watchlistRedis.zcard(REDIS_KEYS.WATCHLIST.PENDING_BRANDS);
     const watchlistFailedCount = await watchlistRedis.llen(REDIS_KEYS.WATCHLIST.FAILED_BRANDS);
 
     let activeBrandsCount = 0;
     try {
-      // Get Brand model for the specified environment
       const { getModels } = require("../models");
       const { Brand } = getModels(environment);
       const activeBrands = await Brand.count({
@@ -197,7 +168,6 @@ async function getQueueOverview(environment = 'production') {
 
     const currentlyProcessing = await getCurrentlyProcessing(environment);
 
-    // Get watchlist stats
     let watchlistStats = null;
     try {
       watchlistStats = await watchlistRedisService.getWatchlistStats(environment);
@@ -211,11 +181,9 @@ async function getQueueOverview(environment = 'production') {
 
     return {
       queue_counts: {
-        // Regular queue counts
         pending: regularPendingCount,
         failed: regularFailedCount,
         active: activeBrandsCount,
-        // Watchlist queue counts
         watchlist_pending: watchlistPendingCount,
         watchlist_failed: watchlistFailedCount,
       },
@@ -231,7 +199,6 @@ async function getQueueOverview(environment = 'production') {
 async function getCurrentlyProcessing(environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys(environment);
-    // Get ALL currently processing brands from Redis key (cleanup runs automatically every 5 minutes)
     const currentlyProcessingBrands = await getGlobalRedis(environment).lrange(REDIS_KEYS.GLOBAL.CURRENTLY_PROCESSING, 0, -1);
     
     if (!currentlyProcessingBrands || currentlyProcessingBrands.length === 0) {
@@ -240,7 +207,6 @@ async function getCurrentlyProcessing(environment = 'production') {
 
     const results = [];
     
-    // Get models for the specified environment
     const { getModels } = require("../models");
     const { WatchList } = getModels(environment);
     
@@ -248,7 +214,6 @@ async function getCurrentlyProcessing(environment = 'production') {
       try {
         const processingData = JSON.parse(currentlyProcessingBrands[i]);
         
-        // Check if brand is in watchlist table
         let isInWatchlist = false;
         try {
           const watchlistBrand = await WatchList.findOne({
@@ -262,7 +227,6 @@ async function getCurrentlyProcessing(environment = 'production') {
           isInWatchlist = false;
         }
         
-        // Get brand details from database
         const { Brand } = getModels(environment);
         const brand = await Brand.findOne({
           where: { id: parseInt(processingData.brandId) },
@@ -272,7 +236,6 @@ async function getCurrentlyProcessing(environment = 'production') {
 
         if (!brand) {
           logger.warn(`Brand with ID ${processingData.brandId} not found in database`);
-          // Return the Redis data even if brand not found in database
           results.push({
             brand_id: parseInt(processingData.brandId),
             brand_name: `Brand ${processingData.brandId}`,
@@ -295,7 +258,6 @@ async function getCurrentlyProcessing(environment = 'production') {
             is_watchlist: isInWatchlist
           });
         } else {
-          // Parse proxy information if available
           let proxyInfo = null;
           if (processingData.proxy) {
             try {
@@ -306,7 +268,6 @@ async function getCurrentlyProcessing(environment = 'production') {
           }
 
           let brandName;
-          // Priority: actual_name > name (only if name is not "Brand") > page_id > Brand ID
           if (brand.actual_name && brand.actual_name.trim() !== '' && brand.actual_name.toLowerCase() !== 'brand') {
             brandName = brand.actual_name;
           } else if (brand.name && brand.name.trim() !== '' && brand.name.toLowerCase() !== 'brand') {
@@ -334,7 +295,6 @@ async function getCurrentlyProcessing(environment = 'production') {
         }
       } catch (parseError) {
         logger.error(`Error parsing currently processing brand data at index ${i}:`, parseError);
-        // Continue with next brand instead of failing completely
       }
     }
 
@@ -350,7 +310,6 @@ async function getAllBrandProcessingJobs() {
     const regularRedis = getQueueRedis('regular');
     const watchlistRedis = getQueueRedis('watchlist');
     
-    // Get all job IDs from all Redis queues
     const [regularWaiting, regularActive, regularPrioritized, regularCompleted, regularFailed, regularDelayed] = await Promise.all([
       regularRedis.lrange('bull:brand-processing:waiting', 0, -1).catch(() => []),
       regularRedis.lrange('bull:brand-processing:active', 0, -1).catch(() => []),
@@ -369,10 +328,8 @@ async function getAllBrandProcessingJobs() {
       watchlistRedis.lrange('bull:brand-processing:delayed', 0, -1).catch(() => [])
     ]);
     
-    // Combine all job IDs with their status and queue type
     const allJobs = [];
     
-    // Regular jobs
     regularWaiting.forEach(jobId => allJobs.push({ jobId, status: 'waiting', queueType: 'regular' }));
     regularActive.forEach(jobId => allJobs.push({ jobId, status: 'active', queueType: 'regular' }));
     regularPrioritized.forEach(jobId => allJobs.push({ jobId, status: 'prioritized', queueType: 'regular' }));
@@ -380,7 +337,6 @@ async function getAllBrandProcessingJobs() {
     regularFailed.forEach(jobId => allJobs.push({ jobId, status: 'failed', queueType: 'regular' }));
     regularDelayed.forEach(jobId => allJobs.push({ jobId, status: 'delayed', queueType: 'regular' }));
     
-    // Watchlist jobs
     watchlistWaiting.forEach(jobId => allJobs.push({ jobId, status: 'waiting', queueType: 'watchlist' }));
     watchlistActive.forEach(jobId => allJobs.push({ jobId, status: 'active', queueType: 'watchlist' }));
     watchlistPrioritized.forEach(jobId => allJobs.push({ jobId, status: 'prioritized', queueType: 'watchlist' }));
@@ -392,7 +348,6 @@ async function getAllBrandProcessingJobs() {
       return { regular: [], watchlist: [], counters: { regular: {}, watchlist: {} } };
     }
     
-    // Get job details from Redis
     const jobDetails = new Map();
     
     for (const job of allJobs) {
@@ -401,7 +356,6 @@ async function getAllBrandProcessingJobs() {
         const jobData = await redis.hgetall(`bull:brand-processing:${job.jobId}`);
         
         if (jobData && Object.keys(jobData).length > 0) {
-          // Parse job data
           const parsedData = {};
           Object.keys(jobData).forEach(key => {
             try {
@@ -426,7 +380,6 @@ async function getAllBrandProcessingJobs() {
       }
     }
     
-    // Get brand details from database
     const { Brand, WatchList } = require("../models");
     const brandIds = Array.from(new Set(Array.from(jobDetails.values()).map(job => job.brand_id).filter(Boolean)));
     
@@ -446,7 +399,6 @@ async function getAllBrandProcessingJobs() {
       const watchlistBrandIds = new Set(watchlistBrands.map(wb => wb.brand_id));
       const brandMap = new Map(brands.map(brand => [brand.id, brand]));
       
-      // Enrich job details with brand information
       for (const [jobId, job] of jobDetails) {
         const brand = brandMap.get(job.brand_id);
         if (brand) {
@@ -454,7 +406,6 @@ async function getAllBrandProcessingJobs() {
           job.page_name = brand.page_name || brand.page_id;
           job.is_watchlist = watchlistBrandIds.has(job.brand_id);
           
-          // Get ads count from database if available
           try {
             const { Ad } = require("../models");
             const adCount = await Ad.count({
@@ -469,11 +420,9 @@ async function getAllBrandProcessingJobs() {
       }
     }
     
-    // Separate regular and watchlist jobs
     const regularJobs = Array.from(jobDetails.values()).filter(job => job.queue_type === 'regular');
     const watchlistJobs = Array.from(jobDetails.values()).filter(job => job.queue_type === 'watchlist');
     
-    // Calculate counters
     const regularCounters = {
       waiting: regularWaiting.length,
       active: regularActive.length,
@@ -513,19 +462,15 @@ async function getQueueStatistics(environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys(environment);
     
-    // Get regular Redis instance
     const regularRedis = getQueueRedis('regular', environment);
     const watchlistRedis = getQueueRedis('watchlist', environment);
     
-    // Get regular queue counts
     const regularPendingCount = await regularRedis.zcard(REDIS_KEYS.REGULAR.PENDING_BRANDS);
     const regularFailedCount = await regularRedis.llen(REDIS_KEYS.REGULAR.FAILED_BRANDS);
     
-    // Get watchlist queue counts
     const watchlistPendingCount = await watchlistRedis.zcard(REDIS_KEYS.WATCHLIST.PENDING_BRANDS);
     const watchlistFailedCount = await watchlistRedis.llen(REDIS_KEYS.WATCHLIST.FAILED_BRANDS);
 
-    // Require Brand model dynamically to get the latest version
     const { Brand } = require("../models");
     
     const activeBrandsCount = await Brand.count({
@@ -536,15 +481,12 @@ async function getQueueStatistics(environment = 'production') {
 
     return {
       queue_stats: {
-        // Regular queue stats
         pending_count: regularPendingCount,
         failed_count: regularFailedCount,
         total_queued: regularPendingCount + regularFailedCount,
-        // Watchlist queue stats
         watchlist_pending_count: watchlistPendingCount,
         watchlist_failed_count: watchlistFailedCount,
         watchlist_total_queued: watchlistPendingCount + watchlistFailedCount,
-        // Combined stats
         total_pending: regularPendingCount + watchlistPendingCount,
         total_failed: regularFailedCount + watchlistFailedCount,
         total_queued_all: regularPendingCount + regularFailedCount + watchlistPendingCount + watchlistFailedCount,
@@ -560,12 +502,10 @@ async function getQueueStatistics(environment = 'production') {
   }
 }
 
-// Function to clear all caches when environment changes
 function clearAllCaches() {
   try {
-    logger.info('🧹 Clearing all queue overview caches for environment switch...');
+    logger.info(' Clearing all queue overview caches for environment switch...');
     
-    // Stop any running cleanup intervals
     if (cleanupInterval) {
       clearInterval(cleanupInterval);
       cleanupInterval = null;
@@ -578,13 +518,12 @@ function clearAllCaches() {
       logger.info('Stopped running cleanup interval for environment switch');
     }
     
-    // Restart cleanup intervals for the new environment
     startCleanupInterval();
-    logger.info('✅ Restarted cleanup intervals for new environment');
+    logger.info(' Restarted cleanup intervals for new environment');
     
-    logger.info('✅ All queue overview caches cleared successfully');
+    logger.info(' All queue overview caches cleared successfully');
   } catch (error) {
-    logger.error('❌ Error clearing queue overview caches:', error);
+    logger.error(' Error clearing queue overview caches:', error);
   }
 }
 

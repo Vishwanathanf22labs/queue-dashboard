@@ -2,13 +2,6 @@ import React from 'react';
 import CustomDropdown from './CustomDropdown';
 import { RefreshCw } from 'lucide-react';
 
-// A reusable refresh control identical to the Dashboard's control
-// Props:
-// - isRefreshing: boolean
-// - refreshInterval: number (seconds)
-// - onManualRefresh: () => void
-// - onIntervalChange: (value: number) => void
-// - className?: string
 const RefreshControl = ({
   isRefreshing = false,
   refreshInterval = 0,

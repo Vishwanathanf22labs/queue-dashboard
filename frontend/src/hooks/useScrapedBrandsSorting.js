@@ -21,11 +21,10 @@ const useScrapedBrandsSorting = (defaultSortBy = 'normal', defaultSortOrder = 'd
   const [sortBy, setSortBy] = useState(initialState.sortBy);
   const [sortOrder, setSortOrder] = useState(initialState.sortOrder);
 
-  // Save to localStorage whenever sorting changes
   const updateSorting = (newSortBy, newSortOrder) => {
     setSortBy(newSortBy);
     setSortOrder(newSortOrder);
-    
+
     try {
       localStorage.setItem('scraped-brands-sorting', JSON.stringify({
         sortBy: newSortBy,

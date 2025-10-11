@@ -79,6 +79,9 @@ const Brand = getDatabaseConnection().define(
     uid: {
       type: DataTypes.STRING,
     },
+    actual_ads_count: {
+      type: DataTypes.INTEGER,
+    },
   },
   { timestamps: false }
 );

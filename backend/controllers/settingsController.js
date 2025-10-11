@@ -1,20 +1,18 @@
 const { getGlobalRedis } = require("../utils/redisSelector");
-const { validateConfigUpdates, getAllowedConfigKeys } = require("../services/utils/configValidation");
+const {
+  validateConfigUpdates,
+  getAllowedConfigKeys,
+} = require("../services/utils/configValidation");
 const logger = require("../utils/logger");
 
-/**
- * Get all config values from Redis config hash
- */
 async function getConfigSettings(req, res) {
   try {
     logger.info("Getting config settings from Redis");
 
     const redis = getGlobalRedis(req.environment);
-    
-    // Get all config values from Redis hash
-    const configData = await redis.hgetall('metadata');
-    
-    // Get allowed keys for frontend
+
+    const configData = await redis.hgetall("metadata");
+
     const allowedKeys = getAllowedConfigKeys();
 
     res.json({
@@ -22,56 +20,53 @@ async function getConfigSettings(req, res) {
       data: {
         config: configData,
         allowedKeys: allowedKeys,
-        timestamp: new Date().toISOString()
-      }
+        timestamp: new Date().toISOString(),
+      },
     });
   } catch (error) {
     logger.error("Error getting config settings:", error);
     res.status(500).json({
       success: false,
       message: "Failed to get config settings",
-      error: error.message
+      error: error.message,
     });
   }
 }
 
-/**
- * Update config values in Redis config hash
- */
 async function updateConfigSettings(req, res) {
   try {
     const { updates } = req.body;
 
-    if (!updates || typeof updates !== 'object') {
+    if (!updates || typeof updates !== "object") {
       return res.status(400).json({
         success: false,
-        message: "Updates object is required"
+        message: "Updates object is required",
       });
     }
 
-    logger.info("Updating config settings in Redis", { keys: Object.keys(updates) });
+    logger.info("Updating config settings in Redis", {
+      keys: Object.keys(updates),
+    });
 
-    // Validate all updates
     const validation = validateConfigUpdates(updates);
     if (!validation.valid) {
       return res.status(400).json({
         success: false,
         message: "Validation failed",
-        errors: validation.errors
+        errors: validation.errors,
       });
     }
 
     const redis = getGlobalRedis(req.environment);
-    
-    // Update each key-value pair in Redis
+
     const updateResults = {};
     for (const [key, value] of Object.entries(updates)) {
-      await redis.hset('metadata', key, value);
+      await redis.hset("metadata", key, value);
       updateResults[key] = value;
     }
 
-    logger.info("Successfully updated config settings", { 
-      updatedKeys: Object.keys(updateResults) 
+    logger.info("Successfully updated config settings", {
+      updatedKeys: Object.keys(updateResults),
     });
 
     res.json({
@@ -79,20 +74,20 @@ async function updateConfigSettings(req, res) {
       message: "Config settings updated successfully",
       data: {
         updated: updateResults,
-        timestamp: new Date().toISOString()
-      }
+        timestamp: new Date().toISOString(),
+      },
     });
   } catch (error) {
     logger.error("Error updating config settings:", error);
     res.status(500).json({
       success: false,
       message: "Failed to update config settings",
-      error: error.message
+      error: error.message,
     });
   }
 }
 
 module.exports = {
   getConfigSettings,
-  updateConfigSettings
+  updateConfigSettings,
 };

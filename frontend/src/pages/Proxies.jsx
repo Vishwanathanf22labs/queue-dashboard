@@ -22,11 +22,9 @@ const Proxies = () => {
   const { onAdminLogin } = useAdminLogin();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Refs for managing state
   const isInitialMountRef = useRef(true);
   const prevParamsRef = useRef({ page: null, search: null, filter: null });
 
-  // Initialize state from URL parameters
   const [dataState, setDataState] = useState({
     proxies: [],
     stats: null,
@@ -74,7 +72,7 @@ const Proxies = () => {
 
         if (search && search.trim() && proxies.length === 0) {
           toast(`No proxies found for "${search}"`, {
-            icon: 'ℹ️',
+            icon: 'ℹ',
             duration: 3000,
           });
         }
@@ -116,29 +114,23 @@ const Proxies = () => {
     }
   }, [updateDataState]);
 
-  // Single useEffect to handle ALL URL parameter changes
   useEffect(() => {
     const urlPage = parseInt(searchParams.get('page')) || 1;
     const urlSearch = searchParams.get('search') || '';
     const urlFilter = searchParams.get('filter') || 'all';
 
-    // Update local state to match URL
     setCurrentPage(urlPage);
     setSearchTerm(urlSearch);
     setFilter(urlFilter);
 
-    // Update previous params reference
     prevParamsRef.current = { page: urlPage, search: urlSearch, filter: urlFilter };
 
-    // Load data based on current URL params
     if (isInitialMountRef.current) {
-      // Initial load
       loadProxies(urlPage, urlFilter, urlSearch || null, true);
       loadStats();
       loadManagementStats();
       isInitialMountRef.current = false;
     } else {
-      // Subsequent loads
       loadProxies(urlPage, urlFilter, urlSearch || null, false);
     }
   }, [searchParams]);
@@ -177,7 +169,7 @@ const Proxies = () => {
 
 
   const handleProxyUpdated = useCallback(async (proxyId, updates) => {
-    
+
     setDataState(prev => ({
       ...prev,
       proxies: prev.proxies.map(proxy =>
@@ -238,7 +230,6 @@ const Proxies = () => {
     setSearchParams(newParams, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  // Auto-refresh hook
   const refreshFn = useCallback(async () => {
     try {
       await Promise.all([

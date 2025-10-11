@@ -12,12 +12,16 @@ async function getBrandStatus(req, res) {
       });
     }
 
-    const result = await brandService.getBrandByIdentifier({ brand_id, page_id });
+    const result = await brandService.getBrandByIdentifier({
+      brand_id,
+      page_id,
+    });
 
     return res.status(200).json(result);
   } catch (error) {
     logger.error("Error in getBrandStatus:", error);
-    const status = error.message && /not found/i.test(error.message) ? 404 : 400;
+    const status =
+      error.message && /not found/i.test(error.message) ? 404 : 400;
     return res.status(status).json({ success: false, message: error.message });
   }
 }
@@ -33,14 +37,19 @@ async function updateBrandStatus(req, res) {
       });
     }
 
-    const result = await brandService.updateBrandStatus({ brand_id, page_id }, status);
+    const result = await brandService.updateBrandStatus(
+      { brand_id, page_id },
+      status
+    );
 
     return res.status(200).json(result);
   } catch (error) {
     logger.error("Error in updateBrandStatus:", error);
     let statusCode = 400;
     if (error.message && /not found/i.test(error.message)) statusCode = 404;
-    return res.status(statusCode).json({ success: false, message: error.message });
+    return res
+      .status(statusCode)
+      .json({ success: false, message: error.message });
   }
 }
 
@@ -84,7 +93,9 @@ async function bulkApplyStatusUpdates(req, res) {
   }
 }
 
-module.exports = { getBrandStatus, updateBrandStatus, bulkPreviewBrands, bulkApplyStatusUpdates };
-
-
-
+module.exports = {
+  getBrandStatus,
+  updateBrandStatus,
+  bulkPreviewBrands,
+  bulkApplyStatusUpdates,
+};

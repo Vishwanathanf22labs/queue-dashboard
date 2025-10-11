@@ -3,9 +3,9 @@ import { queueAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import Button from '../ui/Button';
 
-const StartScraperButton = ({ 
-  onScraperStart, 
-  isDisabled = false, 
+const StartScraperButton = ({
+  onScraperStart,
+  isDisabled = false,
   className = "",
   size = "md"
 }) => {
@@ -15,7 +15,7 @@ const StartScraperButton = ({
     try {
       setIsLoading(true);
       const response = await queueAPI.startScraper();
-      
+
       if (response.data.success) {
         const startTime = response.data.startTime;
         const formattedTime = startTime ? new Date(startTime).toLocaleString('en-IN', {
@@ -28,7 +28,7 @@ const StartScraperButton = ({
           second: '2-digit',
           hour12: true
         }) : 'Unknown';
-        
+
         toast.success(`Scraper started successfully at ${formattedTime}`);
         if (onScraperStart) {
           onScraperStart(response.data);

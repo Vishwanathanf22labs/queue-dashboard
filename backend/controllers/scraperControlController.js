@@ -1,12 +1,14 @@
-const scraperControlService = require('../services/scraperControlService');
+const scraperControlService = require("../services/scraperControlService");
 
 async function getScraperStatus(req, res) {
   try {
-    const status = await scraperControlService.getScraperStatus(req.environment);
+    const status = await scraperControlService.getScraperStatus(
+      req.environment
+    );
     res.status(200).json(status);
   } catch (error) {
     res.status(500).json({
-      status: 'not_running'
+      status: "not_running",
     });
   }
 }
@@ -19,8 +21,8 @@ async function startScraper(req, res) {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: 'Internal server error',
-      status: 'unknown'
+      message: "Internal server error",
+      status: "unknown",
     });
   }
 }
@@ -33,8 +35,8 @@ async function stopScraper(req, res) {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: 'Internal server error',
-      status: 'unknown'
+      message: "Internal server error",
+      status: "unknown",
     });
   }
 }
@@ -44,7 +46,9 @@ async function getBrandTiming(req, res) {
     const data = await scraperControlService.getBrandTiming(req.environment);
     res.status(200).json({ success: true, data });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to fetch brand timing' });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch brand timing" });
   }
 }
 
@@ -52,5 +56,5 @@ module.exports = {
   getScraperStatus,
   startScraper,
   stopScraper,
-  getBrandTiming
+  getBrandTiming,
 };

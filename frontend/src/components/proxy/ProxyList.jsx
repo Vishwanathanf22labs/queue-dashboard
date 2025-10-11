@@ -8,7 +8,6 @@ import toast from 'react-hot-toast';
 import { CheckCircle, XCircle, Trash2, RotateCcw, Lock, Unlock, Edit, X } from 'lucide-react';
 import EditProxyModal from './EditProxyModal';
 
-// Helper function to format failure reasons for display
 const formatFailureReason = (failureReason) => {
   if (!failureReason) return 'failed';
 
@@ -34,7 +33,6 @@ const formatFailureReason = (failureReason) => {
   return 'fail';
 };
 
-// Helper function to get initial editing proxy state from localStorage
 const getInitialEditingProxyState = () => {
   try {
     const isPageRefresh = sessionStorage.getItem('proxyPageRefreshed') === 'true';
@@ -48,7 +46,6 @@ const getInitialEditingProxyState = () => {
   }
 };
 
-// Helper function to get initial locking proxy state from localStorage
 const getInitialLockingProxyState = () => {
   try {
     const isPageRefresh = sessionStorage.getItem('proxyPageRefreshed') === 'true';
@@ -62,7 +59,6 @@ const getInitialLockingProxyState = () => {
   }
 };
 
-// Helper function to get initial lock input from localStorage
 const getInitialLockInputState = () => {
   try {
     const isPageRefresh = sessionStorage.getItem('proxyPageRefreshed') === 'true';
@@ -129,7 +125,6 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
         });
         setLockInput('');
         setLockingProxy(null);
-        // Clear from localStorage
         try {
           localStorage.removeItem('proxyList_lockingProxy');
           localStorage.removeItem('proxyList_lockInput');
@@ -240,7 +235,6 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
     }
   }, []);
 
-  // Save lockInput to localStorage whenever it changes
   useEffect(() => {
     if (lockingProxy !== null) {
       try {
@@ -251,7 +245,6 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
     }
   }, [lockInput, lockingProxy]);
 
-  // Detect page refresh and restore state
   useEffect(() => {
     const isInitialLoad = !sessionStorage.getItem('proxyPageVisited');
     if (!isInitialLoad) {
@@ -260,9 +253,7 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
       sessionStorage.setItem('proxyPageVisited', 'true');
     }
 
-    // Only restore state after setting the flag
     setTimeout(() => {
-      // Restore editing proxy state
       const savedEditingProxy = getInitialEditingProxyState();
       if (savedEditingProxy) {
         const proxyStillExists = proxies.some(proxy => proxy.id === savedEditingProxy.id);
@@ -273,7 +264,6 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
         }
       }
 
-      // Restore locking proxy state
       const savedLockingProxyId = getInitialLockingProxyState();
       if (savedLockingProxyId) {
         const proxyStillExists = proxies.some(proxy => proxy.id === savedLockingProxyId);
@@ -287,12 +277,10 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
         }
       }
 
-      // Clear the refresh flag after restoration
       sessionStorage.removeItem('proxyPageRefreshed');
     }, 0);
   }, []);
 
-  // Cleanup on unmount (page navigation)
   useEffect(() => {
     return () => {
       const isPageRefresh = sessionStorage.getItem('proxyPageRefreshed') === 'true';
@@ -317,7 +305,6 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
 
   return (
     <Card title="Proxy List" subtitle="Manage your proxy configurations">
-      {/* Mobile view */}
       <div className="block xl:hidden space-y-4">
         {proxies.map((proxy) => (
           <div key={proxy.id} className="relative bg-gray-50 rounded-lg p-4 border border-gray-200">
@@ -393,17 +380,15 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
               </div>
 
               <div className="flex items-center justify-center space-x-2 pt-2 border-t border-gray-200">
-                {/* Lock/Unlock Button */}
                 {proxy.is_locked ? (
                   <Button
                     onClick={disabled ? undefined : () => handleUnlockProxy(proxy.id, proxy.lock_key)}
                     variant="outline"
                     size="sm"
-                    className={`p-2 min-w-0 ${
-                      disabled 
-                        ? 'cursor-not-allowed opacity-50 border-gray-300' 
-                        : 'border-orange-500 text-orange-500 hover:bg-orange-50'
-                    }`}
+                    className={`p-2 min-w-0 ${disabled
+                      ? 'cursor-not-allowed opacity-50 border-gray-300'
+                      : 'border-orange-500 text-orange-500 hover:bg-orange-50'
+                      }`}
                     title={disabled ? 'Admin access required' : `Click to unlock proxy locked by ${proxy.lock_worker}`}
                     disabled={disabled}
                   >
@@ -414,11 +399,10 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
                     onClick={disabled ? undefined : () => handleLockIconClick(proxy)}
                     variant="outline"
                     size="sm"
-                    className={`p-2 min-w-0 ${
-                      disabled 
-                        ? 'cursor-not-allowed opacity-50 border-gray-300' 
-                        : 'border-blue-500 text-blue-500 hover:bg-blue-50'
-                    }`}
+                    className={`p-2 min-w-0 ${disabled
+                      ? 'cursor-not-allowed opacity-50 border-gray-300'
+                      : 'border-blue-500 text-blue-500 hover:bg-blue-50'
+                      }`}
                     title={disabled ? 'Admin access required' : 'Click to lock proxy'}
                     disabled={disabled}
                   >
@@ -426,7 +410,6 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
                   </Button>
                 )}
 
-                {/* Edit Button */}
                 <Button
                   onClick={disabled ? undefined : () => handleEditProxy(proxy)}
                   variant="outline"
@@ -438,7 +421,6 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
                   <Edit className="h-4 w-4" />
                 </Button>
 
-                {/* Active/Inactive Button */}
                 <Button
                   onClick={disabled ? undefined : () => handleStatusUpdate(proxy.id, !proxy.is_working)}
                   disabled={disabled || updatingStatus === proxy.id}
@@ -455,7 +437,6 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
                   )}
                 </Button>
 
-                {/* Delete Button */}
                 <Button
                   onClick={disabled ? undefined : () => handleRemoveProxy(proxy.id)}
                   variant="outline"
@@ -472,7 +453,6 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
         ))}
       </div>
 
-      {/* Desktop view */}
       <div className="hidden xl:block overflow-hidden">
         <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
           <div className="bg-gray-50 border-b border-gray-200">
@@ -494,15 +474,14 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
               <div key={proxy.id} className={`relative grid grid-cols-12 gap-1 px-4 py-3 text-xs hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
                 {proxy.is_locked ? (
                   <div
-                    className={`absolute left-1 top-1 px-1 py-0.5 rounded z-10 text-xs font-medium bg-white border ${
-                      disabled 
-                        ? 'cursor-not-allowed opacity-50 text-gray-400 border-gray-300' 
-                        : 'cursor-pointer hover:bg-orange-100 text-orange-600 border-orange-200'
-                    }`}
+                    className={`absolute left-1 top-1 px-1 py-0.5 rounded z-10 text-xs font-medium bg-white border ${disabled
+                      ? 'cursor-not-allowed opacity-50 text-gray-400 border-gray-300'
+                      : 'cursor-pointer hover:bg-orange-100 text-orange-600 border-orange-200'
+                      }`}
                     onClick={disabled ? undefined : () => handleUnlockProxy(proxy.id, proxy.lock_key)}
                     title={disabled ? 'Admin access required' : `Click to unlock proxy locked by ${proxy.lock_worker}`}
                   >
-                    🔒 {(() => {
+                    � {(() => {
                       if (!proxy.lock_worker) return 'WL-1';
                       if (proxy.lock_worker.includes('non-watchlist')) {
                         const match = proxy.lock_worker.match(/non-watchlist:(\d+)/);
@@ -519,15 +498,14 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
                   </div>
                 ) : (
                   <div
-                    className={`absolute left-1 top-1 px-1 py-0.5 rounded z-10 text-xs font-medium bg-white border ${
-                      disabled 
-                        ? 'cursor-not-allowed opacity-50 text-gray-400 border-gray-300' 
-                        : 'cursor-pointer hover:bg-blue-100 text-blue-600 border-blue-200'
-                    }`}
+                    className={`absolute left-1 top-1 px-1 py-0.5 rounded z-10 text-xs font-medium bg-white border ${disabled
+                      ? 'cursor-not-allowed opacity-50 text-gray-400 border-gray-300'
+                      : 'cursor-pointer hover:bg-blue-100 text-blue-600 border-blue-200'
+                      }`}
                     onClick={disabled ? undefined : () => handleLockIconClick(proxy)}
                     title={disabled ? 'Admin access required' : 'Click to lock proxy'}
                   >
-                    🔓 Lock
+                    � Lock
                   </div>
                 )}
 
@@ -600,11 +578,10 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
                 <div className="col-span-1 flex items-center justify-center space-x-1">
                   <button
                     onClick={disabled ? undefined : () => handleEditProxy(proxy)}
-                    className={`p-1 border rounded flex items-center justify-center ${
-                      disabled 
-                        ? 'cursor-not-allowed opacity-50 border-gray-200 bg-gray-100' 
-                        : 'cursor-pointer border-gray-300 hover:bg-gray-50'
-                    }`}
+                    className={`p-1 border rounded flex items-center justify-center ${disabled
+                      ? 'cursor-not-allowed opacity-50 border-gray-200 bg-gray-100'
+                      : 'cursor-pointer border-gray-300 hover:bg-gray-50'
+                      }`}
                     title={disabled ? 'Admin access required' : 'Edit Proxy'}
                     disabled={disabled}
                   >
@@ -614,14 +591,13 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
                   <button
                     onClick={disabled ? undefined : () => handleStatusUpdate(proxy.id, !proxy.is_working)}
                     disabled={disabled || updatingStatus === proxy.id}
-                    className={`p-1 border rounded flex items-center justify-center ${
-                      disabled 
-                        ? 'cursor-not-allowed opacity-50 border-gray-200 bg-gray-100' 
-                        : `cursor-pointer hover:bg-gray-50 ${proxy.is_working
-                          ? 'border-red-300 text-red-500 hover:bg-red-50'
-                          : 'border-green-300 text-green-500 hover:bg-green-50'
-                        }`
-                    }`}
+                    className={`p-1 border rounded flex items-center justify-center ${disabled
+                      ? 'cursor-not-allowed opacity-50 border-gray-200 bg-gray-100'
+                      : `cursor-pointer hover:bg-gray-50 ${proxy.is_working
+                        ? 'border-red-300 text-red-500 hover:bg-red-50'
+                        : 'border-green-300 text-green-500 hover:bg-green-50'
+                      }`
+                      }`}
                     title={disabled ? 'Admin access required' : (proxy.is_working ? 'Mark as Failed' : 'Mark as Working')}
                   >
                     {proxy.is_working ? (
@@ -633,11 +609,10 @@ const ProxyList = ({ proxies, onProxyRemoved, onProxyUpdated, disabled = false }
 
                   <button
                     onClick={disabled ? undefined : () => handleRemoveProxy(proxy.id)}
-                    className={`p-1 border rounded flex items-center justify-center ${
-                      disabled 
-                        ? 'cursor-not-allowed opacity-50 border-gray-200 bg-gray-100' 
-                        : 'cursor-pointer border-red-300 text-red-500 hover:bg-red-50'
-                    }`}
+                    className={`p-1 border rounded flex items-center justify-center ${disabled
+                      ? 'cursor-not-allowed opacity-50 border-gray-200 bg-gray-100'
+                      : 'cursor-pointer border-red-300 text-red-500 hover:bg-red-50'
+                      }`}
                     title={disabled ? 'Admin access required' : 'Remove Proxy'}
                     disabled={disabled}
                   >

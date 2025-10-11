@@ -1,31 +1,30 @@
-// Models will be required dynamically
 const { Op } = require("sequelize");
 const { getCacheKey, getCachedData, setCachedData } = require("../utils/cacheUtils");
 const { getTypesenseBullQueueData, getTypesenseFailedQueueData, getFileUploadBullQueueData } = require("../utils/redisUtils");
 const { getTypesenseStatus } = require("./typesenseService");
 const { getFileUploadStatus } = require("./fileUploadService");
 
-/**
- * Get scraping status for a specific brand
- */
+
 async function getBrandScrapingStatus(brandId, date = null, environment = 'production') {
   try {
-    // Require models dynamically to get the latest version
     const { getModels } = require("../../models");
     const { Brand, BrandsDailyStatus, Ad, AdMediaItem } = getModels(environment);
-    
+
     const targetDate = date || new Date().toISOString().split("T")[0];
     const cacheKey = getCacheKey("brand", brandId, targetDate);
     const cached = await getCachedData(cacheKey, environment);
     if (cached) return cached;
+
 
     const brand = await Brand.findByPk(brandId);
     if (!brand) {
       throw new Error("Brand not found");
     }
 
+
     const startDate = new Date(targetDate + "T00:00:00.000Z");
     const endDate = new Date(targetDate + "T23:59:59.999Z");
+
 
     const dailyStatus = await BrandsDailyStatus.findOne({
       where: {
@@ -37,14 +36,18 @@ async function getBrandScrapingStatus(brandId, date = null, environment = 'produ
       order: [["created_at", "DESC"]],
     });
 
+
     const scrapingCompleted = dailyStatus?.status === "Started";
+
 
     let dbStoredStatus = "Not started";
     let dbStoredCompleted = false;
 
+
     if (dailyStatus) {
       const status = dailyStatus.status;
       const activeAds = dailyStatus.active_ads;
+
 
       if (status === "Completed") {
         if (activeAds > 0) {
@@ -74,7 +77,7 @@ async function getBrandScrapingStatus(brandId, date = null, environment = 'produ
       }
     }
 
-    // Get ads for this brand on the specific date
+
     const ads = await Ad.findAll({
       where: {
         brand_id: brandId,
@@ -84,23 +87,23 @@ async function getBrandScrapingStatus(brandId, date = null, environment = 'produ
       },
     });
 
+
     const adIds = ads.map((ad) => ad.id);
     const mediaItems =
       adIds.length > 0
         ? await AdMediaItem.findAll({
-            where: {
-              ad_id: { [Op.in]: adIds },
-            },
-          })
+          where: {
+            ad_id: { [Op.in]: adIds },
+          },
+        })
         : [];
 
-    // FIXED: Get all required Redis queue data
+
     const bullJobData = await getTypesenseBullQueueData('regular', environment);
     const failedJobData = await getTypesenseFailedQueueData('regular', environment);
     const brandProcessingJobData = await getFileUploadBullQueueData('regular', environment);
-    // Media upload queue doesn't exist - only brand-processing queue is used
 
-    // Get statuses with Redis queue checking for accurate status
+
     const typesenseStatus = await getTypesenseStatus(
       brandId,
       targetDate,
@@ -116,6 +119,7 @@ async function getBrandScrapingStatus(brandId, date = null, environment = 'produ
       brand,
       brandProcessingJobData
     );
+
 
     const result = {
       brandId,
@@ -162,6 +166,7 @@ async function getBrandScrapingStatus(brandId, date = null, environment = 'produ
       },
     };
 
+
     await setCachedData(cacheKey, result, 300, environment);
     return result;
   } catch (error) {
@@ -169,6 +174,7 @@ async function getBrandScrapingStatus(brandId, date = null, environment = 'produ
     throw error;
   }
 }
+
 
 module.exports = {
   getBrandScrapingStatus,

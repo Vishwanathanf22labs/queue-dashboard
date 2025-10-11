@@ -9,10 +9,8 @@ const Layout = ({ children }) => {
 
   const getInitialLoginModalState = () => {
     try {
-      // Check if this is a page refresh by looking for a specific flag
       const isPageRefresh = sessionStorage.getItem('layoutPageRefreshed') === 'true';
       if (isPageRefresh) {
-        // Clear the flag and check for saved login modal state
         sessionStorage.removeItem('layoutPageRefreshed');
         const saved = localStorage.getItem('layout_showLoginModal');
         return saved ? JSON.parse(saved) : false;
@@ -25,15 +23,11 @@ const Layout = ({ children }) => {
 
   const [showLoginModal, setShowLoginModal] = useState(getInitialLoginModalState());
 
-  // Effect to detect page refresh and restore admin login modal state
   useEffect(() => {
-    // Detect if this is a page refresh (not initial load)
     const isInitialLoad = !sessionStorage.getItem('layoutPageVisited');
     if (!isInitialLoad) {
-      // This is a page refresh, set the flag
       sessionStorage.setItem('layoutPageRefreshed', 'true');
     } else {
-      // This is initial load, mark page as visited
       sessionStorage.setItem('layoutPageVisited', 'true');
     }
 
@@ -43,10 +37,8 @@ const Layout = ({ children }) => {
     }
   }, []);
 
-  // Cleanup effect to clear persistence when component unmounts (page navigation)
   useEffect(() => {
     return () => {
-      // Only clear if this is not a page refresh (i.e., user is navigating away)
       const isPageRefresh = sessionStorage.getItem('layoutPageRefreshed') === 'true';
       if (!isPageRefresh) {
         localStorage.removeItem('layout_showLoginModal');
@@ -76,7 +68,6 @@ const Layout = ({ children }) => {
           </main>
         </div>
 
-        {/* Global Admin Login Modal */}
         <AdminLoginModal
           isOpen={showLoginModal}
           onClose={() => {

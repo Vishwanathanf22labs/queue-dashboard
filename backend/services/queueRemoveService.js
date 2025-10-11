@@ -14,14 +14,13 @@ async function removePendingBrand(brandId, queueType = 'regular', environment = 
     let brandToRemove = null;
     let brandMember = null;
 
-    // pendingBrands is [member1, score1, member2, score2, ...]
     for (let i = 0; i < pendingBrands.length; i += 2) {
       try {
         const member = pendingBrands[i];
         const score = pendingBrands[i + 1];
-        
+
         if (!member) continue;
-        
+
         const brandData = JSON.parse(member);
         if (
           brandData.id === brandId ||
@@ -47,8 +46,7 @@ async function removePendingBrand(brandId, queueType = 'regular', environment = 
     await redis.zrem(queueKey, brandMember);
 
     logger.info(
-      `Successfully removed brand ${
-        brandToRemove?.brand_name || brandId
+      `Successfully removed brand ${brandToRemove?.brand_name || brandId
       } from ${queueType} pending queue`
     );
 
@@ -103,8 +101,7 @@ async function removeFailedBrand(brandId, queueType = 'regular', environment = '
     await redis.lrem(queueKey, 1, failedBrands[brandIndex]);
 
     logger.info(
-      `Successfully removed brand ${
-        brandToRemove?.brand_name || brandId
+      `Successfully removed brand ${brandToRemove?.brand_name || brandId
       } from ${queueType} failed queue`
     );
 

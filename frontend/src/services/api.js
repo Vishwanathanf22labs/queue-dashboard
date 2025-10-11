@@ -30,13 +30,13 @@ export const queueAPI = {
 
   requeueSingleBrand: (itemId, namespace) =>
     api.post("/queue/reenqueue/single", { itemId, namespace }),
-  
+
   requeueAllBrands: (namespace) =>
     api.post("/queue/reenqueue/all", { namespace }),
-  
+
   deleteReenqueueBrand: (itemId, namespace) =>
     api.delete("/queue/reenqueue/single", { data: { itemId, namespace } }),
-  
+
   deleteAllReenqueueBrands: (namespace) =>
     api.delete("/queue/reenqueue/all", { data: { namespace } }),
 
@@ -97,7 +97,6 @@ export const queueAPI = {
     return api.get(`/queue/all-brand-processing-jobs?${params.toString()}`);
   },
 
-  // Ad-update processing APIs
   getAdUpdateQueue: (page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc', search = null) => {
     const params = new URLSearchParams();
     params.append("page", page);
@@ -168,7 +167,6 @@ export const queueAPI = {
     return api.get(`/queue/search-brands?${params.toString()}`);
   },
 
-  // Brand status read/update (Edit Brands tab)
   getBrandStatus: ({ brand_id, page_id }) => {
     const params = new URLSearchParams();
     if (brand_id) params.append("brand_id", brand_id);
@@ -178,7 +176,6 @@ export const queueAPI = {
   updateBrandStatus: ({ brand_id, page_id, status }) =>
     api.put(`/queue/brand/status`, { brand_id, page_id, status }),
 
-  // Bulk operations
   bulkPreviewBrands: ({ ids, page_ids }) => api.post('/queue/brand/status/bulk/preview', { ids, page_ids }),
   bulkApplyStatusUpdates: ({ updates }) => api.put('/queue/brand/status/bulk/apply', { updates }),
 
@@ -213,13 +210,11 @@ export const queueAPI = {
       `/queue/queue-management/watchlist/failed/${brandId}/move-to-pending`
     ),
 
-  // Watchlist specific clear operations
   clearWatchlistPendingQueue: () =>
     api.delete("/queue/queue-management/watchlist/pending/clear"),
   clearWatchlistFailedQueue: () =>
     api.delete("/queue/queue-management/watchlist/failed/clear"),
 
-  // Watchlist specific bulk move operations
   moveAllWatchlistPendingToFailed: () =>
     api.put("/queue/queue-management/watchlist/pending/move-all-to-failed"),
   moveAllWatchlistFailedToPending: () =>
@@ -235,7 +230,6 @@ export const queueAPI = {
   changeBrandScore: (queueType, brandName, newScore) =>
     api.put(`/queue/change-score`, { queueType, brandName, newScore }),
 
-  // Settings API
   getConfigSettings: () => api.get("/queue/settings/config"),
   updateConfigSettings: (updates) => api.put("/queue/settings/config", { updates }),
 };
@@ -335,7 +329,7 @@ export const pipelineAPI = {
     if (date) params.append("date", date);
     return api.get(`/pipeline-status/overall-stats?${params.toString()}`);
   },
-  
+
   searchBrandsStatus: (query, date = null) => {
     const params = new URLSearchParams();
     params.append("query", query);

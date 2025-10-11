@@ -1,10 +1,10 @@
 import Card from '../ui/Card';
 import { Clock, AlertTriangle, Play, Eye, List, XCircle, BarChart3 } from 'lucide-react';
 
-const DashboardStats = ({ 
-  pendingCount, 
-  failedCount, 
-  activeCount, 
+const DashboardStats = ({
+  pendingCount,
+  failedCount,
+  activeCount,
   brandsScrapedToday,
   watchlistPendingCount = 0,
   watchlistFailedCount = 0,
@@ -13,7 +13,6 @@ const DashboardStats = ({
 }) => {
   return (
     <div className="space-y-3 sm:space-y-4 lg:space-y-6">
-      {/* Main Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
         <Card>
           <div className="flex items-center">
@@ -66,17 +65,16 @@ const DashboardStats = ({
         </Card>
       </div>
 
-      {/* Watchlist and Processing Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
         <Card>
           <div className="flex items-center">
             <div className="p-2 sm:p-3 bg-purple-100 rounded-lg">
               <List className="h-5 w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8 text-purple-600" />
             </div>
-             <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
-               <p className="text-xs sm:text-sm font-medium text-gray-600 break-words">Watchlist Pending</p>
-               <p className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-purple-600">{watchlistPendingCount}</p>
-             </div>
+            <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 break-words">Watchlist Pending</p>
+              <p className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-purple-600">{watchlistPendingCount}</p>
+            </div>
           </div>
         </Card>
 
@@ -85,10 +83,10 @@ const DashboardStats = ({
             <div className="p-2 sm:p-3 bg-orange-100 rounded-lg">
               <XCircle className="h-5 w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8 text-orange-600" />
             </div>
-             <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
-               <p className="text-xs sm:text-sm font-medium text-gray-600 break-words">Watchlist Failed</p>
-               <p className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-orange-600">{watchlistFailedCount}</p>
-             </div>
+            <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 break-words">Watchlist Failed</p>
+              <p className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-orange-600">{watchlistFailedCount}</p>
+            </div>
           </div>
         </Card>
 
@@ -111,10 +109,10 @@ const DashboardStats = ({
             <div className="p-2 sm:p-3 bg-indigo-100 rounded-lg">
               <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8 text-indigo-600" />
             </div>
-             <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
-               <p className="text-xs sm:text-sm font-medium text-gray-600 break-words">Ads Processed</p>
-               <p className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-indigo-600">{adsProcessed}</p>
-             </div>
+            <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 break-words">Ads Processed</p>
+              <p className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-indigo-600">{adsProcessed}</p>
+            </div>
           </div>
         </Card>
       </div>

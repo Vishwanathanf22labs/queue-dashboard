@@ -3,22 +3,20 @@ import Badge from '../ui/Badge';
 import { Play, Clock, Pause, Square, Hourglass, ExternalLink } from 'lucide-react';
 import { openFacebookAdLibrary } from '../../utils/facebookAdLibrary';
 
-const ProcessingStatus = ({ 
-  currentlyProcessing, 
-  nextBrand, 
-  scraperStatus, 
-  scraperStatusLoading, 
+const ProcessingStatus = ({
+  currentlyProcessing,
+  nextBrand,
+  scraperStatus,
+  scraperStatusLoading,
   formattedStartTime,
   pendingCount = 0,
   failedCount = 0
 }) => {
   const getScraperStatusInfo = (status) => {
-    // Handle specific stopped reasons
     if (status && status.startsWith('stopped(')) {
       const reason = status.replace('stopped(', '').replace(')', '');
-      let label = status; // Show the full status including reason
-      
-      // Map specific reasons to shorter labels for display
+      let label = status;
+
       switch (reason) {
         case 'cooldown NWL':
           label = 'Stopped (Cooldown Regular)';
@@ -32,19 +30,18 @@ const ProcessingStatus = ({
         default:
           label = status;
       }
-      
+
       return { variant: 'warning', icon: Square, label: label };
     }
-    
-    // Handle direct cooldown status (not wrapped in stopped())
+
     if (status === 'cooldown(WL)' || status === 'cooldown (WL)') {
       return { variant: 'cooldownWL', icon: Square, label: 'Cooldown (Watchlist Only)' };
     }
-    
+
     if (status === 'cooldown(NWL)' || status === 'cooldown (NWL)') {
       return { variant: 'cooldownNWL', icon: Square, label: 'Cooldown (Regular Only)' };
     }
-    
+
     switch (status) {
       case 'running':
         return { variant: 'success', icon: Play, label: 'Running' };
@@ -59,12 +56,11 @@ const ProcessingStatus = ({
     }
   };
 
-  // Filter out watchlist brands - only show non-watchlist brands
   const getNonWatchlistCurrentlyProcessing = () => {
     if (!currentlyProcessing) {
       return [];
     }
-    
+
     const processingArray = Array.isArray(currentlyProcessing) ? currentlyProcessing : [currentlyProcessing];
     return processingArray.filter(brand => {
       return brand && brand.is_watchlist !== true;
@@ -73,22 +69,16 @@ const ProcessingStatus = ({
 
   const nonWatchlistProcessingBrands = getNonWatchlistCurrentlyProcessing();
 
-  // Calculate total count (regular + watchlist currently processing)
-  const totalCurrentlyProcessingCount = currentlyProcessing ? 
-    (Array.isArray(currentlyProcessing) ? currentlyProcessing.length : 1) : 0;
+  const regularCurrentlyProcessingCount = nonWatchlistProcessingBrands.length;
 
-  // Check if we should show waiting message (when scraper is running but no brand processing)
-  // Show waiting when scraper is running and card is empty, regardless of queue count
   const shouldShowWaiting = scraperStatus === 'running' && (!currentlyProcessing || currentlyProcessing.length === 0);
 
-  // Determine if status badge should be visible based on scraper status
   const shouldShowStatusBadge = () => {
-    if (scraperStatus === 'cooldown(WL)' || scraperStatus === 'cooldown (WL)' || 
-        scraperStatus === 'stopped(cooldown WL)') {
+    if (scraperStatus === 'cooldown(WL)' || scraperStatus === 'cooldown (WL)' ||
+      scraperStatus === 'stopped(cooldown WL)') {
       return false;
     }
-    
-    // Show badge for all other statuses including cooldown(NWL)
+
     return true;
   };
 
@@ -101,7 +91,6 @@ const ProcessingStatus = ({
           </h3>
           {shouldShowStatusBadge() && !scraperStatusLoading && (
             (() => {
-              // Show the actual API status instead of overriding it
               const statusInfo = getScraperStatusInfo(scraperStatus);
               const StatusIcon = statusInfo.icon;
               return (
@@ -115,14 +104,12 @@ const ProcessingStatus = ({
         </div>
         {nonWatchlistProcessingBrands.length > 0 ? (
           <div className="space-y-4">
-            {/* Header with count */}
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-gray-600">
-                {totalCurrentlyProcessingCount} brand{totalCurrentlyProcessingCount !== 1 ? 's' : ''} processing
+                {regularCurrentlyProcessingCount} brand{regularCurrentlyProcessingCount !== 1 ? 's' : ''} scraping
               </span>
             </div>
 
-            {/* List of processing brands */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-96 overflow-y-auto scrollbar-hide">
               {nonWatchlistProcessingBrands.map((brand, index) => (
                 <div key={`${brand.brand_id}-${brand.page_id}-${index}`} className="flex flex-col space-y-2 p-3 bg-gray-50 rounded-lg border min-h-[200px]">
@@ -147,7 +134,7 @@ const ProcessingStatus = ({
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-1 flex-1">
                     <p className="text-xs text-gray-500">
                       ID: {brand.brand_id} | Page: {brand.page_id}
@@ -179,23 +166,23 @@ const ProcessingStatus = ({
                       </div>
                     )}
                   </div>
-                  
+
                   <div className="flex justify-end mt-auto pt-2">
                     {(() => {
-                      const badgeVariant = brand.status === 'completed' || brand.status === 'complete' 
-                        ? 'success' 
-                        : brand.status === 'failed' 
-                          ? 'error' 
+                      const badgeVariant = brand.status === 'completed' || brand.status === 'complete'
+                        ? 'success'
+                        : brand.status === 'failed'
+                          ? 'error'
                           : 'info';
                       return (
-                        <Badge 
-                          variant={badgeVariant} 
+                        <Badge
+                          variant={badgeVariant}
                           className="text-xs"
                         >
-                          {brand.status === 'completed' || brand.status === 'complete' 
-                            ? 'Completed' 
-                            : brand.status === 'failed' 
-                              ? 'Failed' 
+                          {brand.status === 'completed' || brand.status === 'complete'
+                            ? 'Completed'
+                            : brand.status === 'failed'
+                              ? 'Failed'
                               : 'Active'
                           }
                         </Badge>
@@ -227,7 +214,6 @@ const ProcessingStatus = ({
         )}
       </Card>
 
-      {/* Only show Next in Line card when there are NO pending brands AND there are failed brands */}
       {pendingCount === 0 && failedCount > 0 && (
         <Card>
           <div className="flex items-center justify-between mb-3 sm:mb-4">
@@ -261,7 +247,7 @@ const ProcessingStatus = ({
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-1 flex-1">
                     <p className="text-xs text-gray-500">
                       ID: {brand.queue_id || 'N/A'}
@@ -273,7 +259,7 @@ const ProcessingStatus = ({
                       Position: #{brand.queue_position || index + 1}
                     </p>
                   </div>
-                  
+
                   <div className="flex justify-end mt-auto pt-2">
                     <Badge variant="info" className="text-xs">Waiting</Badge>
                   </div>
@@ -281,7 +267,6 @@ const ProcessingStatus = ({
               ))}
             </div>
           ) : nextBrand && !Array.isArray(nextBrand) ? (
-            // Fallback for single brand object (backward compatibility)
             <div className="space-y-3">
               <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
                 <div className="flex items-center space-x-3">

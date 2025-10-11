@@ -1,16 +1,11 @@
 const { getWatchlistRedisInstance } = require('../utils/redisSelector');
 const logger = require('../utils/logger');
 
-// Function to get dynamic Redis keys
 function getRedisKeys(environment = null) {
   const { getRedisKeys } = require('../config/constants');
   return getRedisKeys(environment);
 }
 
-/**
- * Get count of watchlist pending brands from Redis sorted set
- * @returns {Promise<number>} Count of pending brands
- */
 async function getWatchlistPendingCount(environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys(environment);
@@ -24,10 +19,6 @@ async function getWatchlistPendingCount(environment = 'production') {
   }
 }
 
-/**
- * Get count of watchlist failed brands from Redis list
- * @returns {Promise<number>} Count of failed brands
- */
 async function getWatchlistFailedCount(environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys(environment);
@@ -41,79 +32,72 @@ async function getWatchlistFailedCount(environment = 'production') {
   }
 }
 
-/**
- * Get count of watchlist completed brands (not in pending or failed queues)
- * @returns {Promise<number>} Count of completed brands
- */
 async function getWatchlistCompletedCount(environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys(environment);
-    // Get current pending and failed page_ids from Redis
     const [pendingItems, failedItems] = await Promise.all([
       getWatchlistRedisInstance(environment).zrange(REDIS_KEYS.WATCHLIST.PENDING_BRANDS, 0, -1),
       getWatchlistRedisInstance(environment).lrange(REDIS_KEYS.WATCHLIST.FAILED_BRANDS, 0, -1)
     ]);
-    
-    // If both queues are empty, completed count is 0
+
     if (pendingItems.length === 0 && failedItems.length === 0) {
       logger.info('Watchlist queues are empty, completed count: 0');
       return 0;
     }
-    
+
 
     const { getWatchlistBrands } = require('./queueReadService');
-    
+
 
     const watchlistData = await getWatchlistBrands(1, 10000, null, environment, null);
-    
+
     if (!watchlistData || !watchlistData.brands || watchlistData.brands.length === 0) {
       logger.info('No watchlist brands found');
       return 0;
     }
-    
-    // Create sets for fast lookup
+
+
     const pendingPageIds = new Set();
     const failedPageIds = new Set();
-    
+
     pendingItems.forEach(item => {
       try {
         const brandData = JSON.parse(item);
         pendingPageIds.add(brandData.page_id);
       } catch (e) {
-        // Skip invalid items
+
       }
     });
-    
+
     failedItems.forEach(item => {
       try {
         const brandData = JSON.parse(item);
         failedPageIds.add(brandData.page_id);
       } catch (e) {
-        // Skip invalid items
       }
     });
-    
+
 
     let completedCount = 0;
-    
+
     watchlistData.brands.forEach(brand => {
       const pageId = brand.page_id;
 
       if (pendingPageIds.has(pageId)) {
-        return; 
+        return;
       }
 
       if (failedPageIds.has(pageId)) {
-        return; 
+        return;
       }
-      
+
       if (brand.status === 'Inactive') {
-        return; 
+        return;
       }
 
       completedCount++;
     });
-    
+
     logger.info(`Watchlist completed count: ${completedCount} (from ${watchlistData.brands.length} total watchlist brands)`);
     return completedCount;
   } catch (error) {
@@ -122,10 +106,6 @@ async function getWatchlistCompletedCount(environment = 'production') {
   }
 }
 
-/**
- * Get watchlist stats (pending, failed, and completed counts)
- * @returns {Promise<Object>} Object with pending, failed, and completed counts
- */
 async function getWatchlistStats(environment = 'production') {
   try {
     const [pendingCount, failedCount, completedCount] = await Promise.all([

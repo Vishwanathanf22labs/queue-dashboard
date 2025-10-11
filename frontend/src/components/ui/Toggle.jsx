@@ -1,11 +1,11 @@
 import React from 'react';
 
-const Toggle = ({ 
-  isOn, 
-  onToggle, 
-  disabled = false, 
+const Toggle = ({
+  isOn,
+  onToggle,
+  disabled = false,
   size = 'md',
-  className = '' 
+  className = ''
 }) => {
   const sizeClasses = {
     sm: 'w-8 h-4',

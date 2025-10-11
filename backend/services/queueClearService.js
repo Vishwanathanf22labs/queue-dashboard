@@ -2,7 +2,6 @@ const { getQueueRedis, getGlobalRedis } = require("../utils/redisSelector");
 const logger = require("../utils/logger");
 const { QUEUES } = require("../config/constants");
 
-// Function to get dynamic Redis keys
 function getRedisKeys(environment = 'production') {
   return require("../config/constants").getRedisKeys(environment);
 }
@@ -13,27 +12,22 @@ async function clearAllQueues(environment = 'production') {
     
     logger.info("Clearing all queues (regular and watchlist pending and failed) and reenqueue list");
 
-    // Get both Redis instances
     const regularRedis = getQueueRedis('regular', environment);
     const watchlistRedis = getQueueRedis('watchlist', environment);
     const globalRedis = getGlobalRedis(environment);
 
-    // Get counts from all queues
     const regularPendingCount = await regularRedis.zcard(REDIS_KEYS.REGULAR.PENDING_BRANDS);
     const regularFailedCount = await regularRedis.llen(REDIS_KEYS.REGULAR.FAILED_BRANDS);
     const watchlistPendingCount = await watchlistRedis.zcard(REDIS_KEYS.WATCHLIST.PENDING_BRANDS);
     const watchlistFailedCount = await watchlistRedis.llen(REDIS_KEYS.WATCHLIST.FAILED_BRANDS);
     
-    // Get count from reenqueue list
     const reenqueueCount = await globalRedis.llen(REDIS_KEYS.GLOBAL.REENQUEUE_KEY);
 
-    // Clear all queues
     await regularRedis.del(REDIS_KEYS.REGULAR.PENDING_BRANDS);
     await regularRedis.del(REDIS_KEYS.REGULAR.FAILED_BRANDS);
     await watchlistRedis.del(REDIS_KEYS.WATCHLIST.PENDING_BRANDS);
     await watchlistRedis.del(REDIS_KEYS.WATCHLIST.FAILED_BRANDS);
     
-    // Clear reenqueue list
     await globalRedis.del(REDIS_KEYS.GLOBAL.REENQUEUE_KEY);
 
     const totalCleared = regularPendingCount + regularFailedCount + watchlistPendingCount + watchlistFailedCount + reenqueueCount;

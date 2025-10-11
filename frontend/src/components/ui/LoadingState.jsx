@@ -1,10 +1,10 @@
 import Spinner from './Spinner';
 
-const LoadingState = ({ 
-  size = 'lg', 
-  className = '', 
+const LoadingState = ({
+  size = 'lg',
+  className = '',
   message = 'Loading...',
-  variant = 'default' // 'default', 'page', 'inline'
+  variant = 'default'
 }) => {
   if (variant === 'page') {
     return (
@@ -30,7 +30,6 @@ const LoadingState = ({
     );
   }
 
-  // Default variant
   return (
     <div className={`flex flex-col justify-center items-center py-8 ${className}`}>
       <Spinner size={size} />

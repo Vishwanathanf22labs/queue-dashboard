@@ -1,13 +1,10 @@
 const queueReenqueueManagementService = require("../services/queueReenqueueManagementService");
 const logger = require("../utils/logger");
 
-/**
- * Requeue a single brand
- */
 async function requeueSingleBrand(req, res) {
   try {
     const { itemId, namespace } = req.body;
-    const environment = req.environment || 'production';
+    const environment = req.environment || "production";
 
     if (!itemId || !namespace) {
       return res.status(400).json({
@@ -16,14 +13,18 @@ async function requeueSingleBrand(req, res) {
       });
     }
 
-    if (namespace !== 'watchlist' && namespace !== 'non-watchlist') {
+    if (namespace !== "watchlist" && namespace !== "non-watchlist") {
       return res.status(400).json({
         success: false,
         message: "namespace must be 'watchlist' or 'non-watchlist'",
       });
     }
 
-    const result = await queueReenqueueManagementService.requeueSingleBrand(itemId, namespace, environment);
+    const result = await queueReenqueueManagementService.requeueSingleBrand(
+      itemId,
+      namespace,
+      environment
+    );
 
     res.status(200).json({
       success: true,
@@ -40,13 +41,10 @@ async function requeueSingleBrand(req, res) {
   }
 }
 
-/**
- * Requeue all brands
- */
 async function requeueAllBrands(req, res) {
   try {
     const { namespace } = req.body;
-    const environment = req.environment || 'production';
+    const environment = req.environment || "production";
 
     if (!namespace) {
       return res.status(400).json({
@@ -55,14 +53,17 @@ async function requeueAllBrands(req, res) {
       });
     }
 
-    if (namespace !== 'watchlist' && namespace !== 'non-watchlist') {
+    if (namespace !== "watchlist" && namespace !== "non-watchlist") {
       return res.status(400).json({
         success: false,
         message: "namespace must be 'watchlist' or 'non-watchlist'",
       });
     }
 
-    const result = await queueReenqueueManagementService.requeueAllBrands(namespace, environment);
+    const result = await queueReenqueueManagementService.requeueAllBrands(
+      namespace,
+      environment
+    );
 
     res.status(200).json({
       success: true,
@@ -79,13 +80,10 @@ async function requeueAllBrands(req, res) {
   }
 }
 
-/**
- * Delete a single brand
- */
 async function deleteSingleBrand(req, res) {
   try {
     const { itemId, namespace } = req.body;
-    const environment = req.environment || 'production';
+    const environment = req.environment || "production";
 
     if (!itemId || !namespace) {
       return res.status(400).json({
@@ -94,14 +92,18 @@ async function deleteSingleBrand(req, res) {
       });
     }
 
-    if (namespace !== 'watchlist' && namespace !== 'non-watchlist') {
+    if (namespace !== "watchlist" && namespace !== "non-watchlist") {
       return res.status(400).json({
         success: false,
         message: "namespace must be 'watchlist' or 'non-watchlist'",
       });
     }
 
-    const result = await queueReenqueueManagementService.deleteSingleBrand(itemId, namespace, environment);
+    const result = await queueReenqueueManagementService.deleteSingleBrand(
+      itemId,
+      namespace,
+      environment
+    );
 
     res.status(200).json({
       success: true,
@@ -118,13 +120,10 @@ async function deleteSingleBrand(req, res) {
   }
 }
 
-/**
- * Delete all brands
- */
 async function deleteAllBrands(req, res) {
   try {
     const { namespace } = req.body;
-    const environment = req.environment || 'production';
+    const environment = req.environment || "production";
 
     if (!namespace) {
       return res.status(400).json({
@@ -133,14 +132,17 @@ async function deleteAllBrands(req, res) {
       });
     }
 
-    if (namespace !== 'watchlist' && namespace !== 'non-watchlist') {
+    if (namespace !== "watchlist" && namespace !== "non-watchlist") {
       return res.status(400).json({
         success: false,
         message: "namespace must be 'watchlist' or 'non-watchlist'",
       });
     }
 
-    const result = await queueReenqueueManagementService.deleteAllBrands(namespace, environment);
+    const result = await queueReenqueueManagementService.deleteAllBrands(
+      namespace,
+      environment
+    );
 
     res.status(200).json({
       success: true,

@@ -15,23 +15,19 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
   const [searchParams, setSearchParams] = useSearchParams();
   const { brandProcessingQueue, loading, error } = useQueueStore();
 
-  // Get pagination and sorting state from URL params
   const currentPage = parseInt(searchParams.get('regularPage')) || 1;
   const sortBy = searchParams.get('regularSortBy') || 'normal';
   const sortOrder = searchParams.get('regularSortOrder') || 'desc';
-  
-  // Store original totals (for static display - don't change during search)
+
   const [originalTotals, setOriginalTotals] = useState({
     total_items: 0,
     total_ads: 0
   });
 
-  // Update original totals only when NOT searching
   useEffect(() => {
     if (brandProcessingQueue) {
       const isSearchActive = searchTerm && searchTerm.trim().length > 0;
-      
-      // Only update original totals when NOT searching
+
       if (!isSearchActive) {
         setOriginalTotals({
           total_items: brandProcessingQueue.pagination?.total_items || 0,
@@ -41,11 +37,7 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
     }
   }, [brandProcessingQueue, searchTerm]);
 
-  // Don't make API calls on mount - let the parent Dashboard handle initial loading
-  // The parent will load data with the correct saved state from localStorage
-  // No useEffect needed here as Dashboard already handles the initial API calls
 
-  // Status indicator component - show colored dot for all statuses
   const StatusIndicator = ({ status }) => {
     const getStatusColor = (status) => {
       switch (status) {
@@ -86,7 +78,7 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
     };
 
     return (
-      <Circle 
+      <Circle
         className={`h-2 w-2 ${getStatusColor(status)}`}
         fill="currentColor"
         title={getStatusTitle(status)}
@@ -99,7 +91,6 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
     if (onPageChange) {
       onPageChange(newPage, sortBy, sortOrder);
     }
-    // Scroll to the table section when changing pages
     const tableSection = document.getElementById('brands-table-section');
     if (tableSection) {
       tableSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -107,13 +98,12 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
   };
 
   const handleSortChange = (field, order) => {
-    // Update URL params
     const newParams = new URLSearchParams(searchParams);
-    newParams.set('regularPage', '1'); // Reset to page 1 when sorting
+    newParams.set('regularPage', '1');
     newParams.set('regularSortBy', field);
     newParams.set('regularSortOrder', order);
     setSearchParams(newParams);
-    
+
     if (onSortChange) {
       onSortChange(field, order);
     }
@@ -147,17 +137,14 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
 
   const { brands, pagination } = brandProcessingQueue;
 
-  // Use server-side pagination data
   const totalItems = pagination?.total_items || 0;
   const totalPages = pagination?.total_pages || 1;
   const itemsPerPage = pagination?.per_page || 10;
   const apiCurrentPage = pagination?.current_page || 1;
-  
 
-  // Use brands directly from API (server-side sorted)
+
   const currentPageBrands = brands || [];
 
-  // Sortable header component
   const SortableHeader = ({ field, label, currentSortBy, currentSortOrder, onSortChange }) => {
     const isActive = currentSortBy === field;
     const isAsc = isActive && currentSortOrder === 'asc';
@@ -167,16 +154,14 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
       if (field === 'normal') {
         onSortChange('normal', 'desc');
       } else if (isActive) {
-        // Toggle between asc and desc
         onSortChange(field, isAsc ? 'desc' : 'asc');
       } else {
-        // Set to desc by default
         onSortChange(field, 'desc');
       }
     };
 
     return (
-      <th 
+      <th
         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-50 select-none relative group"
         onClick={handleClick}
         title={field === 'normal' ? 'Normal' : undefined}
@@ -184,11 +169,11 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
         <div className="flex items-center space-x-1">
           <span>{label}</span>
           <div className="flex flex-col">
-            <ChevronUp 
-              className={`h-3 w-3 ${isAsc ? 'text-blue-600' : 'text-gray-300'}`} 
+            <ChevronUp
+              className={`h-3 w-3 ${isAsc ? 'text-blue-600' : 'text-gray-300'}`}
             />
-            <ChevronDown 
-              className={`h-3 w-3 -mt-1 ${isDesc ? 'text-blue-600' : 'text-gray-300'}`} 
+            <ChevronDown
+              className={`h-3 w-3 -mt-1 ${isDesc ? 'text-blue-600' : 'text-gray-300'}`}
             />
           </div>
         </div>
@@ -206,7 +191,7 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
     {
       key: 'brand',
       label: 'Regular Brand',
-      sortable: false, // Brand name is not sortable
+      sortable: false,
       render: (value, brand) => (
         <div>
           <div className="flex items-center space-x-2">
@@ -239,9 +224,22 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
       key: 'total_ads',
       label: 'Ads Count',
       sortable: true,
-      render: (value) => (
-        <div className="text-sm text-gray-900">{value || 0}</div>
-      )
+      render: (value, brand) => {
+        const currentAds = value || 0;
+        const actualAds = brand.actual_ads_count;
+        const displayValue = actualAds !== null && actualAds !== undefined
+          ? `${currentAds}/${actualAds}`
+          : `${currentAds}/NA`;
+
+        return (
+          <div
+            className="text-sm text-gray-900 font-medium"
+            title="Total Ads"
+          >
+            {displayValue}
+          </div>
+        );
+      }
     },
     {
       key: 'created_at',
@@ -261,7 +259,6 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
         <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">Regular Brands Scrapped Queue</h2>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
         <Card>
           <div className="flex items-center">
@@ -304,7 +301,6 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
         </Card>
       </div>
 
-      {/* Search Input */}
       <Card>
         <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 sm:gap-4">
           <div className="flex-1 max-w-md">
@@ -331,7 +327,6 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
           <div>
             <h3 className="text-base sm:text-lg font-semibold text-gray-900">Regular Brands in Queue</h3>
             <div className="flex flex-wrap items-center gap-3 mt-1">
-              {/* Active */}
               <div className="flex items-center space-x-1">
                 <Circle className="h-3 w-3 text-green-500" fill="currentColor" />
                 <span className="text-sm font-medium text-gray-700">Active:</span>
@@ -339,8 +334,7 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
                   {brandProcessingQueue?.analytics?.pre_computed_counters?.active || 0}
                 </span>
               </div>
-              
-              {/* Waiting */}
+
               <div className="flex items-center space-x-1">
                 <Circle className="h-3 w-3 text-yellow-500" fill="currentColor" />
                 <span className="text-sm font-medium text-gray-700">Waiting:</span>
@@ -348,8 +342,7 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
                   {brandProcessingQueue?.analytics?.pre_computed_counters?.waiting || 0}
                 </span>
               </div>
-              
-              {/* Delayed */}
+
               <div className="flex items-center space-x-1">
                 <Circle className="h-3 w-3 text-orange-500" fill="currentColor" />
                 <span className="text-sm font-medium text-gray-700">Delayed:</span>
@@ -357,8 +350,7 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
                   {brandProcessingQueue?.analytics?.pre_computed_counters?.delayed || 0}
                 </span>
               </div>
-              
-              {/* Completed */}
+
               <div className="flex items-center space-x-1">
                 <Circle className="h-3 w-3 text-blue-500" fill="currentColor" />
                 <span className="text-sm font-medium text-gray-700">Completed:</span>
@@ -366,8 +358,7 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
                   {brandProcessingQueue?.analytics?.pre_computed_counters?.completed || 0}
                 </span>
               </div>
-              
-              {/* Failed */}
+
               <div className="flex items-center space-x-1">
                 <Circle className="h-3 w-3 text-red-500" fill="currentColor" />
                 <span className="text-sm font-medium text-gray-700">Failed:</span>
@@ -375,8 +366,7 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
                   {brandProcessingQueue?.analytics?.pre_computed_counters?.failed || 0}
                 </span>
               </div>
-              
-              {/* Prioritized */}
+
               <div className="flex items-center space-x-1">
                 <Circle className="h-3 w-3 text-purple-500" fill="currentColor" />
                 <span className="text-sm font-medium text-gray-700">Prioritized:</span>
@@ -410,44 +400,40 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
           <LoadingSpinner />
         ) : !loading && currentPageBrands && currentPageBrands.length > 0 ? (
           <>
-            {/* Mobile Sorting Controls */}
             <div className="md:hidden mb-4">
               <div className="flex flex-nowrap gap-1 overflow-x-auto">
                 <span className="text-xs font-medium text-gray-700 self-center flex-shrink-0 mr-1">Sort by:</span>
                 <div className="flex gap-0.5 flex-nowrap min-w-0">
                   <button
                     onClick={() => handleSortChange('normal', sortBy === 'normal' && sortOrder === 'desc' ? 'asc' : 'desc')}
-                    className={`flex items-center space-x-0.5 px-1.5 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
-                      sortBy === 'normal' 
-                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                    }`}
+                    className={`flex items-center space-x-0.5 px-1.5 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap flex-shrink-0 ${sortBy === 'normal'
+                      ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
                   >
                     <ChevronUp className={`h-2 w-2 ${sortBy === 'normal' && sortOrder === 'asc' ? 'text-blue-600' : 'text-gray-400'}`} />
                     <ChevronDown className={`h-2 w-2 -mt-1 ${sortBy === 'normal' && sortOrder === 'desc' ? 'text-blue-600' : 'text-gray-400'}`} />
                     <span>Normal</span>
                   </button>
-                  
+
                   <button
                     onClick={() => handleSortChange('total_ads', sortBy === 'total_ads' && sortOrder === 'desc' ? 'asc' : 'desc')}
-                    className={`flex items-center space-x-0.5 px-1.5 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
-                      sortBy === 'total_ads' 
-                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                    }`}
+                    className={`flex items-center space-x-0.5 px-1.5 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap flex-shrink-0 ${sortBy === 'total_ads'
+                      ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
                   >
                     <ChevronUp className={`h-2 w-2 ${sortBy === 'total_ads' && sortOrder === 'asc' ? 'text-blue-600' : 'text-gray-400'}`} />
                     <ChevronDown className={`h-2 w-2 -mt-1 ${sortBy === 'total_ads' && sortOrder === 'desc' ? 'text-blue-600' : 'text-gray-400'}`} />
                     <span>Ads Count</span>
                   </button>
-                  
+
                   <button
                     onClick={() => handleSortChange('created_at', sortBy === 'created_at' && sortOrder === 'desc' ? 'asc' : 'desc')}
-                    className={`flex items-center space-x-0.5 px-1.5 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
-                      sortBy === 'created_at' 
-                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                    }`}
+                    className={`flex items-center space-x-0.5 px-1.5 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap flex-shrink-0 ${sortBy === 'created_at'
+                      ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
                   >
                     <ChevronUp className={`h-2 w-2 ${sortBy === 'created_at' && sortOrder === 'asc' ? 'text-blue-600' : 'text-gray-400'}`} />
                     <ChevronDown className={`h-2 w-2 -mt-1 ${sortBy === 'created_at' && sortOrder === 'desc' ? 'text-blue-600' : 'text-gray-400'}`} />
@@ -457,7 +443,6 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
               </div>
             </div>
 
-            {/* Desktop Table View */}
             <div className="hidden md:block">
               <div className="overflow-hidden shadow-md rounded-lg">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -505,12 +490,10 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
               </div>
             </div>
 
-            {/* Mobile Cards View */}
             <div className="md:hidden space-y-3">
               {currentPageBrands.map((brand, index) => (
                 <Card key={`${brand.brand_id}-${index}`} className="p-4 relative pb-12">
                   <div className="space-y-3">
-                    {/* Header with Brand Name */}
                     <div className="flex items-start justify-between">
                       <div className="flex-1 pr-3">
                         <div className="flex items-center space-x-2 mb-1">
@@ -535,7 +518,6 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
                       </div>
                     </div>
 
-                    {/* Details Grid */}
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="text-gray-500">Brand ID:</span>
@@ -547,7 +529,6 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
                       </div>
                     </div>
 
-                    {/* Created Date */}
                     <div className="text-sm">
                       <span className="text-gray-500">Created:</span>
                       <span className="ml-2 text-gray-900">
@@ -555,7 +536,6 @@ const BrandProcessingQueue = ({ onPageChange, onSortChange, onSearch, searchTerm
                       </span>
                     </div>
 
-                    {/* Category */}
                     {brand.page_category && (
                       <div className="text-xs text-gray-400">
                         {brand.page_category}

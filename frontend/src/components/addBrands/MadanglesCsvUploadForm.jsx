@@ -20,12 +20,12 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
 
   const fileInputRef = useRef(null);
 
-  const { 
-    file: csvFile, 
-    uploadStatus: csvUploadStatus, 
-    uploadResult: csvUploadResult, 
-    csvPreview, 
-    showPreview, 
+  const {
+    file: csvFile,
+    uploadStatus: csvUploadStatus,
+    uploadResult: csvUploadResult,
+    csvPreview,
+    showPreview,
     showConfirmModal,
     showQueueButtons,
     scrapedBrands,
@@ -71,27 +71,24 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
         try {
           const csvText = e.target.result;
           const lines = csvText.split('\n').filter(line => line.trim());
-          
+
           if (lines.length === 0) {
             reject(new Error('CSV file is empty'));
             return;
           }
 
-          // Parse header
           const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
           const expectedHeaders = ['Category ID', 'Brand Category', 'Ad Library URL'];
 
 
-          // Condition 1: Check for correct headers (case-insensitive)
           const normalizedHeaders = headers.map(h => h.toLowerCase());
           const normalizedExpected = expectedHeaders.map(h => h.toLowerCase());
-          
+
           if (headers.length !== expectedHeaders.length || !normalizedExpected.every(h => normalizedHeaders.includes(h))) {
             reject(new Error(`Invalid CSV format. Required headers: "${expectedHeaders.join(', ')}". Found: "${headers.join(', ')}"`));
             return;
           }
 
-          // Parse data rows with validation
           const data = [];
           for (let i = 1; i < lines.length; i++) {
             const line = lines[i];
@@ -102,21 +99,18 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
               row[header] = values[idx] || '';
             });
 
-            // Condition 2: Validate Category ID (case-insensitive)
             const categoryId = row['Category ID'] || row['category id'];
             if (!categoryId || isNaN(Number(categoryId))) {
               reject(new Error(`Invalid 'Category ID' in row ${i + 1}. Must be a number.`));
               return;
             }
 
-            // Condition 3: Validate Ad Library URL and extract page_id (case-insensitive)
             const adLibraryUrl = row['Ad Library URL'] || row['ad library url'] || row['Ad library Url'];
             if (!adLibraryUrl) {
               reject(new Error(`Missing 'Ad Library URL' in row ${i + 1}.`));
               return;
             }
 
-            // Check if it's a valid Facebook Ad Library URL
             if (!adLibraryUrl.includes('facebook.com/ads/library/') || !adLibraryUrl.includes('view_all_page_id=')) {
               reject(new Error(`Invalid 'Ad Library URL' in row ${i + 1}. Must be a Facebook Ad Library URL with 'view_all_page_id' parameter.`));
               return;
@@ -127,9 +121,8 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
               reject(new Error(`Invalid 'Ad Library URL' in row ${i + 1}. Missing or invalid page ID.`));
               return;
             }
-            
+
             row['page_id'] = urlMatch[1];
-            // Keep the original Ad Library URL for display
             row['Ad Library URL'] = adLibraryUrl;
             data.push({ ...row, rowNumber: i + 1 });
           }
@@ -183,7 +176,6 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
       return;
     }
 
-    // Show confirmation modal
     setCsvState(prev => ({ ...prev, showConfirmModal: true }));
   };
 
@@ -193,17 +185,17 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
 
   const handleConfirmUpload = async () => {
     try {
-      setCsvState(prev => ({ 
-        ...prev, 
+      setCsvState(prev => ({
+        ...prev,
         showConfirmModal: false,
-        uploadStatus: { type: 'uploading', message: 'Uploading CSV to madangles-scraper...' } 
+        uploadStatus: { type: 'uploading', message: 'Uploading CSV to madangles-scraper...' }
       }));
 
       const result = await uploadCsvToMadangles(csvFile);
 
       if (result && result.success) {
         toast.success('CSV uploaded successfully to madangles-scraper!');
-        
+
         const uploadResult = {
           type: 'success',
           message: result.message,
@@ -220,7 +212,6 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
           uploadStatus: { type: 'success', message: result.message }
         }));
 
-        // Start polling for scraping completion
         const pageIds = csvPreview.data.map(row => row.page_id);
         startDatabasePolling(pageIds);
 
@@ -244,91 +235,87 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
 
   // Database polling function
   const startDatabasePolling = async (pageIds) => {
-    const maxAttempts = 30; // 1 minute total
-    const interval = 2000; // 2 seconds
-    
+    const maxAttempts = 30;
+    const interval = 2000;
+
     setCsvState(prev => ({
       ...prev,
       pollingStatus: { type: 'polling', message: 'Waiting for scraping to complete...' }
     }));
-    
+
     for (let i = 0; i < maxAttempts; i++) {
       try {
         const response = await checkScrapingStatus(pageIds);
         const { completed, scrapedBrands, totalFound, totalExpected, progress } = response.data;
-        
+
         if (completed) {
           setCsvState(prev => ({
             ...prev,
-            pollingStatus: null, // Hide polling status
+            pollingStatus: null,
             showQueueButtons: true,
             scrapedBrands: scrapedBrands
           }));
           return;
         } else {
-          // Update progress
           const progressPercent = Math.min(90, progress || (i / maxAttempts) * 100);
           setCsvState(prev => ({
             ...prev,
-            pollingStatus: { 
-              type: 'polling', 
-              message: `Scraping progress: ${totalFound}/${totalExpected} brands (${progressPercent.toFixed(0)}%)` 
+            pollingStatus: {
+              type: 'polling',
+              message: `Scraping progress: ${totalFound}/${totalExpected} brands (${progressPercent.toFixed(0)}%)`
             }
           }));
         }
       } catch (error) {
         console.log(`Polling attempt ${i + 1} failed:`, error.message);
       }
-      
+
       await new Promise(resolve => setTimeout(resolve, interval));
     }
-    
-    // Timeout
+
     setCsvState(prev => ({
       ...prev,
-      pollingStatus: { 
-        type: 'warning', 
-        message: 'Scraping is taking longer than expected. You can check manually later.' 
+      pollingStatus: {
+        type: 'warning',
+        message: 'Scraping is taking longer than expected. You can check manually later.'
       },
-      showQueueButtons: true // Show buttons anyway, let user decide
+      showQueueButtons: true
     }));
     toast.warning('Scraping is taking longer than expected. You can add to queue manually.');
   };
 
-  // Add brands to queue function
   const handleAddToQueue = async (queueType) => {
     try {
       const pageIds = scrapedBrands.map(brand => brand.page_id);
-      
+
       setCsvState(prev => ({
         ...prev,
         queueAdditionStatus: { type: 'adding', message: `Adding brands to ${queueType} queue...` }
       }));
 
       const result = await addScrapedBrandsToQueue(pageIds, queueType);
-      
+
       if (result && result.success) {
         const { successCount, failedCount, skippedCount } = result.data;
         let message = `Successfully added ${successCount} brands to ${queueType} pending queue!`;
-        
+
         if (skippedCount > 0) {
           message += ` (${skippedCount} already in queue)`;
         }
         if (failedCount > 0) {
           message += ` (${failedCount} failed)`;
         }
-        
+
         toast.success(message);
-        
+
         setCsvState(prev => ({
           ...prev,
           queueAdditionStatus: { type: 'success', message: message }
         }));
 
-        // Clear form after 3 seconds
         setTimeout(() => {
-          setCsvState(prev => ({ 
-            ...prev, 
+          setCsvState(prev => ({
+            ...prev,
             uploadStatus: null,
             file: null,
             csvPreview: null,
@@ -395,7 +382,6 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
         </p>
       </div>
 
-      {/* File Upload Area */}
       <div>
         {!csvFile ? (
           <div
@@ -499,7 +485,6 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
           disabled={disabled}
         />
 
-        {/* CSV Preview */}
         {csvPreview && showPreview && (
           <div className="mt-4 border border-gray-200 rounded-lg overflow-hidden">
             <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
@@ -534,7 +519,6 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
           </div>
         )}
 
-        {/* Upload Status */}
         {csvUploadStatus && (
           <div className={`mt-4 p-3 rounded-lg ${csvUploadStatus.type === 'uploading'
             ? 'bg-blue-50 border border-blue-200 text-blue-800'
@@ -559,7 +543,6 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
           </div>
         )}
 
-        {/* Polling Status */}
         {pollingStatus && (
           <div className={`mt-4 p-3 rounded-lg ${pollingStatus.type === 'polling'
             ? 'bg-yellow-50 border border-yellow-200 text-yellow-800'
@@ -584,7 +567,6 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
           </div>
         )}
 
-        {/* Queue Addition Status */}
         {queueAdditionStatus && (
           <div className={`mt-4 p-3 rounded-lg ${queueAdditionStatus.type === 'adding'
             ? 'bg-blue-50 border border-blue-200 text-blue-800'
@@ -609,14 +591,13 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
           </div>
         )}
 
-        {/* Queue Selection Interface */}
         {showQueueButtons && scrapedBrands.length > 0 && (
           <div className="mt-6 border border-gray-200 rounded-lg p-6 bg-white">
             <div className="mb-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Choose which queue to add the brands to:</h3>
               <p className="text-sm text-gray-600">Select where you want to add the {scrapedBrands.length} scraped brands</p>
             </div>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Button
                 onClick={() => handleAddToQueue('regular')}
@@ -630,7 +611,7 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
                   <div className="text-sm text-gray-500">Standard processing queue</div>
                 </div>
               </Button>
-              
+
               <Button
                 onClick={() => handleAddToQueue('watchlist')}
                 variant="outline"
@@ -645,7 +626,6 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
               </Button>
             </div>
 
-            {/* Scraped Brands Preview */}
             <div className="mt-4 bg-gray-50 rounded-lg border border-gray-200 p-4">
               <h5 className="text-sm font-medium text-gray-900 mb-3">Scraped Brands ({scrapedBrands.length}):</h5>
               <div className="space-y-2 max-h-32 overflow-y-auto">
@@ -653,8 +633,8 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
                   <div key={index} className="flex items-center justify-between text-xs bg-white rounded border border-gray-100 p-2">
                     <div className="flex items-center space-x-2">
                       {brand.logo_url && (
-                        <img 
-                          src={brand.logo_url} 
+                        <img
+                          src={brand.logo_url}
                           alt={brand.name}
                           className="w-4 h-4 rounded"
                           onError={(e) => { e.target.style.display = 'none'; }}
@@ -670,7 +650,6 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
           </div>
         )}
 
-        {/* Upload Button - Only show if no upload result */}
         {csvFile && !csvUploadResult && (
           <div className="mt-6 flex space-x-3">
             <Button
@@ -694,7 +673,6 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
         )}
       </div>
 
-      {/* Upload Result Confirmation */}
       {csvUploadResult && csvUploadResult.type === 'success' && (
         <div className="mt-6 border border-green-200 rounded-lg p-4 bg-green-50">
           <div className="flex items-start justify-between">
@@ -705,8 +683,7 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
               <div className="flex-1">
                 <h4 className="text-base font-medium text-green-800 mb-2">Upload Successful!</h4>
                 <p className="text-sm text-green-700 mb-3">{csvUploadResult.message}</p>
-                
-                {/* File Details */}
+
                 <div className="bg-white rounded border border-green-200 p-3 mb-3">
                   <h5 className="text-sm font-medium text-gray-900 mb-2">File Details:</h5>
                   <div className="text-xs text-gray-600 space-y-1">
@@ -731,94 +708,90 @@ const MadanglesCsvUploadForm = ({ disabled = false }) => {
         </div>
       )}
 
-      {/* Confirmation Modal */}
       {showConfirmModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-hidden">
           <div className="flex items-center justify-center min-h-screen p-4">
-            <div className="bg-white rounded-lg p-6 max-w-2xl w-full shadow-xl max-h-[85vh] overflow-y-auto scrollbar-hide" 
-                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <div className="bg-white rounded-lg p-6 max-w-2xl w-full shadow-xl max-h-[85vh] overflow-y-auto scrollbar-hide"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               <div className="flex items-center space-x-3 mb-4">
-              <div className="p-2 bg-blue-100 rounded-full">
-                <Upload className="h-5 w-5 text-blue-600" />
+                <div className="p-2 bg-blue-100 rounded-full">
+                  <Upload className="h-5 w-5 text-blue-600" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900">Confirm Upload</h3>
               </div>
-              <h3 className="text-lg font-medium text-gray-900">Confirm Upload</h3>
-            </div>
-            
-            <div className="mb-6">
-              <p className="text-sm text-gray-600 mb-4">
-                Are you sure you want to upload this CSV file to madangles-scraper?
-              </p>
-              
-              {csvFile && (
-                <div className="bg-gray-50 rounded-lg p-3 mb-4">
-                  <div className="flex items-center space-x-2 mb-3">
-                    <FileText className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm font-medium text-gray-900">{csvFile.name}</span>
-                  </div>
-                  <div className="text-xs text-gray-500 mb-3">
-                    {(csvFile.size / 1024).toFixed(1)} KB • {csvPreview?.data.length || 0} rows
-                  </div>
-                  
-                  {/* CSV Data Preview - Cards */}
-                  {csvPreview && csvPreview.data.length > 0 && (
-                    <div className="space-y-3">
-                      <h5 className="text-sm font-medium text-gray-700">Data Preview</h5>
-                      <div className="space-y-3 max-h-96 overflow-y-auto scrollbar-hide" 
-                           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                        {csvPreview.data.map((row, index) => (
-                          <div key={index} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              {/* Left Column */}
-                              <div className="space-y-2">
-                                <div>
-                                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Category ID</label>
-                                  <p className="text-sm text-gray-900 font-medium">{row['Category ID'] || 'N/A'}</p>
+
+              <div className="mb-6">
+                <p className="text-sm text-gray-600 mb-4">
+                  Are you sure you want to upload this CSV file to madangles-scraper?
+                </p>
+
+                {csvFile && (
+                  <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <FileText className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm font-medium text-gray-900">{csvFile.name}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 mb-3">
+                      {(csvFile.size / 1024).toFixed(1)} KB • {csvPreview?.data.length || 0} rows
+                    </div>
+
+                    {csvPreview && csvPreview.data.length > 0 && (
+                      <div className="space-y-3">
+                        <h5 className="text-sm font-medium text-gray-700">Data Preview</h5>
+                        <div className="space-y-3 max-h-96 overflow-y-auto scrollbar-hide"
+                          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                          {csvPreview.data.map((row, index) => (
+                            <div key={index} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="space-y-2">
+                                  <div>
+                                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Category ID</label>
+                                    <p className="text-sm text-gray-900 font-medium">{row['Category ID'] || 'N/A'}</p>
+                                  </div>
+                                  <div>
+                                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Brand Category</label>
+                                    <p className="text-sm text-gray-900">{row['Brand Category'] || 'N/A'}</p>
+                                  </div>
                                 </div>
-                                <div>
-                                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Brand Category</label>
-                                  <p className="text-sm text-gray-900">{row['Brand Category'] || 'N/A'}</p>
-                                </div>
-                              </div>
-                              
-                              {/* Right Column */}
-                              <div className="space-y-2">
-                                <div>
-                                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Page ID</label>
-                                  <p className="text-sm text-gray-900 font-mono bg-gray-50 px-2 py-1 rounded">{row['page_id'] || 'N/A'}</p>
-                                </div>
-                                <div>
-                                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Ad Library URL</label>
-                                  <p className="text-xs text-blue-600 break-all bg-blue-50 px-2 py-1 rounded" title={row['Ad Library URL']}>
-                                    {row['Ad Library URL'] || 'N/A'}
-                                  </p>
+
+                                <div className="space-y-2">
+                                  <div>
+                                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Page ID</label>
+                                    <p className="text-sm text-gray-900 font-mono bg-gray-50 px-2 py-1 rounded">{row['page_id'] || 'N/A'}</p>
+                                  </div>
+                                  <div>
+                                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Ad Library URL</label>
+                                    <p className="text-xs text-blue-600 break-all bg-blue-50 px-2 py-1 rounded" title={row['Ad Library URL']}>
+                                      {row['Ad Library URL'] || 'N/A'}
+                                    </p>
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
-            <div className="flex space-x-3">
-              <Button
-                onClick={handleCancelUpload}
-                variant="outline"
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleConfirmUpload}
-                variant="primary"
-                className="flex-1"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Confirm Upload
-              </Button>
+              <div className="flex space-x-3">
+                <Button
+                  onClick={handleCancelUpload}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleConfirmUpload}
+                  variant="primary"
+                  className="flex-1"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Confirm Upload
+                </Button>
               </div>
             </div>
           </div>

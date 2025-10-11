@@ -106,7 +106,6 @@ export const watchlistBrandsColumns = [
     key: 'scraper_status',
     label: 'Scraper Status',
     render: (value, brand, index, startIndex) => {
-      // This will be handled in the component with proper status logic
       return value || 'Unknown';
     }
   },
@@ -116,7 +115,6 @@ export const watchlistBrandsColumns = [
     headerAlign: 'center',
     className: 'text-center',
     render: (value, brand) => {
-      // This will be handled in the component with proper action buttons
       return null;
     }
   }

@@ -25,10 +25,13 @@ async function clearAllQueues(req, res) {
 
 async function clearPendingQueue(req, res) {
   try {
-    const { queueType = 'regular' } = req.query;
+    const { queueType = "regular" } = req.query;
     logger.info(`Clear ${queueType} pending queue request received`);
 
-    const result = await queueManagementService.clearPendingQueue(queueType, req.environment);
+    const result = await queueManagementService.clearPendingQueue(
+      queueType,
+      req.environment
+    );
 
     res.status(200).json({
       success: true,
@@ -48,10 +51,13 @@ async function clearPendingQueue(req, res) {
 
 async function clearFailedQueue(req, res) {
   try {
-    const { queueType = 'regular' } = req.query;
+    const { queueType = "regular" } = req.query;
     logger.info(`Clear ${queueType} failed queue request received`);
 
-    const result = await queueManagementService.clearFailedQueue(queueType, req.environment);
+    const result = await queueManagementService.clearFailedQueue(
+      queueType,
+      req.environment
+    );
 
     res.status(200).json({
       success: true,
@@ -72,8 +78,10 @@ async function clearFailedQueue(req, res) {
 async function movePendingToFailed(req, res) {
   try {
     const { id } = req.params;
-    const { queueType = 'regular' } = req.query;
-    logger.info(`Move ${queueType} pending to failed request received for queue ID: ${id}`);
+    const { queueType = "regular" } = req.query;
+    logger.info(
+      `Move ${queueType} pending to failed request received for queue ID: ${id}`
+    );
 
     const result = await queueManagementService.movePendingToFailed(
       parseInt(id),
@@ -100,8 +108,10 @@ async function movePendingToFailed(req, res) {
 async function moveFailedToPending(req, res) {
   try {
     const { id } = req.params;
-    const { queueType = 'regular' } = req.query;
-    logger.info(`Move ${queueType} failed to pending request received for brand ID: ${id}`);
+    const { queueType = "regular" } = req.query;
+    logger.info(
+      `Move ${queueType} failed to pending request received for brand ID: ${id}`
+    );
 
     const result = await queueManagementService.moveFailedToPending(
       parseInt(id),
@@ -128,8 +138,10 @@ async function moveFailedToPending(req, res) {
 async function removePendingBrand(req, res) {
   try {
     const { id } = req.params;
-    const { queueType = 'regular' } = req.query;
-    logger.info(`Remove ${queueType} pending brand request received for brand ID: ${id}`);
+    const { queueType = "regular" } = req.query;
+    logger.info(
+      `Remove ${queueType} pending brand request received for brand ID: ${id}`
+    );
 
     const result = await queueManagementService.removePendingBrand(
       parseInt(id),
@@ -156,10 +168,16 @@ async function removePendingBrand(req, res) {
 async function removeFailedBrand(req, res) {
   try {
     const { id } = req.params;
-    const { queueType = 'regular' } = req.query;
-    logger.info(`Remove ${queueType} failed brand request received for brand ID: ${id}`);
+    const { queueType = "regular" } = req.query;
+    logger.info(
+      `Remove ${queueType} failed brand request received for brand ID: ${id}`
+    );
 
-    const result = await queueManagementService.removeFailedBrand(parseInt(id), queueType, req.environment);
+    const result = await queueManagementService.removeFailedBrand(
+      parseInt(id),
+      queueType,
+      req.environment
+    );
 
     res.status(200).json({
       success: true,
@@ -181,7 +199,9 @@ async function moveAllPendingToFailed(req, res) {
   try {
     logger.info("Move all pending to failed request received");
 
-    const result = await queueManagementService.moveAllPendingToFailed(req.environment);
+    const result = await queueManagementService.moveAllPendingToFailed(
+      req.environment
+    );
 
     res.status(200).json({
       success: true,
@@ -203,7 +223,9 @@ async function moveAllFailedToPending(req, res) {
   try {
     logger.info("Move all failed to pending request received");
 
-    const result = await queueManagementService.moveAllFailedToPending(req.environment);
+    const result = await queueManagementService.moveAllFailedToPending(
+      req.environment
+    );
 
     res.status(200).json({
       success: true,
@@ -225,7 +247,9 @@ async function moveWatchlistFailedToPending(req, res) {
   try {
     logger.info("Move watchlist failed to pending request received");
 
-    const result = await queueManagementService.moveWatchlistFailedToPending(req.environment);
+    const result = await queueManagementService.moveWatchlistFailedToPending(
+      req.environment
+    );
 
     res.status(200).json({
       success: true,
@@ -247,7 +271,9 @@ async function moveWatchlistToPending(req, res) {
   try {
     logger.info("Move watchlist to pending request received");
 
-    const result = await queueManagementService.moveWatchlistToPending(req.environment);
+    const result = await queueManagementService.moveWatchlistToPending(
+      req.environment
+    );
 
     res.status(200).json({
       success: true,
@@ -290,24 +316,32 @@ async function getQueueManagementStats(req, res) {
 async function moveIndividualWatchlistFailedToPending(req, res) {
   try {
     const { id } = req.params;
-    logger.info(`Move individual watchlist failed to pending request received for brand ID: ${id}`);
-
-    const result = await queueManagementService.moveIndividualWatchlistFailedToPending(
-      parseInt(id),
-      req.environment
+    logger.info(
+      `Move individual watchlist failed to pending request received for brand ID: ${id}`
     );
+
+    const result =
+      await queueManagementService.moveIndividualWatchlistFailedToPending(
+        parseInt(id),
+        req.environment
+      );
 
     res.status(200).json({
       success: true,
-      message: "Individual watchlist failed brand moved to pending queue successfully",
+      message:
+        "Individual watchlist failed brand moved to pending queue successfully",
       data: result,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    logger.error("Error in moveIndividualWatchlistFailedToPending controller:", error);
+    logger.error(
+      "Error in moveIndividualWatchlistFailedToPending controller:",
+      error
+    );
     res.status(500).json({
       success: false,
-      message: "Failed to move individual watchlist failed brand to pending queue",
+      message:
+        "Failed to move individual watchlist failed brand to pending queue",
       error: error.message,
     });
   }
@@ -317,7 +351,9 @@ async function clearWatchlistPendingQueue(req, res) {
   try {
     logger.info("Clear watchlist pending queue request received");
 
-    const result = await queueManagementService.clearWatchlistPendingQueue(req.environment);
+    const result = await queueManagementService.clearWatchlistPendingQueue(
+      req.environment
+    );
 
     res.status(200).json({
       success: true,
@@ -339,7 +375,9 @@ async function clearWatchlistFailedQueue(req, res) {
   try {
     logger.info("Clear watchlist failed queue request received");
 
-    const result = await queueManagementService.clearWatchlistFailedQueue(req.environment);
+    const result = await queueManagementService.clearWatchlistFailedQueue(
+      req.environment
+    );
 
     res.status(200).json({
       success: true,
@@ -361,11 +399,14 @@ async function moveAllWatchlistPendingToFailed(req, res) {
   try {
     logger.info("Move all watchlist pending to failed request received");
 
-    const result = await queueManagementService.moveAllWatchlistPendingToFailed(req.environment);
+    const result = await queueManagementService.moveAllWatchlistPendingToFailed(
+      req.environment
+    );
 
     res.status(200).json({
       success: true,
-      message: "All watchlist pending brands moved to failed queue successfully",
+      message:
+        "All watchlist pending brands moved to failed queue successfully",
       data: result,
       timestamp: new Date().toISOString(),
     });
@@ -383,7 +424,9 @@ async function moveAllWatchlistFailedToPending(req, res) {
   try {
     logger.info("Move all watchlist failed to pending request received");
 
-    const result = await queueManagementService.moveAllWatchlistFailedToPending(req.environment);
+    const result = await queueManagementService.moveAllWatchlistFailedToPending(
+      req.environment
+    );
 
     res.status(200).json({
       success: true,
@@ -411,7 +454,9 @@ async function cleanupWatchlistFailedQueue(req, res) {
   try {
     logger.info("Cleanup watchlist failed queue request received");
 
-    const result = await queueManagementService.cleanupWatchlistFailedQueue(req.environment);
+    const result = await queueManagementService.cleanupWatchlistFailedQueue(
+      req.environment
+    );
 
     res.status(200).json({
       success: true,
@@ -431,8 +476,6 @@ async function cleanupWatchlistFailedQueue(req, res) {
     });
   }
 }
-
-
 
 module.exports = {
   clearAllQueues,

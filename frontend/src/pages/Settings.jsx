@@ -29,17 +29,14 @@ const Settings = () => {
   const [errors, setErrors] = useState({});
   const { onAdminLogin } = useAdminLogin();
 
-  // Local loading state for immediate feedback
   const [isTogglingEnvironment, setIsTogglingEnvironment] = useState(false);
 
-  // Read-only fields (visible but not editable)
   const readOnlyFields = [
     'MAX_CONCURRENCY',
     'BRAND_PROCESSING_CONCURRENCY',
     'TYPESENSE_PROCESS_CONCURRENCY'
   ];
 
-  // Field groups for organized display
   const fieldGroups = {
     'Processing and Holding Timing': [
       'MAX_CONCURRENCY',
@@ -79,18 +76,15 @@ const Settings = () => {
     ]
   };
 
-  // Load initial data
   useEffect(() => {
     loadData();
   }, []);
 
-  // Reset form data when editing group changes
   useEffect(() => {
     if (editingGroup) {
       const groupFields = fieldGroups[editingGroup];
       const newFormData = {};
       groupFields.forEach(key => {
-        // Exclude read-only fields from form data
         if (!readOnlyFields.includes(key)) {
           newFormData[key] = '';
         }
@@ -100,7 +94,6 @@ const Settings = () => {
     }
   }, [editingGroup]);
 
-  // Warn user before leaving page if they're editing
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (editingGroup) {
@@ -120,7 +113,6 @@ const Settings = () => {
     try {
       setLoading(true);
 
-      // Load only config data (environment info not needed for settings)
       const configResponse = await queueAPI.getConfigSettings();
 
       setConfigData(configResponse.data.data.config);
@@ -139,7 +131,6 @@ const Settings = () => {
       [key]: value
     }));
 
-    // Validate field
     const validation = validateField(key, value);
     if (validation.valid) {
       setErrors(prev => {
@@ -162,7 +153,6 @@ const Settings = () => {
       const groupFields = fieldGroups[groupName];
       const updates = {};
 
-      // Get only non-empty values from form data (excluding read-only fields)
       groupFields.forEach(key => {
         if (!readOnlyFields.includes(key) && formData[key] && formData[key].trim() !== '') {
           updates[key] = formData[key];
@@ -174,7 +164,6 @@ const Settings = () => {
         return;
       }
 
-      // Check for validation errors in this group
       const hasErrors = groupFields.some(key => errors[key]);
       if (hasErrors) {
         toast.error('Please fix validation errors before saving');
@@ -182,11 +171,8 @@ const Settings = () => {
       }
 
       await queueAPI.updateConfigSettings(updates);
-
-      // Reload data to get updated values
       await loadData();
 
-      // Exit edit mode
       setEditingGroup(null);
 
       toast.success(`${groupName} settings saved successfully`);
@@ -209,7 +195,6 @@ const Settings = () => {
     setErrors({});
   };
 
-  // Auto-refresh hook
   const refreshFn = useCallback(async () => {
     try {
       await loadData();
@@ -226,23 +211,19 @@ const Settings = () => {
 
   const handleRefresh = async () => {
     await manualRefresh();
-    // Toast is now handled in refreshFn
   };
 
   const handleEnvironmentToggle = async () => {
     const newEnvironment = currentEnvironment === 'production' ? 'stage' : 'production';
 
-    // Set local loading state immediately
     setIsTogglingEnvironment(true);
 
     try {
       await changeEnvironment(newEnvironment);
       toast.success(`Switched to ${newEnvironment} environment`);
-      // Navigate to dashboard to show full page loading
       window.location.href = '/';
     } catch (error) {
       toast.error(`Failed to switch to ${newEnvironment} environment: ${error.message}`);
-      // Reset loading state on error
       setIsTogglingEnvironment(false);
     }
   };
@@ -290,8 +271,8 @@ const Settings = () => {
 
     return (
       <div className={`text-sm px-3 py-2 rounded-md border-l-4 ${hasValue
-          ? 'text-gray-800 bg-green-50 border-green-400'
-          : 'text-gray-500 bg-gray-50 border-gray-300'
+        ? 'text-gray-800 bg-green-50 border-green-400'
+        : 'text-gray-500 bg-gray-50 border-gray-300'
         }`}>
         <span className="font-medium">{hasValue ? 'Current:' : 'Status:'}</span>
         <span className="ml-2 font-mono text-xs">{currentValue}</span>
@@ -387,17 +368,14 @@ const Settings = () => {
     return <LoadingSpinner />;
   }
 
-  // Combine local and store loading states
   const isEnvironmentSwitching = isTogglingEnvironment || environmentLoading;
 
-  // Show loading when switching environment
   if (isEnvironmentSwitching) {
     return <LoadingSpinner />;
   }
 
   return (
     <div className="space-y-4 sm:space-y-6 lg:space-y-8">
-      {/* Header */}
       <div className="mb-4 sm:mb-6 lg:mb-8">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
           <div className="flex items-center space-x-4">
@@ -408,7 +386,6 @@ const Settings = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
-            {/* Admin Badge - Full width on mobile */}
             <div className="w-full sm:w-auto">
               {isAdmin ? (
                 <div className="flex items-center justify-center sm:justify-start space-x-2 px-3 py-2 bg-green-100 text-green-800 rounded-lg">
@@ -426,7 +403,6 @@ const Settings = () => {
               )}
             </div>
 
-            {/* Refresh Control - Full width on mobile */}
             <div className="w-full sm:w-auto">
               <RefreshControl
                 isRefreshing={isRefreshing}
@@ -439,7 +415,6 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* Environment Toggle */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
           <div className="flex-1">
@@ -461,7 +436,6 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* Settings Groups */}
       <div className="space-y-4 sm:space-y-6">
         {Object.entries(fieldGroups).map(([groupName, fields]) =>
           renderFieldGroup(groupName, fields)

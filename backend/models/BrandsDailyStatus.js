@@ -1,8 +1,8 @@
-const Sequelize = require('sequelize');
-const { getDatabaseConnection } = require('../config/database');
+const Sequelize = require("sequelize");
+const { getDatabaseConnection } = require("../config/database");
 
 const BrandsDailyStatus = getDatabaseConnection().define(
-  'brand_daily_statuses',
+  "brand_daily_statuses",
   {
     id: {
       type: Sequelize.INTEGER,
@@ -13,8 +13,8 @@ const BrandsDailyStatus = getDatabaseConnection().define(
       type: Sequelize.INTEGER,
       allowNull: false,
       references: {
-        model: 'brands',
-        key: 'id',
+        model: "brands",
+        key: "id",
       },
     },
     started_at: {
@@ -36,7 +36,7 @@ const BrandsDailyStatus = getDatabaseConnection().define(
       type: Sequelize.INTEGER,
     },
     status: {
-      type: Sequelize.ENUM('Started', 'Completed', 'Blocked'),
+      type: Sequelize.ENUM("Started", "Completed", "Blocked"),
       allowNull: true,
     },
     uuid: {
@@ -45,11 +45,11 @@ const BrandsDailyStatus = getDatabaseConnection().define(
     },
     created_at: {
       type: Sequelize.DATE,
-      defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+      defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
     },
     updated_at: {
       type: Sequelize.DATE,
-      defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+      defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
     },
     comparative_status: {
       type: Sequelize.STRING,
@@ -67,10 +67,9 @@ const BrandsDailyStatus = getDatabaseConnection().define(
     timestamps: true,
     freezeTableName: true,
     underscored: true,
-    createdAt: 'created_at',
-    updatedAt: 'updated_at',
-  },
+    createdAt: "created_at",
+    updatedAt: "updated_at",
+  }
 );
 
 module.exports = BrandsDailyStatus;
-

@@ -27,7 +27,6 @@ const EditProxyModal = ({ isOpen, onClose, proxy, onProxyUpdated }) => {
     }
   }, [proxy, isOpen]);
 
-  // Handle ESC key to close modal
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' && isOpen) {
@@ -54,14 +53,12 @@ const EditProxyModal = ({ isOpen, onClose, proxy, onProxyUpdated }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate namespace
     const namespaceValidation = validateNamespace(formData.namespace);
     if (!namespaceValidation.success) {
       toast.error(namespaceValidation.error);
       return;
     }
 
-    // Validate viewport
     const viewportValidation = validateViewport(formData.viewport);
     if (!viewportValidation.success) {
       toast.error(viewportValidation.error);
@@ -128,7 +125,6 @@ const EditProxyModal = ({ isOpen, onClose, proxy, onProxyUpdated }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Row 1: Namespace (small) and Version */}
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -164,7 +160,6 @@ const EditProxyModal = ({ isOpen, onClose, proxy, onProxyUpdated }) => {
             </div>
           </div>
 
-          {/* Row 2: User Agent (full width) */}
           <Input
             label="User Agent"
             name="userAgent"
@@ -175,7 +170,6 @@ const EditProxyModal = ({ isOpen, onClose, proxy, onProxyUpdated }) => {
             fullWidth
           />
 
-          {/* Row 3: Viewport (full width) */}
           <Input
             label="Viewport"
             name="viewport"

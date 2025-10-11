@@ -11,7 +11,7 @@ import { Plus, Check } from 'lucide-react';
 const SingleBrandForm = ({ loading, isSubmitting, onSubmittingChange, disabled = false }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const brandSearchRef = useRef(null);
-  
+
   const getInitialSingleBrand = () => {
     try {
       const saved = localStorage.getItem('addBrands_singleBrand');
@@ -22,11 +22,9 @@ const SingleBrandForm = ({ loading, isSubmitting, onSubmittingChange, disabled =
   };
 
   const [singleBrandForm, setSingleBrandForm] = useState(getInitialSingleBrand());
-  
-  // Get queueType from URL params or default to 'regular'
+
   const queueType = searchParams.get('queueType') || 'regular';
 
-  // Function to update URL params when queueType changes
   const updateQueueType = (newQueueType) => {
     const newSearchParams = new URLSearchParams(searchParams);
     if (newQueueType === 'regular') {
@@ -104,12 +102,11 @@ const SingleBrandForm = ({ loading, isSubmitting, onSubmittingChange, disabled =
       const result = await queueAPI.addSingleBrand(validation.data);
       toast.success(result.message || 'Brand added successfully');
       clearSearchInputs();
-      
-      // Auto-remove the selected brand after 3 seconds
+
       setTimeout(() => {
         setSingleBrandForm({ id: '', page_id: '', name: '', score: 0 });
       }, 3000);
-      
+
     } catch (error) {
       toast.error(error.message || 'Failed to add brand');
     } finally {
@@ -189,7 +186,7 @@ const SingleBrandForm = ({ loading, isSubmitting, onSubmittingChange, disabled =
                       Brand ID: {singleBrandForm.id} | Page ID: {singleBrandForm.page_id}
                     </p>
                     <p className="text-sm text-green-600">
-                      Queue Score: {singleBrandForm.score} 
+                      Queue Score: {singleBrandForm.score}
                       {singleBrandForm.score === 1 && ' (Priority)'}
                       {singleBrandForm.score === 0 && ' (Normal)'}
                       {singleBrandForm.score > 1 && ' (High Priority)'}

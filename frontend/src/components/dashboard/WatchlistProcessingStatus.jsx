@@ -3,24 +3,21 @@ import Badge from '../ui/Badge';
 import { Play, Clock, Eye, Hourglass, ExternalLink, Pause, Square } from 'lucide-react';
 import { openFacebookAdLibrary } from '../../utils/facebookAdLibrary';
 
-const WatchlistProcessingStatus = ({ 
-  currentlyProcessing, 
+const WatchlistProcessingStatus = ({
+  currentlyProcessing,
   watchlistPendingCount = 0,
   watchlistFailedCount = 0,
   nextWatchlistBrand = null,
   scraperStatus = 'unknown',
   scraperStatusLoading = false
 }) => {
-  // Filter brands that have is_watchlist: true
   const getWatchlistCurrentlyProcessing = () => {
     if (!currentlyProcessing) {
       return [];
     }
 
-    // Handle both single brand and array of brands
     const processingArray = Array.isArray(currentlyProcessing) ? currentlyProcessing : [currentlyProcessing];
-    
-    // Filter brands that are in the watchlist
+
     return processingArray.filter(brand => {
       return brand && brand.is_watchlist === true;
     });
@@ -28,18 +25,14 @@ const WatchlistProcessingStatus = ({
 
   const watchlistProcessingBrands = getWatchlistCurrentlyProcessing();
 
-  // Check if we should show waiting message (when scraper is running but no watchlist brand processing)
-  // Show waiting when scraper is running and card is empty, regardless of queue count
   const shouldShowWaiting = scraperStatus === 'running' && (!currentlyProcessing || currentlyProcessing.length === 0);
 
-  // Determine if status badge should be visible based on scraper status
   const shouldShowStatusBadge = () => {
-    if (scraperStatus === 'cooldown(NWL)' || scraperStatus === 'cooldown (NWL)' || 
-        scraperStatus === 'stopped(cooldown NWL)') {
+    if (scraperStatus === 'cooldown(NWL)' || scraperStatus === 'cooldown (NWL)' ||
+      scraperStatus === 'stopped(cooldown NWL)') {
       return false;
     }
-    
-    // Show badge for all other statuses including cooldown(WL)
+
     return true;
   };
 
@@ -52,12 +45,11 @@ const WatchlistProcessingStatus = ({
           </h3>
           {shouldShowStatusBadge() && !scraperStatusLoading && (
             (() => {
-              // Show the actual API status
               const getScraperStatusInfo = (status) => {
                 if (status && status.startsWith('stopped(')) {
                   const reason = status.replace('stopped(', '').replace(')', '');
                   let label = status;
-                  
+
                   switch (reason) {
                     case 'cooldown NWL':
                       label = 'Stopped (Cooldown Regular)';
@@ -71,19 +63,18 @@ const WatchlistProcessingStatus = ({
                     default:
                       label = status;
                   }
-                  
+
                   return { variant: 'warning', icon: 'Square', label: label };
                 }
-                
-                // Handle direct cooldown status (not wrapped in stopped())
+
                 if (status === 'cooldown(WL)' || status === 'cooldown (WL)') {
                   return { variant: 'cooldownWL', icon: 'Square', label: 'Cooldown (Watchlist Only)' };
                 }
-                
+
                 if (status === 'cooldown(NWL)' || status === 'cooldown (NWL)') {
                   return { variant: 'cooldownNWL', icon: 'Square', label: 'Cooldown (Regular Only)' };
                 }
-                
+
                 switch (status) {
                   case 'running':
                     return { variant: 'success', icon: 'Play', label: 'Running' };
@@ -97,12 +88,12 @@ const WatchlistProcessingStatus = ({
                     return { variant: 'secondary', icon: 'Clock', label: status || 'Unknown' };
                 }
               };
-              
+
               const statusInfo = getScraperStatusInfo(scraperStatus);
-              const StatusIcon = statusInfo.icon === 'Play' ? Play : 
-                                statusInfo.icon === 'Pause' ? Pause :
-                                statusInfo.icon === 'Square' ? Square : Clock;
-              
+              const StatusIcon = statusInfo.icon === 'Play' ? Play :
+                statusInfo.icon === 'Pause' ? Pause :
+                  statusInfo.icon === 'Square' ? Square : Clock;
+
               return (
                 <Badge variant={statusInfo.variant} className="flex items-center space-x-1">
                   <StatusIcon className="h-3 w-3" />
@@ -112,13 +103,12 @@ const WatchlistProcessingStatus = ({
             })()
           )}
         </div>
-        
+
         {watchlistProcessingBrands.length > 0 ? (
           <div className="space-y-4">
-            {/* Header with count */}
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-gray-600">
-                {watchlistProcessingBrands.length} watchlist brand{watchlistProcessingBrands.length !== 1 ? 's' : ''} processing
+                {watchlistProcessingBrands.length} watchlist brand{watchlistProcessingBrands.length !== 1 ? 's' : ''} scraping
               </span>
               <Badge variant="info" className="flex items-center space-x-1">
                 <Eye className="h-3 w-3" />
@@ -126,7 +116,6 @@ const WatchlistProcessingStatus = ({
               </Badge>
             </div>
 
-            {/* List of processing watchlist brands */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-96 overflow-y-auto scrollbar-hide">
               {watchlistProcessingBrands.map((brand, index) => (
                 <div key={`${brand.brand_id}-${brand.page_id}-${index}`} className="flex flex-col space-y-2 p-3 bg-blue-50 rounded-lg border border-blue-200 min-h-[200px]">
@@ -151,7 +140,7 @@ const WatchlistProcessingStatus = ({
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-1 flex-1">
                     <p className="text-xs text-gray-500">
                       ID: {brand.brand_id} | Page: {brand.page_id}
@@ -183,23 +172,23 @@ const WatchlistProcessingStatus = ({
                       </div>
                     )}
                   </div>
-                  
+
                   <div className="flex justify-end mt-auto pt-2">
                     {(() => {
-                      const badgeVariant = brand.status === 'completed' || brand.status === 'complete' 
-                        ? 'success' 
-                        : brand.status === 'failed' 
-                          ? 'error' 
+                      const badgeVariant = brand.status === 'completed' || brand.status === 'complete'
+                        ? 'success'
+                        : brand.status === 'failed'
+                          ? 'error'
                           : 'info';
                       return (
-                        <Badge 
-                          variant={badgeVariant} 
+                        <Badge
+                          variant={badgeVariant}
                           className="text-xs"
                         >
-                          {brand.status === 'completed' || brand.status === 'complete' 
-                            ? 'Completed' 
-                            : brand.status === 'failed' 
-                              ? 'Failed' 
+                          {brand.status === 'completed' || brand.status === 'complete'
+                            ? 'Completed'
+                            : brand.status === 'failed'
+                              ? 'Failed'
                               : 'Active'
                           }
                         </Badge>
@@ -263,7 +252,7 @@ const WatchlistProcessingStatus = ({
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-1 flex-1">
                     <p className="text-xs text-gray-500">
                       ID: {brand.queue_id || 'N/A'}
@@ -275,7 +264,7 @@ const WatchlistProcessingStatus = ({
                       Position: #{brand.queue_position || index + 1}
                     </p>
                   </div>
-                  
+
                   <div className="flex justify-end mt-auto pt-2">
                     <Badge variant="info" className="text-xs">Waiting</Badge>
                   </div>
@@ -283,7 +272,6 @@ const WatchlistProcessingStatus = ({
               ))}
             </div>
           ) : nextWatchlistBrand && !Array.isArray(nextWatchlistBrand) ? (
-            // Fallback for single brand object (backward compatibility)
             <div className="space-y-3">
               <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
                 <div className="flex items-center space-x-3">

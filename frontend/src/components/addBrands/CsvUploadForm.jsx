@@ -7,7 +7,7 @@ import { Upload, FileText, X, CheckCircle, AlertCircle } from 'lucide-react';
 
 const CsvUploadForm = ({ loading, isSubmitting, onSubmittingChange, disabled = false }) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  
+
   const [csvState, setCsvState] = useState({
     file: null,
     uploadStatus: null,
@@ -17,11 +17,9 @@ const CsvUploadForm = ({ loading, isSubmitting, onSubmittingChange, disabled = f
   const fileInputRef = useRef(null);
 
   const { file: csvFile, uploadStatus: csvUploadStatus, uploadResult: csvUploadResult } = csvState;
-  
-  // Get queueType from URL params or default to 'regular'
+
   const queueType = searchParams.get('queueType') || 'regular';
 
-  // Function to update URL params when queueType changes
   const updateQueueType = (newQueueType) => {
     const newSearchParams = new URLSearchParams(searchParams);
     if (newQueueType === 'regular') {

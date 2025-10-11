@@ -1,20 +1,12 @@
 const { Op } = require('sequelize');
 
 class ScrapedBrandsService {
-  /**
-   * Get scraped brands for specific date with pagination
-   * @param {number} page - Page number (default: 1)
-   * @param {number} limit - Items per page (default: 10)
-   * @param {string} date - Date in YYYY-MM-DD format (optional, defaults to current date)
-   * @returns {Object} - Paginated results with brands data
-   */
+  
   static async getScrapedBrands(page = 1, limit = 10, date = null, sortBy = 'normal', sortOrder = 'desc', environment = 'production') {
     try {
-      // Get models for the specified environment
       const { getModels } = require('../models');
       const { Brand, BrandsDailyStatus, WatchList } = getModels(environment);
       
-      // Use provided date if given, otherwise use current date
       let targetDate;
       if (date) {
         targetDate = new Date(date);
@@ -25,14 +17,12 @@ class ScrapedBrandsService {
       const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
       const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1);
 
-      // Get watchlist brand IDs for marking and sorting
       const watchlistRecords = await WatchList.findAll({
         attributes: ["brand_id"],
         raw: true
       });
       const watchlistBrandIds = watchlistRecords.map(record => record.brand_id);
 
-      // Get all brand records first (without pagination) to sort properly
       const allDailyStatusRecords = await BrandsDailyStatus.findAll({
         where: {
           started_at: {
@@ -44,7 +34,6 @@ class ScrapedBrandsService {
         order: [["brand_id", "DESC"], ["started_at", "DESC"]]
       });
 
-      // Group by brand_id and get the latest record for each brand
       const brandMap = new Map();
       allDailyStatusRecords.forEach(record => {
         const brandId = record.brand_id;
@@ -53,26 +42,22 @@ class ScrapedBrandsService {
         }
       });
 
-      // Convert map to array for sorting
       const uniqueBrandRecords = Array.from(brandMap.values());
 
-      // Sort brands based on sorting parameters
       let sortedBrandIds;
       
       if (sortBy === 'normal') {
-        // Default sorting: watchlist first, then regular
         sortedBrandIds = uniqueBrandRecords
           .map(record => record.brand_id)
           .sort((a, b) => {
             const aIsWatchlist = watchlistBrandIds.includes(a);
             const bIsWatchlist = watchlistBrandIds.includes(b);
             
-            if (aIsWatchlist && !bIsWatchlist) return -1; // a (watchlist) comes first
-            if (!aIsWatchlist && bIsWatchlist) return 1;  // b (watchlist) comes first
-            return 0; // maintain original order for same type
+            if (aIsWatchlist && !bIsWatchlist) return -1; 
+            if (!aIsWatchlist && bIsWatchlist) return 1;  
+            return 0; 
           });
       } else {
-        // Sort by active_ads or inactive_ads
         const recordsWithData = uniqueBrandRecords.map(record => ({
           brand_id: record.brand_id,
           active_ads: record.active_ads || 0,
@@ -90,7 +75,6 @@ class ScrapedBrandsService {
             aValue = parseInt(a.inactive_ads) || 0;
             bValue = parseInt(b.inactive_ads) || 0;
           } else {
-            // Fallback to brand_id
             aValue = parseInt(a.brand_id) || 0;
             bValue = parseInt(b.brand_id) || 0;
           }
@@ -105,13 +89,10 @@ class ScrapedBrandsService {
         sortedBrandIds = recordsWithData.map(record => record.brand_id);
       }
 
-      // Update total count after sorting
       const totalCount = sortedBrandIds.length;
 
-      // Calculate offset for pagination
       const offset = (page - 1) * limit;
 
-      // Apply pagination to sorted results
       const paginatedBrandIds = sortedBrandIds.slice(offset, offset + limit);
 
       if (paginatedBrandIds.length === 0) {
@@ -132,7 +113,6 @@ class ScrapedBrandsService {
         };
       }
 
-      // Get paginated data with brand information using Sequelize ORM
       const scrapedBrands = await BrandsDailyStatus.findAll({
         where: {
           brand_id: { [Op.in]: paginatedBrandIds },
@@ -149,7 +129,8 @@ class ScrapedBrandsService {
               'id',
               'name',
               'actual_name',
-              'page_id'
+              'page_id',
+              'actual_ads_count'
             ],
             required: true
           }
@@ -162,16 +143,13 @@ class ScrapedBrandsService {
           'comparative_status',
           'started_at'
         ]
-        // Removed order clause to preserve our custom sorting
       });
 
-      // Create a map for quick lookup of brand data
       const brandDataMap = new Map();
       scrapedBrands.forEach(item => {
         brandDataMap.set(item.brand_id, item);
       });
 
-      // Transform the data in the correct sorted order
       const transformedBrands = paginatedBrandIds.map(brandId => {
         const item = brandDataMap.get(brandId);
         if (!item) return null;
@@ -184,12 +162,12 @@ class ScrapedBrandsService {
           comparative_status: item.comparative_status,
           started_at: item.started_at,
           brand_name: item.brand?.actual_name || item.brand?.name || 'Unknown',
-          page_id: item.brand?.page_id || null, // Add page_id for external link
-          isWatchlist: watchlistBrandIds.includes(item.brand_id) // Add watchlist flag
+          page_id: item.brand?.page_id || null, 
+          actual_ads_count: item.brand?.actual_ads_count || null, 
+          isWatchlist: watchlistBrandIds.includes(item.brand_id) 
         };
-      }).filter(Boolean); // Remove any null entries
+      }).filter(Boolean); 
 
-      // Calculate pagination info
       const totalPages = Math.ceil(totalCount / limit);
       const hasNextPage = page < totalPages;
       const hasPrevPage = page > 1;
@@ -219,19 +197,12 @@ class ScrapedBrandsService {
     }
   }
 
-  /**
-   * Search scraped brands across all pages
-   * @param {string} query - Search query
-   * @param {string} date - Date in YYYY-MM-DD format (optional, defaults to current date)
-   * @returns {Object} - Search results
-   */
+  
   static async searchScrapedBrands(query, date = null, environment = 'production') {
     try {
-      // Get models for the specified environment
       const { getModels } = require('../models');
       const { Brand, BrandsDailyStatus, WatchList } = getModels(environment);
       
-      // Use provided date if given, otherwise use current date
       let targetDate;
       if (date) {
         targetDate = new Date(date);
@@ -242,20 +213,16 @@ class ScrapedBrandsService {
       const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
       const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1);
 
-      // Get watchlist brand IDs for marking
       const watchlistRecords = await WatchList.findAll({
         attributes: ["brand_id"],
         raw: true
       });
       const watchlistBrandIds = watchlistRecords.map(record => record.brand_id);
 
-      // Check if query is numeric for brand_id search
       const isNumericQuery = !isNaN(query) && !isNaN(parseInt(query));
       
-      // 🔍 Normalize search query - remove spaces and make lowercase for flexible matching
       const normalizedQuery = query.toLowerCase().replace(/\s+/g, '');
       
-      // Build where clause based on query type
       let whereClause = {
         started_at: {
           [Op.gte]: startOfDay,
@@ -263,7 +230,6 @@ class ScrapedBrandsService {
         }
       };
       
-      // Search across all pages using Sequelize ORM with flexible matching
       const searchResults = await BrandsDailyStatus.findAll({
         where: whereClause,
         include: [
@@ -274,17 +240,17 @@ class ScrapedBrandsService {
               'id',
               'name',
               'actual_name',
-              'page_id'
+              'page_id',
+              'actual_ads_count'
             ],
             required: true,
             where: isNumericQuery ? {
               [Op.or]: [
-                { page_id: query }, // Search by page_id as string (handles leading zeros like '0004')
-                { id: parseInt(query) } // Also search by brand_id as integer
+                { page_id: query }, 
+                { id: parseInt(query) } 
               ]
             } : {
               [Op.or]: [
-                // 🔍 Exact match with spaces
                 {
                   actual_name: {
                     [Op.iLike]: `%${query}%`
@@ -295,7 +261,6 @@ class ScrapedBrandsService {
                     [Op.iLike]: `%${query}%`
                   }
                 },
-                // 🔍 Flexible match without spaces (for "redbull" to find "Red Bull")
                 {
                   [Op.and]: [
                     BrandsDailyStatus.sequelize.where(
@@ -337,7 +302,6 @@ class ScrapedBrandsService {
         order: [['started_at', 'DESC']]
       });
 
-      // Transform the search results with watchlist flag
       const transformedSearchResults = searchResults.map(item => ({
         brand_id: item.brand_id,
         active_ads: item.active_ads,
@@ -346,8 +310,9 @@ class ScrapedBrandsService {
         comparative_status: item.comparative_status,
         started_at: item.started_at,
         brand_name: item.brand?.actual_name || item.brand?.name || 'Unknown',
-        page_id: item.brand?.page_id || null, // Add page_id for external link
-        isWatchlist: watchlistBrandIds.includes(item.brand_id) // Add watchlist flag
+        page_id: item.brand?.page_id || null, 
+        actual_ads_count: item.brand?.actual_ads_count || null, 
+        isWatchlist: watchlistBrandIds.includes(item.brand_id) 
       }));
 
       return {
@@ -369,18 +334,12 @@ class ScrapedBrandsService {
     }
   }
 
-  /**
-   * Get scraped brands statistics for specific date
-   * @param {string} date - Date in YYYY-MM-DD format (optional, defaults to current date)
-   * @returns {Object} - Statistics summary
-   */
+  
   static async getScrapedBrandsStats(date = null, environment = 'production') {
     try {
-      // Get models for the specified environment
       const { getModels } = require('../models');
       const { Brand, BrandsDailyStatus, WatchList } = getModels(environment);
       
-      // Use provided date if given, otherwise use current date
       let targetDate;
       if (date) {
         targetDate = new Date(date);
@@ -391,7 +350,6 @@ class ScrapedBrandsService {
       const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
       const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() + 1);
 
-      // Get total counts
       const totalBrands = await BrandsDailyStatus.count({
         where: {
           started_at: {
@@ -401,7 +359,6 @@ class ScrapedBrandsService {
         }
       });
 
-      // Get aggregated stats
       const stats = await BrandsDailyStatus.findOne({
         where: {
           started_at: {

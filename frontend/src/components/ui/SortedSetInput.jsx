@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import Input from './Input';
 
-const SortedSetInput = ({ 
-  score, 
-  onScoreChange, 
-  disabled = false, 
+const SortedSetInput = ({
+  score,
+  onScoreChange,
+  disabled = false,
   className = "",
   placeholder = "Enter score (e.g., 1 for priority, 0 for normal)"
 }) => {
@@ -13,7 +13,6 @@ const SortedSetInput = ({
     error: ''
   });
 
-  // Update input value when score prop changes (for auto-reset)
   useEffect(() => {
     setState(prev => ({ ...prev, inputValue: score || '' }));
   }, [score]);
@@ -21,13 +20,11 @@ const SortedSetInput = ({
   const handleInputChange = (value) => {
     setState(prev => ({ ...prev, inputValue: value, error: '' }));
 
-    // Validate input
     if (value === '') {
       onScoreChange(null);
       return;
     }
 
-    // Allow only numbers and decimal points
     if (!/^\d*\.?\d*$/.test(value)) {
       setState(prev => ({ ...prev, error: 'Please enter a valid number' }));
       onScoreChange(null);
@@ -41,13 +38,12 @@ const SortedSetInput = ({
       return;
     }
 
-    // Score can be any number (positive, negative, or zero)
     onScoreChange(numValue);
   };
 
   const handleBlur = () => {
     if (state.inputValue === '') {
-      onScoreChange(0); // Default to 0 if empty
+      onScoreChange(0);
       setState(prev => ({ ...prev, inputValue: '0' }));
     }
   };

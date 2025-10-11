@@ -81,7 +81,12 @@ async function getIpStatsDetail(req, res) {
       });
     }
 
-    const brandsResult = await ipStatsService.getBrandsByIp(ip, page, limit, req.environment);
+    const brandsResult = await ipStatsService.getBrandsByIp(
+      ip,
+      page,
+      limit,
+      req.environment
+    );
 
     return res.json({
       success: true,
@@ -159,7 +164,13 @@ async function getIpBrands(req, res) {
 
     const clientETag = req.headers["if-none-match"];
 
-    const result = await ipStatsService.getBrandsByIp(ip, page, limit, search, req.environment);
+    const result = await ipStatsService.getBrandsByIp(
+      ip,
+      page,
+      limit,
+      search,
+      req.environment
+    );
 
     if (result.etag) {
       res.set("ETag", result.etag);

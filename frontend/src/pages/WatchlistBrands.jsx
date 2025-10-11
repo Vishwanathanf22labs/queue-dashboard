@@ -22,26 +22,25 @@ const WatchlistBrands = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { isAdmin, isLoading: adminLoading } = useAdminStore();
   const { onAdminLogin } = useAdminLogin();
-  
-  const { 
-    watchlistBrands, 
+
+  const {
+    watchlistBrands,
     watchlistPendingBrands,
     watchlistFailedBrands,
-    loading, 
-    error, 
-    fetchWatchlistBrands, 
+    loading,
+    error,
+    fetchWatchlistBrands,
     fetchWatchlistPendingBrands,
     fetchWatchlistFailedBrands,
-    moveWatchlistFailedToPending, 
+    moveWatchlistFailedToPending,
     moveWatchlistToPending,
     moveIndividualWatchlistFailedToPending
   } = useQueueStore();
 
-  // Get pagination and search state from URL params
   const searchTerm = searchParams.get('search') || '';
   const currentPage = parseInt(searchParams.get('page')) || 1;
   const itemsPerPage = parseInt(searchParams.get('limit')) || 20;
-  const statusSortMode = searchParams.get('statusSort') || 'failed'; // failed, waiting, completed, normal
+  const statusSortMode = searchParams.get('statusSort') || 'failed';
 
   const [state, setState] = useState({
     filteredBrands: [],
@@ -56,7 +55,6 @@ const WatchlistBrands = () => {
     setState(prev => ({ ...prev, ...updates }));
   };
 
-  // Auto-refresh hook
   const refreshFn = useCallback(async () => {
     try {
       await Promise.all([
@@ -76,7 +74,6 @@ const WatchlistBrands = () => {
     []
   );
 
-  // Handle status sort mode change
   const handleStatusSortChange = () => {
     let nextMode;
     switch (statusSortMode) {
@@ -95,13 +92,12 @@ const WatchlistBrands = () => {
       default:
         nextMode = 'normal';
     }
-    
+
     const newParams = new URLSearchParams(searchParams);
     newParams.set('statusSort', nextMode);
     setSearchParams(newParams);
   };
 
-  // Function to fetch active watchlist brands count
   const fetchActiveWatchlistCount = async () => {
     try {
       const response = await queueAPI.getBrandCounts();
@@ -114,9 +110,7 @@ const WatchlistBrands = () => {
     }
   };
 
-  // Function to load active watchlist brands to pending queue
   const handleLoadActiveWatchlist = async () => {
- 
     const scrollPosition = window.scrollY;
 
     try {
@@ -127,7 +121,6 @@ const WatchlistBrands = () => {
         fetchWatchlistPendingBrands(1, 10000),
         fetchActiveWatchlistCount()
       ]);
-
 
       requestAnimationFrame(() => {
         window.scrollTo(0, scrollPosition);
@@ -159,29 +152,21 @@ const WatchlistBrands = () => {
 
   useEffect(() => {
     if (watchlistBrands && watchlistBrands.brands) {
-      // Store all watchlist brands for total count
       updateState({ allWatchlistBrands: watchlistBrands.brands });
-      
-      // Show ALL watchlist brands in the table (not just active ones)
+
       updateState({ filteredBrands: watchlistBrands.brands });
     }
   }, [watchlistBrands]);
 
-
-
-  // Custom status sorting function
   const sortBrandsStably = (brands) => {
-    // Don't sort until all data is loaded to prevent inconsistent results
     if (!watchlistPendingBrands || !watchlistFailedBrands || !watchlistBrands?.brands) {
       return brands;
     }
 
     return brands.sort((a, b) => {
       const getPriority = (status) => {
-        // Custom sorting based on statusSortMode
         switch (statusSortMode) {
           case 'failed':
-            // Show failed first
             switch (status) {
               case 'failed': return 1;
               case 'waiting': return 2;
@@ -191,7 +176,6 @@ const WatchlistBrands = () => {
               default: return 6;
             }
           case 'waiting':
-            // Show waiting first
             switch (status) {
               case 'waiting': return 1;
               case 'completed': return 2;
@@ -201,7 +185,6 @@ const WatchlistBrands = () => {
               default: return 6;
             }
           case 'completed':
-            // Show completed first
             switch (status) {
               case 'completed': return 1;
               case 'waiting': return 2;
@@ -212,7 +195,6 @@ const WatchlistBrands = () => {
             }
           case 'normal':
           default:
-            // Normal order: failed > waiting > completed
             switch (status) {
               case 'failed': return 1;
               case 'waiting': return 2;
@@ -226,16 +208,14 @@ const WatchlistBrands = () => {
 
       const statusA = determineScraperStatus(a);
       const statusB = determineScraperStatus(b);
-      
+
       const priorityA = getPriority(statusA);
       const priorityB = getPriority(statusB);
 
-      // Primary sort: by status priority
       if (priorityA !== priorityB) {
         return priorityA - priorityB;
       }
 
-      // Secondary sort: by page_id for stable ordering (prevents shuffle on refresh)
       const pageIdA = parseInt(a.page_id) || 0;
       const pageIdB = parseInt(b.page_id) || 0;
       return pageIdA - pageIdB;
@@ -243,7 +223,6 @@ const WatchlistBrands = () => {
   };
 
   useEffect(() => {
-    // Use all watchlist brands (both active and inactive)
     const allBrands = allWatchlistBrands || [];
 
     if (searchTerm.trim() === '') {
@@ -251,27 +230,23 @@ const WatchlistBrands = () => {
       updateState({ filteredBrands: sortedBrands });
     } else {
       const normalizedSearchTerm = searchTerm.toLowerCase().replace(/\s+/g, '');
-      
+
       const filtered = allBrands.filter(brand => {
         const brandName = brand.brand_name?.toLowerCase() || '';
         const normalizedBrandName = brandName.replace(/\s+/g, '');
-        
+
         return (
-          // Original search (with spaces)
           brandName.includes(searchTerm.toLowerCase()) ||
-          // Space-insensitive search
           normalizedBrandName.includes(normalizedSearchTerm) ||
-          // Page ID and Brand ID search
           brand.page_id?.toString().includes(searchTerm) ||
           brand.brand_id?.toString().includes(searchTerm)
         );
       });
 
-      const sortedFiltered = sortBrandsStably(filtered);w
+      const sortedFiltered = sortBrandsStably(filtered);
       updateState({ filteredBrands: sortedFiltered });
     }
   }, [searchTerm, allWatchlistBrands, statusSortMode]);
-
 
   const getScraperStatusInfo = (status) => {
     switch (status) {
@@ -291,32 +266,26 @@ const WatchlistBrands = () => {
   };
 
   const determineScraperStatus = (brand) => {
-    // Check if brand is in watchlist_pending_brands_prod queue
     const isInPending = watchlistPendingBrands?.brands?.some(
       pendingBrand => pendingBrand.page_id === brand.page_id
     );
-    
-    // Check if brand is in watchlist_failed_brands_prod queue
+
     const isInFailed = watchlistFailedBrands?.brands?.some(
       failedBrand => failedBrand.page_id === brand.page_id
     );
 
-    // If brand is in pending queue, show as waiting regardless of active/inactive status
     if (isInPending) {
       return 'waiting';
     }
-    
-    // If brand is in failed queue, show as failed regardless of active/inactive status
+
     if (isInFailed) {
       return 'failed';
     }
 
-    // If brand is inactive and not in any queue, show as inactive
     if (brand.status === 'Inactive') {
       return 'inactive';
     }
 
-    // For active brands not in queues
     if (brand.scraper_status === 'completed' &&
       (!watchlistPendingBrands?.brands || watchlistPendingBrands.brands.length === 0) &&
       (!watchlistFailedBrands?.brands || watchlistFailedBrands.brands.length === 0)) {
@@ -325,7 +294,6 @@ const WatchlistBrands = () => {
       return 'completed';
     }
   };
-
 
   const totalItems = filteredBrands.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
@@ -346,20 +314,14 @@ const WatchlistBrands = () => {
     } else {
       newParams.set('search', value);
     }
-    newParams.set('page', '1'); // Reset to page 1 when searching
+    newParams.set('page', '1');
     setSearchParams(newParams);
   };
 
-
-
-
-
-  // Handle individual brand movement from failed to pending
   const handleMoveIndividualBrand = async (brand) => {
     const scrollPosition = window.scrollY;
 
     try {
-      // Get the brand identifier (brand_id, page_id, or queue_id)
       const brandIdentifier = brand.brand_id || brand.page_id;
 
       if (!brandIdentifier) {
@@ -367,7 +329,6 @@ const WatchlistBrands = () => {
         return;
       }
 
-      // Move the individual brand from failed to pending
       await moveIndividualWatchlistFailedToPending(brandIdentifier);
       toast.success(`Brand "${brand.brand_name || 'Unknown'}" moved to watchlist pending queue successfully`);
 
@@ -383,7 +344,7 @@ const WatchlistBrands = () => {
       toast.error(error.message || 'Failed to move brand to watchlist pending queue');
     }
   };
-  // Table columns definition with custom render functions
+
   const tableColumns = watchlistBrandsColumns
     .map(column => {
       if (column.key === 'scraper_status') {
@@ -410,7 +371,6 @@ const WatchlistBrands = () => {
             const scraperStatus = determineScraperStatus(brand);
 
             if (scraperStatus === 'failed') {
-              // Show action button for failed brands
               return (
                 <Button
                   variant="primary"
@@ -429,14 +389,12 @@ const WatchlistBrands = () => {
                 </Button>
               );
             } else if (scraperStatus === 'completed') {
-              // Show dash for completed brands (no action needed)
               return (
                 <div className="text-xs text-gray-400 font-medium text-center">
                   —
                 </div>
               );
             } else if (scraperStatus === 'waiting') {
-              // Show dash for waiting brands (no action needed)
               return (
                 <div className="text-xs text-gray-400 font-medium text-center">
                   —
@@ -485,7 +443,7 @@ const WatchlistBrands = () => {
           <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">Watchlist Brands</h1>
           <p className="text-sm sm:text-base text-gray-600">Monitor all your watchlist brands and their scraping status</p>
         </div>
-        
+
         <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-3">
           {!isAdmin ? (
             <button
@@ -507,17 +465,13 @@ const WatchlistBrands = () => {
             refreshInterval={refreshInterval}
             onManualRefresh={async () => {
               await manualRefresh();
-              // Toast is now handled in refreshFn
             }}
             onIntervalChange={setIntervalValue}
           />
         </div>
       </div>
 
-
-      {/* Status Cards - Mobile: 2 columns, Desktop: 3 columns */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4">
-        {/* Row 1 */}
         <Card className="p-3 sm:p-4 md:p-6">
           <div className="text-center">
             <div className="text-lg sm:text-xl md:text-2xl font-bold text-green-600">
@@ -534,8 +488,7 @@ const WatchlistBrands = () => {
             <div className="text-xs sm:text-sm text-gray-600">Watchlist Inactive</div>
           </div>
         </Card>
-        
-        {/* Row 2 */}
+
         <Card className="p-3 sm:p-4 md:p-6">
           <div className="text-center">
             <div className="text-lg sm:text-xl md:text-2xl font-bold text-blue-600">
@@ -552,8 +505,7 @@ const WatchlistBrands = () => {
             <div className="text-xs sm:text-sm text-gray-600">Completed</div>
           </div>
         </Card>
-        
-        {/* Row 3 */}
+
         <Card className="p-3 sm:p-4 md:p-6">
           <div className="text-center">
             <div className="text-lg sm:text-xl md:text-2xl font-bold text-yellow-600">
@@ -572,54 +524,52 @@ const WatchlistBrands = () => {
         </Card>
       </div>
 
-       {/* Load Active Watchlist Button */}
-       <Card>
-         <div className="p-4 sm:p-6">
-           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-             <div>
-               <h4 className="text-lg font-semibold text-gray-900">Load Active Watchlist Brands</h4>
-               <p className="text-sm text-gray-600">
-                 Add all active watchlist brands ({loadingActiveCount ? 'Loading...' : activeWatchlistCount}) to the watchlist pending queue with priority score 1
-               </p>
-             </div>
-             <Button
-               variant="primary"
-               size="md"
-               disabled={!isAdmin || loadingActiveCount || activeWatchlistCount === 0}
-               onClick={handleLoadActiveWatchlist}
-               className={`w-full sm:w-auto ${!isAdmin || loadingActiveCount || activeWatchlistCount === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-             >
-               <span className="hidden sm:inline">
-                 {!isAdmin ? 'Admin Access Required' : 
-                  loadingActiveCount ? 'Loading...' : 
-                  activeWatchlistCount === 0 ? 'No Active Brands' : 
-                  'Load Active Watchlist to Pending'}
-               </span>
-               <span className="sm:hidden">
-                 {!isAdmin ? 'Admin Required' : 
-                  loadingActiveCount ? 'Loading...' : 
-                  activeWatchlistCount === 0 ? 'No Active' : 
-                  'Load Active Watchlist'}
-               </span>
-             </Button>
-           </div>
-         </div>
-       </Card>
+      <Card>
+        <div className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+            <div>
+              <h4 className="text-lg font-semibold text-gray-900">Load Active Watchlist Brands</h4>
+              <p className="text-sm text-gray-600">
+                Add all active watchlist brands ({loadingActiveCount ? 'Loading...' : activeWatchlistCount}) to the watchlist pending queue with priority score 1
+              </p>
+            </div>
+            <Button
+              variant="primary"
+              size="md"
+              disabled={!isAdmin || loadingActiveCount || activeWatchlistCount === 0}
+              onClick={handleLoadActiveWatchlist}
+              className={`w-full sm:w-auto ${!isAdmin || loadingActiveCount || activeWatchlistCount === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <span className="hidden sm:inline">
+                {!isAdmin ? 'Admin Access Required' :
+                  loadingActiveCount ? 'Loading...' :
+                    activeWatchlistCount === 0 ? 'No Active Brands' :
+                      'Load Active Watchlist to Pending'}
+              </span>
+              <span className="sm:hidden">
+                {!isAdmin ? 'Admin Required' :
+                  loadingActiveCount ? 'Loading...' :
+                    activeWatchlistCount === 0 ? 'No Active' :
+                      'Load Active Watchlist'}
+              </span>
+            </Button>
+          </div>
+        </div>
+      </Card>
 
-       {/* Load Watchlist to Pending Button */}
-       <Card>
-         <div className="p-4 sm:p-6">
-           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-             <div>
-               <h4 className="text-lg font-semibold text-gray-900">Load All Watchlist to Watchlist Pending Queue</h4>
-               <p className="text-sm text-gray-600">
-                 Add all watchlist brands to the watchlist pending queue with priority score 1
-               </p>
-             </div>
-             <Button
-               variant="primary"
-               size="md"
-               disabled={!isAdmin}
+      <Card>
+        <div className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+            <div>
+              <h4 className="text-lg font-semibold text-gray-900">Load All Watchlist to Watchlist Pending Queue</h4>
+              <p className="text-sm text-gray-600">
+                Add all watchlist brands to the watchlist pending queue with priority score 1
+              </p>
+            </div>
+            <Button
+              variant="primary"
+              size="md"
+              disabled={!isAdmin}
 
               onClick={async () => {
                 if (!isAdmin) {
@@ -627,7 +577,6 @@ const WatchlistBrands = () => {
                   return;
                 }
 
-         
                 const scrollPosition = window.scrollY;
 
                 try {
@@ -643,20 +592,19 @@ const WatchlistBrands = () => {
                   toast.error(error.message || 'Failed to load watchlist brands to watchlist pending queue');
                 }
               }}
-               className={`w-full sm:w-auto ${!isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}
-             >
-               <span className="hidden sm:inline">
-                 {isAdmin ? 'Load All Watchlist to Watchlist Pending' : 'Admin Access Required'}
-               </span>
-               <span className="sm:hidden">
-                 {isAdmin ? 'Load All to Watchlist Pending' : 'Admin Required'}
-               </span>
-             </Button>
-           </div>
-         </div>
-       </Card>
+              className={`w-full sm:w-auto ${!isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <span className="hidden sm:inline">
+                {isAdmin ? 'Load All Watchlist to Watchlist Pending' : 'Admin Access Required'}
+              </span>
+              <span className="sm:hidden">
+                {isAdmin ? 'Load All to Watchlist Pending' : 'Admin Required'}
+              </span>
+            </Button>
+          </div>
+        </div>
+      </Card>
 
-      {/* Move Watchlist Failed to Pending Button */}
       {filteredBrands && filteredBrands.filter(b => determineScraperStatus(b) === 'failed').length > 0 && (
         <Card>
           <div className="p-4 sm:p-6">
@@ -678,7 +626,6 @@ const WatchlistBrands = () => {
                     return;
                   }
 
-                 
                   const scrollPosition = window.scrollY;
 
                   try {
@@ -699,19 +646,18 @@ const WatchlistBrands = () => {
                 }}
                 className={`w-full sm:w-auto ${!isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                               <span className="hidden sm:inline">
-                 {isAdmin ? 'Move All Watchlist Failed to Watchlist Pending' : 'Admin Access Required'}
-               </span>
-               <span className="sm:hidden">
-                 {isAdmin ? 'Move All Failed to Watchlist Pending' : 'Admin Required'}
-               </span>
+                <span className="hidden sm:inline">
+                  {isAdmin ? 'Move All Watchlist Failed to Watchlist Pending' : 'Admin Access Required'}
+                </span>
+                <span className="sm:hidden">
+                  {isAdmin ? 'Move All Failed to Watchlist Pending' : 'Admin Required'}
+                </span>
               </Button>
             </div>
           </div>
         </Card>
       )}
 
-      {/* Search Bar */}
       <Card>
         <SearchInput
           value={searchTerm}
@@ -725,7 +671,6 @@ const WatchlistBrands = () => {
         />
       </Card>
 
-      {/* Mobile Status Sort Control */}
       {currentBrands.length > 0 && (
         <Card className="md:hidden">
           <div className="p-4">
@@ -741,44 +686,41 @@ const WatchlistBrands = () => {
                 <ChevronDown className={`h-3 w-3 -mt-1 ${statusSortMode === 'waiting' ? 'text-blue-600' : statusSortMode === 'completed' ? 'text-blue-600' : 'text-gray-400'}`} />
               </div>
               <span>
-                {statusSortMode === 'failed' ? 'Failed First (Default)' : 
-                 statusSortMode === 'waiting' ? 'Waiting First' : 
-                 statusSortMode === 'completed' ? 'Completed First' : 
-                 'Normal (Failed > Waiting > Completed)'}
+                {statusSortMode === 'failed' ? 'Failed First (Default)' :
+                  statusSortMode === 'waiting' ? 'Waiting First' :
+                    statusSortMode === 'completed' ? 'Completed First' :
+                      'Normal (Failed > Waiting > Completed)'}
               </span>
             </button>
           </div>
         </Card>
       )}
 
-             {/* Brands Table - Desktop */}
-       <Card className="hidden md:block">
-         <Table
-           data={currentBrands}
-           columns={tableColumns}
-           emptyMessage={searchTerm ? 'No watchlist brands found matching your search.' : 'No watchlist brands found.'}
-           className="min-w-full"
-           onSortChange={(columnKey) => {
-             if (columnKey === 'scraper_status') {
-               handleStatusSortChange();
-             }
-           }}
-         />
-       </Card>
+      <Card className="hidden md:block">
+        <Table
+          data={currentBrands}
+          columns={tableColumns}
+          emptyMessage={searchTerm ? 'No watchlist brands found matching your search.' : 'No watchlist brands found.'}
+          className="min-w-full"
+          onSortChange={(columnKey) => {
+            if (columnKey === 'scraper_status') {
+              handleStatusSortChange();
+            }
+          }}
+        />
+      </Card>
 
-             {/* Mobile Cards View */}
-       <div className="md:hidden space-y-3">
-         {currentBrands.length === 0 ? (
-           <Card>
-             <div className="text-center py-8 text-gray-500">
-               {searchTerm ? 'No watchlist brands found matching your search.' : 'No watchlist brands found.'}
-             </div>
-           </Card>
-         ) : (
-           currentBrands.map((brand, index) => (
-             <Card key={brand.page_id || brand.brand_id} className="p-4 relative transition-all duration-200">
+      <div className="md:hidden space-y-3">
+        {currentBrands.length === 0 ? (
+          <Card>
+            <div className="text-center py-8 text-gray-500">
+              {searchTerm ? 'No watchlist brands found matching your search.' : 'No watchlist brands found.'}
+            </div>
+          </Card>
+        ) : (
+          currentBrands.map((brand, index) => (
+            <Card key={brand.page_id || brand.brand_id} className="p-4 relative transition-all duration-200">
               <div className="space-y-3">
-                {/* Brand Name */}
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold text-gray-900 text-lg">{brand.brand_name || 'Unknown'}</h3>
                   <div className="flex items-center space-x-2">
@@ -796,7 +738,6 @@ const WatchlistBrands = () => {
                   </div>
                 </div>
 
-                {/* Details Grid */}
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-gray-500">Page ID:</span>
@@ -808,7 +749,6 @@ const WatchlistBrands = () => {
                   </div>
                 </div>
 
-                {/* Action Button - Only for Failed Brands */}
                 {determineScraperStatus(brand) === 'failed' && (
                   <div className="pt-2">
                     <Button
@@ -829,7 +769,6 @@ const WatchlistBrands = () => {
                   </div>
                 )}
 
-                {/* External Link Icon - Bottom Right */}
                 {brand?.page_id && (
                   <button
                     onClick={() => {
@@ -848,16 +787,15 @@ const WatchlistBrands = () => {
         )}
       </div>
 
-             {/* Pagination */}
-       <Pagination
-         currentPage={currentPage}
-         totalPages={totalPages}
-         totalItems={totalItems}
-         itemsPerPage={itemsPerPage}
-         onPageChange={handlePageChange}
-         showPageInfo={true}
-         className="py-4"
-       />
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        itemsPerPage={itemsPerPage}
+        onPageChange={handlePageChange}
+        showPageInfo={true}
+        className="py-4"
+      />
 
     </div>
   );

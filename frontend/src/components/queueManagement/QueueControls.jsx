@@ -106,8 +106,7 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
   return (
     <div className="p-3 sm:p-4 lg:p-6">
       <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">Queue Management Controls</h2>
-      
-      {/* Clear All Queues - Common */}
+
       <div className="mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
           <Button
@@ -120,7 +119,7 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
             <span className="hidden sm:inline">Clear All Queues</span>
             <span className="sm:hidden">Clear All</span>
           </Button>
-          
+
           <Button
             variant="danger"
             onClick={handleClearCurrentlyScrapingClick}
@@ -132,7 +131,6 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
             <span className="sm:hidden">Clear Scraping</span>
           </Button>
 
-          {/* Clear Cache Only (Cache Redis) */}
           <Button
             variant="danger"
             onClick={() => onConfirmDialogStateChange({
@@ -150,7 +148,6 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
         </div>
       </div>
 
-      {/* Regular Queue Controls */}
       <div className="mb-4">
         <h3 className="text-sm font-medium text-gray-700 mb-2">Regular Queues</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
@@ -183,9 +180,9 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
             className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5"
           >
             <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden lg:inline">All Pending → Failed</span>
-            <span className="hidden sm:inline lg:hidden">Pending → Failed</span>
-            <span className="sm:hidden">P→F</span>
+            <span className="hidden lg:inline">All Pending  Failed</span>
+            <span className="hidden sm:inline lg:hidden">Pending  Failed</span>
+            <span className="sm:hidden">PF</span>
           </Button>
 
           <Button
@@ -195,14 +192,13 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
             className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5"
           >
             <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden lg:inline">All Failed → Pending</span>
-            <span className="hidden sm:inline lg:hidden">Failed → Pending</span>
-            <span className="sm:hidden">F→P</span>
+            <span className="hidden lg:inline">All Failed  Pending</span>
+            <span className="hidden sm:inline lg:hidden">Failed  Pending</span>
+            <span className="sm:hidden">FP</span>
           </Button>
         </div>
       </div>
 
-      {/* Watchlist Queue Controls */}
       <div>
         <h3 className="text-sm font-medium text-gray-700 mb-2">Watchlist Queues</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
@@ -235,9 +231,9 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
             className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5"
           >
             <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden lg:inline">WL Pending → Failed</span>
-            <span className="hidden sm:inline lg:hidden">WL P→F</span>
-            <span className="sm:hidden">WL P→F</span>
+            <span className="hidden lg:inline">WL Pending  Failed</span>
+            <span className="hidden sm:inline lg:hidden">WL PF</span>
+            <span className="sm:hidden">WL PF</span>
           </Button>
 
           <Button
@@ -247,14 +243,13 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
             className="flex items-center gap-2 text-xs sm:text-sm py-2 sm:py-2.5"
           >
             <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden lg:inline">WL Failed → Pending</span>
-            <span className="hidden sm:inline lg:hidden">WL F→P</span>
-            <span className="sm:hidden">WL F→P</span>
+            <span className="hidden lg:inline">WL Failed  Pending</span>
+            <span className="hidden sm:inline lg:hidden">WL FP</span>
+            <span className="sm:hidden">WL FP</span>
           </Button>
         </div>
       </div>
 
-      {/* Confirmation Dialog */}
       {showConfirmDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
@@ -267,22 +262,22 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
+
             <div className="mb-4">
               <p className="text-sm text-gray-600 mb-3">
-                {confirmAction === 'Clear All Queues' 
+                {confirmAction === 'Clear All Queues'
                   ? 'This action will permanently clear ALL queues (both regular and watchlist pending/failed queues). This action cannot be undone.'
                   : confirmAction === 'Clear Cache Only'
                     ? 'This will safely clear only Cache Redis (pipeline, queue, brand caches) and related frontend cache data. Admin login and other important data will remain untouched. Type confirm to proceed.'
                     : confirmAction.includes('Clear')
-                    ? `This action will permanently clear the ${confirmAction.toLowerCase().replace('clear ', '').replace(' queue', '')} queue. This action cannot be undone.`
-                  : `This action will move all brands in the ${confirmAction.toLowerCase().replace('move all ', '').replace(' to ', ' → ')}. This action cannot be undone.`
+                      ? `This action will permanently clear the ${confirmAction.toLowerCase().replace('clear ', '').replace(' queue', '')} queue. This action cannot be undone.`
+                      : `This action will move all brands in the ${confirmAction.toLowerCase().replace('move all ', '').replace(' to ', '  ')}. This action cannot be undone.`
                 }
               </p>
               <p className="text-sm text-gray-600 mb-4">
                 Type <strong>"confirm"</strong> to proceed:
               </p>
-              
+
               <input
                 type="text"
                 value={confirmText}
@@ -295,7 +290,7 @@ const QueueControls = ({ isProcessingAction, onAdminAction, confirmDialogState, 
                 autoFocus
               />
             </div>
-            
+
             <div className="flex gap-3 justify-end">
               <Button
                 variant="secondary"

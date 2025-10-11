@@ -25,13 +25,12 @@ const FailedQueue = () => {
   const isScrollLockedRef = useRef(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const { onAdminLogin } = useAdminLogin();
-  
-  // Separate state for original totals (for static display)
+
   const [originalTotals, setOriginalTotals] = useState({
     total_items: 0,
     total_pages: 0
   });
-  
+
   const [queueState, setQueueState] = useState({
     searchTerm: searchParams.get('search') || '',
     currentPage: parseInt(searchParams.get('page')) || 1,
@@ -43,7 +42,6 @@ const FailedQueue = () => {
     error: null
   });
 
-  // Separate state for reenqueue data
   const [reenqueueState, setReenqueueState] = useState({
     items: [],
     pagination: {},
@@ -52,14 +50,12 @@ const FailedQueue = () => {
     isLoading: false
   });
 
-  // Helper function to get initial confirmation dialog state from localStorage
   const getInitialConfirmDialogState = () => {
     try {
       const isPageRefresh = sessionStorage.getItem('failedQueuePageRefreshed') === 'true';
       const wasPageVisited = sessionStorage.getItem('failedQueuePageVisited') === 'true';
-      
+
       if (isPageRefresh && wasPageVisited) {
-        // Don't remove the flag here since it's used by both dialogs
         const saved = localStorage.getItem('failedQueue_confirmDialog');
         if (saved) {
           const parsed = JSON.parse(saved);
@@ -75,14 +71,12 @@ const FailedQueue = () => {
     return { show: false, confirmText: '' };
   };
 
-  // Helper function to get initial requeue confirmation dialog state from localStorage
   const getInitialRequeueConfirmDialogState = () => {
     try {
       const isPageRefresh = sessionStorage.getItem('failedQueuePageRefreshed') === 'true';
       const wasPageVisited = sessionStorage.getItem('failedQueuePageVisited') === 'true';
-      
+
       if (isPageRefresh && wasPageVisited) {
-        // Don't remove the flag here since it's used by both dialogs
         const saved = localStorage.getItem('failedQueue_requeueConfirmDialog');
         if (saved) {
           const parsed = JSON.parse(saved);
@@ -98,10 +92,8 @@ const FailedQueue = () => {
     return { show: false, confirmText: '' };
   };
 
-  // Confirmation dialog state for Delete All
   const [confirmDialog, setConfirmDialog] = useState({ show: false, confirmText: '' });
 
-  // Confirmation dialog state for Requeue All
   const [requeueConfirmDialog, setRequeueConfirmDialog] = useState({ show: false, confirmText: '' });
 
   const { searchTerm, currentPage, itemsPerPage, isRefreshing, brands, pagination, isSearching, error } = queueState;
@@ -117,20 +109,19 @@ const FailedQueue = () => {
     }
   });
 
-  // Handler for requeue single brand
   const handleRequeueSingle = async (itemId) => {
 
     const scrollPosition = window.scrollY;
     scrollPositionRef.current = scrollPosition;
     isScrollLockedRef.current = true;
-    
+
     try {
       await requeueSingleBrand(itemId, 'non-watchlist');
       toast.success('Brand requeued successfully to pending queue');
-      
-      loadReenqueueData(reenqueueCurrentPage, false); // Reload current page
-      loadFailedBrands(); // Reload failed brands to update counts
-      
+
+      loadReenqueueData(reenqueueCurrentPage, false);
+      loadFailedBrands();
+
       setTimeout(() => {
         isScrollLockedRef.current = false;
       }, 100);
@@ -140,7 +131,6 @@ const FailedQueue = () => {
     }
   };
 
-  // Handler for requeue all brands
   const handleRequeueAll = () => {
     setRequeueConfirmDialog({ show: true, confirmText: '' });
   };
@@ -158,11 +148,11 @@ const FailedQueue = () => {
     try {
       const result = await requeueAllBrands('non-watchlist');
       toast.success(`${result.data.count} brands requeued successfully`);
-      
-      loadReenqueueData(1, false); // Reset to page 1
-      loadFailedBrands(); // Reload failed brands to update counts
+
+      loadReenqueueData(1, false);
+      loadFailedBrands();
       setRequeueConfirmDialog({ show: false, confirmText: '' });
-      
+
       setTimeout(() => {
         isScrollLockedRef.current = false;
       }, 100);
@@ -176,17 +166,16 @@ const FailedQueue = () => {
     setRequeueConfirmDialog({ show: false, confirmText: '' });
   };
 
-  // Handler for delete single brand (no confirmation)
   const handleDeleteSingle = async (itemId) => {
     const scrollPosition = window.scrollY;
     scrollPositionRef.current = scrollPosition;
     isScrollLockedRef.current = true;
-    
+
     try {
       await deleteReenqueueBrand(itemId, 'non-watchlist');
       toast.success('Brand deleted successfully from reenqueue list');
-      
-      loadReenqueueData(reenqueueCurrentPage, false); // Reload current page
+
+      loadReenqueueData(reenqueueCurrentPage, false);
 
       setTimeout(() => {
         isScrollLockedRef.current = false;
@@ -197,7 +186,6 @@ const FailedQueue = () => {
     }
   };
 
-  // Handler for delete all brands (with typing confirmation)
   const handleDeleteAllClick = () => {
     setConfirmDialog({ show: true, confirmText: '' });
   };
@@ -208,7 +196,6 @@ const FailedQueue = () => {
       return;
     }
 
-    // Lock scroll position during the entire operation
     const scrollPosition = window.scrollY;
     scrollPositionRef.current = scrollPosition;
     isScrollLockedRef.current = true;
@@ -216,9 +203,9 @@ const FailedQueue = () => {
     try {
       const result = await deleteAllReenqueueBrands('non-watchlist');
       toast.success(`${result.data.count} brands deleted successfully`);
-      
+
       setConfirmDialog({ show: false, confirmText: '' });
-      loadReenqueueData(1, false); // Reset to page 1
+      loadReenqueueData(1, false);
 
       setTimeout(() => {
         isScrollLockedRef.current = false;
@@ -233,7 +220,6 @@ const FailedQueue = () => {
     setConfirmDialog({ show: false, confirmText: '' });
   };
 
-  // Reenqueue table columns: Position → Brand Name → Brand ID → Page ID → Coverage → Actions
   const reenqueueColumns = [
     {
       key: 'position',
@@ -441,16 +427,13 @@ const FailedQueue = () => {
       label: 'Error Message',
       render: (value, row) => {
         const errorMsg = value || row.error_message || row.error || row.message || 'Unknown error';
-        // Extract the important part of the error message - get the last meaningful part
         let importantPart = errorMsg;
-        
-        // If it contains ':', get the part after the last colon
+
         if (errorMsg.includes(':')) {
           const parts = errorMsg.split(':');
           importantPart = parts[parts.length - 1].trim();
         }
-        
-        // Further shorten common error patterns
+
         if (importantPart.toLowerCase().includes('no matching script tag found')) {
           importantPart = 'No script tag';
         } else if (importantPart.toLowerCase().includes('session closed')) {
@@ -468,7 +451,7 @@ const FailedQueue = () => {
         } else if (importantPart.toLowerCase().includes('failed to extract')) {
           importantPart = 'Extraction failed';
         }
-        
+
         return (
           <div className="text-xs text-red-600 max-w-[100px] sm:max-w-[150px] truncate font-medium" title={errorMsg}>
             {importantPart}
@@ -481,14 +464,12 @@ const FailedQueue = () => {
 
   const loadReenqueueData = useCallback(async (page = 1, showLoading = false) => {
     try {
-      // Only show loading spinner on initial load, not on page changes
       if (showLoading) {
         setReenqueueState(prev => ({ ...prev, isLoading: true }));
       }
-      
-      // Always use the page parameter passed in
+
       const response = await fetchReenqueueData(page, 10, null, 'non-watchlist');
-      
+
       let items = [];
       let pagination = {};
 
@@ -518,7 +499,6 @@ const FailedQueue = () => {
 
   const loadFailedBrands = useCallback(async (searchTerm = null, pageOverride = null) => {
     try {
-      // Set loading states appropriately
       if (searchTerm) {
         updateQueueState({ isSearching: true, error: null });
       } else {
@@ -528,14 +508,12 @@ const FailedQueue = () => {
       const pageToLoad = searchTerm ? 1 : (pageOverride || currentPage);
       const response = await fetchFailedBrands(pageToLoad, itemsPerPage, searchTerm);
 
-      // Only update results if they match the current search term
       const currentSearch = currentSearchRef.current;
       const searchToCheck = searchTerm || '';
-      
-      // If search terms don't match, ignore this response (it's stale)
+
       if (searchToCheck !== currentSearch) {
         updateQueueState({ isSearching: false });
-        return; 
+        return;
       }
 
       let brands = [];
@@ -559,7 +537,6 @@ const FailedQueue = () => {
         isSearching: false
       });
 
-      // Store original totals only when not searching (for static display)
       if (!searchTerm) {
         setOriginalTotals({
           total_items: pagination.total_items || 0,
@@ -575,9 +552,7 @@ const FailedQueue = () => {
     }
   }, [fetchFailedBrands, itemsPerPage]);
 
-  // Initial load effect - runs only once on mount
   useEffect(() => {
-    // Load initial data based on URL parameters
     const initialSearch = searchParams.get('search') || '';
     const initialPage = parseInt(searchParams.get('page')) || 1;
 
@@ -589,18 +564,14 @@ const FailedQueue = () => {
       loadFailedBrands(null, initialPage);
     }
 
-    // Load reenqueue data (show loading on initial load)
     loadReenqueueData(1, true);
 
-    // Mark initial mount as complete
     setTimeout(() => {
       isInitialMountRef.current = false;
     }, 100);
-  }, []); // Empty dependency array - only run once
+  }, []);
 
-  // Handle page changes (when not searching)
   useEffect(() => {
-    // Skip initial mount and when searching
     if (isInitialMountRef.current || (searchTerm && searchTerm.trim().length >= 3)) {
       return;
     }
@@ -608,9 +579,7 @@ const FailedQueue = () => {
     loadFailedBrands(null, currentPage);
   }, [currentPage]);
 
-  // Handle search with debouncing
   useEffect(() => {
-    // Skip initial mount to prevent duplicate calls
     if (isInitialMountRef.current) {
       return;
     }
@@ -625,32 +594,25 @@ const FailedQueue = () => {
 
       return () => clearTimeout(timeoutId);
     } else if (searchTerm === '') {
-      // Handle clearing search - load normal data
       currentSearchRef.current = '';
       loadFailedBrands(null, 1);
     }
   }, [searchTerm]);
 
-  // Handle reenqueue page changes
   useEffect(() => {
-    // Skip initial mount
     if (isInitialMountRef.current) {
       return;
     }
 
-    // Load reenqueue data when page changes
     loadReenqueueData(reenqueueCurrentPage, false);
   }, [reenqueueCurrentPage]);
 
-  // Detect page refresh and set flag, then restore dialog states
   useEffect(() => {
     const isInitialLoad = !sessionStorage.getItem('failedQueuePageVisited');
-    
+
     if (!isInitialLoad) {
-      // This is a page refresh, set the flag
       sessionStorage.setItem('failedQueuePageRefreshed', 'true');
-      
-      // Restore dialog states from localStorage
+
       try {
         const savedConfirmDialog = localStorage.getItem('failedQueue_confirmDialog');
         if (savedConfirmDialog) {
@@ -660,7 +622,7 @@ const FailedQueue = () => {
             confirmText: parsed.confirmText || ''
           });
         }
-        
+
         const savedRequeueDialog = localStorage.getItem('failedQueue_requeueConfirmDialog');
         if (savedRequeueDialog) {
           const parsed = JSON.parse(savedRequeueDialog);
@@ -673,17 +635,14 @@ const FailedQueue = () => {
         console.error('Error restoring dialog states:', error);
       }
     } else {
-      // This is initial load, mark page as visited
       sessionStorage.setItem('failedQueuePageVisited', 'true');
     }
 
-    // Cleanup function to clear the visited flag when navigating away
     return () => {
       sessionStorage.removeItem('failedQueuePageVisited');
     };
   }, []);
 
-  // Save confirmation dialog state to localStorage whenever it changes
   useEffect(() => {
     if (confirmDialog.show) {
       localStorage.setItem('failedQueue_confirmDialog', JSON.stringify(confirmDialog));
@@ -692,7 +651,6 @@ const FailedQueue = () => {
     }
   }, [confirmDialog]);
 
-  // Save requeue confirmation dialog state to localStorage whenever it changes
   useEffect(() => {
     if (requeueConfirmDialog.show) {
       localStorage.setItem('failedQueue_requeueConfirmDialog', JSON.stringify(requeueConfirmDialog));
@@ -702,7 +660,6 @@ const FailedQueue = () => {
   }, [requeueConfirmDialog]);
 
 
-  // Auto-refresh hook
   const refreshFn = useCallback(async () => {
     try {
       if (searchTerm && searchTerm.trim().length >= 3) {
@@ -723,27 +680,23 @@ const FailedQueue = () => {
 
   const handleRefresh = async () => {
     await manualRefresh();
-    // Toast is now handled in refreshFn
   };
 
   const handleSearch = (searchValue) => {
-    // Update search term in state immediately (for input display)
     updateQueueState({ searchTerm: searchValue });
 
-    // Update URL parameters
     const newParams = new URLSearchParams(searchParams);
     if (searchValue && searchValue.trim()) {
       newParams.set('search', searchValue);
-      newParams.set('page', '1'); // Reset to page 1 on search
+      newParams.set('page', '1');
     } else {
       newParams.delete('search');
-      newParams.set('page', '1'); // Reset to page 1 when clearing search
+      newParams.set('page', '1');
     }
     setSearchParams(newParams, { replace: true });
 
     if (!searchValue || searchValue.trim() === '') {
       updateQueueState({ currentPage: 1 });
-      // The useEffect will handle loading the data
     }
   };
 
@@ -751,24 +704,19 @@ const FailedQueue = () => {
     currentSearchRef.current = '';
     updateQueueState({ searchTerm: '', currentPage: 1 });
 
-    // Update URL parameters
     const newParams = new URLSearchParams(searchParams);
     newParams.delete('search');
     newParams.set('page', '1');
     setSearchParams(newParams, { replace: true });
-
-    // The useEffect will handle loading the data
   };
 
   const handlePageChange = (page) => {
     updateQueueState({ currentPage: page });
 
-    // Update URL parameters
     const newParams = new URLSearchParams(searchParams);
     newParams.set('page', page.toString());
     setSearchParams(newParams, { replace: true });
-    
-    // Scroll to the table section when changing pages
+
     const tableSection = document.getElementById('failed-queue-table-section');
     if (tableSection) {
       tableSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -779,12 +727,10 @@ const FailedQueue = () => {
 
   const totalPages = pagination.total_pages || 1;
 
-  // Show loading state while initial data is loading
   if (loading && brands.length === 0 && !isSearching) {
     return <LoadingSpinner />;
   }
 
-  // Show error state if there's an error
   if (error && !isSearching && brands.length === 0) {
     return <ErrorDisplay message={error} onRetry={() => loadFailedBrands()} />;
   }
@@ -899,7 +845,6 @@ const FailedQueue = () => {
         </div>
       </Card>
 
-      {/* Desktop Table View */}
       <Card id="failed-queue-table-section" className="hidden md:block">
         {isSearching ? (
           <div className="text-center py-12 sm:py-16">
@@ -931,7 +876,6 @@ const FailedQueue = () => {
         )}
       </Card>
 
-      {/* Mobile Cards View */}
       <div className="md:hidden space-y-3">
         {isSearching ? (
           <Card>
@@ -968,10 +912,8 @@ const FailedQueue = () => {
             return (
               <Card key={`${brandId}-${index}`} className="p-4 relative pb-12">
                 <div className="space-y-3">
-                  {/* Header with Position and Brand Name */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      {/* Position Circle */}
                       <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
                         <span className="text-sm font-medium text-red-600">
                           {position}
@@ -982,7 +924,6 @@ const FailedQueue = () => {
                     <Badge variant="error">Failed</Badge>
                   </div>
 
-                  {/* Details Grid */}
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-gray-500">Brand ID:</span>
@@ -994,45 +935,40 @@ const FailedQueue = () => {
                     </div>
                   </div>
 
-                   {/* Error Message */}
-                   <div className="pt-2">
-                     <span className="text-gray-500 text-sm">Error:</span>
-                     <p className="text-sm text-red-600 mt-1 break-words font-medium" title={errorMessage}>
-                       {(() => {
-                         // Extract the important part of the error message - get the last meaningful part
-                         let importantPart = errorMessage;
-                         
-                         // If it contains ':', get the part after the last colon
-                         if (errorMessage.includes(':')) {
-                           const parts = errorMessage.split(':');
-                           importantPart = parts[parts.length - 1].trim();
-                         }
-                         
-                         // Further shorten common error patterns
-                         if (importantPart.toLowerCase().includes('no matching script tag found')) {
-                           importantPart = 'No script tag';
-                         } else if (importantPart.toLowerCase().includes('session closed')) {
-                           importantPart = 'Session closed';
-                         } else if (importantPart.toLowerCase().includes('target closed')) {
-                           importantPart = 'Target closed';
-                         } else if (importantPart.toLowerCase().includes('protocol error')) {
-                           importantPart = 'Protocol error';
-                         } else if (importantPart.toLowerCase().includes('timeout')) {
-                           importantPart = 'Timeout';
-                         } else if (importantPart.toLowerCase().includes('network')) {
-                           importantPart = 'Network error';
-                         } else if (importantPart.toLowerCase().includes('connection')) {
-                           importantPart = 'Connection error';
-                         } else if (importantPart.toLowerCase().includes('failed to extract')) {
-                           importantPart = 'Extraction failed';
-                         }
-                         
-                         return importantPart;
-                       })()}
-                     </p>
-                   </div>
+                  <div className="pt-2">
+                    <span className="text-gray-500 text-sm">Error:</span>
+                    <p className="text-sm text-red-600 mt-1 break-words font-medium" title={errorMessage}>
+                      {(() => {
+                        let importantPart = errorMessage;
 
-                  {/* External Link Icon - Bottom Right */}
+                        if (errorMessage.includes(':')) {
+                          const parts = errorMessage.split(':');
+                          importantPart = parts[parts.length - 1].trim();
+                        }
+
+                        if (importantPart.toLowerCase().includes('no matching script tag found')) {
+                          importantPart = 'No script tag';
+                        } else if (importantPart.toLowerCase().includes('session closed')) {
+                          importantPart = 'Session closed';
+                        } else if (importantPart.toLowerCase().includes('target closed')) {
+                          importantPart = 'Target closed';
+                        } else if (importantPart.toLowerCase().includes('protocol error')) {
+                          importantPart = 'Protocol error';
+                        } else if (importantPart.toLowerCase().includes('timeout')) {
+                          importantPart = 'Timeout';
+                        } else if (importantPart.toLowerCase().includes('network')) {
+                          importantPart = 'Network error';
+                        } else if (importantPart.toLowerCase().includes('connection')) {
+                          importantPart = 'Connection error';
+                        } else if (importantPart.toLowerCase().includes('failed to extract')) {
+                          importantPart = 'Extraction failed';
+                        }
+
+                        return importantPart;
+                      })()}
+                    </p>
+                  </div>
+
                   {pageId && pageId !== 'N/A' && (
                     <button
                       onClick={() => {
@@ -1052,7 +988,6 @@ const FailedQueue = () => {
         )}
       </div>
 
-      {/* Pagination for Failed Brands Table */}
       {totalPages > 1 && (
         <Pagination
           currentPage={currentPage}
@@ -1064,12 +999,10 @@ const FailedQueue = () => {
         />
       )}
 
-      {/* Reenqueue Data Section - Below Failed Brands Pagination */}
       {reenqueueItems && reenqueueItems.length > 0 && (
         <>
           <Card id="reenqueue-table-section" className="mt-6 mb-4">
             <div className="mb-4">
-              {/* Header Section */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
                 <div className="flex-1">
                   <h2 className="text-base sm:text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -1080,8 +1013,7 @@ const FailedQueue = () => {
                     Brands waiting to be requeued for processing
                   </p>
                 </div>
-                
-                {/* Action Buttons */}
+
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
                   <Button
                     onClick={handleRequeueAll}
@@ -1115,7 +1047,6 @@ const FailedQueue = () => {
               </div>
             ) : (
               <>
-                {/* Desktop Table View */}
                 <div className="hidden md:block">
                   <Table
                     data={reenqueueItems}
@@ -1125,7 +1056,6 @@ const FailedQueue = () => {
                   />
                 </div>
 
-                {/* Mobile Cards View */}
                 <div className="md:hidden space-y-3">
                   {reenqueueItems && reenqueueItems.length > 0 ? (
                     reenqueueItems.map((item, index) => {
@@ -1138,7 +1068,6 @@ const FailedQueue = () => {
                       return (
                         <Card key={`${brandId}-${index}`} className="p-4 relative pb-16">
                           <div className="space-y-3">
-                            {/* Header with Brand Name and Position */}
                             <div className="flex items-start justify-between">
                               <div className="flex-1 pr-3">
                                 <div className="flex items-center space-x-2 mb-1">
@@ -1160,7 +1089,6 @@ const FailedQueue = () => {
                               </div>
                             </div>
 
-                            {/* Details Grid */}
                             <div className="grid grid-cols-2 gap-4 text-sm">
                               <div>
                                 <span className="text-gray-500">Brand ID:</span>
@@ -1172,7 +1100,6 @@ const FailedQueue = () => {
                               </div>
                             </div>
 
-                            {/* External Link Icon - Bottom Right */}
                             {pageId && pageId !== 'N/A' && (
                               <button
                                 onClick={() => {
@@ -1186,7 +1113,6 @@ const FailedQueue = () => {
                               </button>
                             )}
 
-                            {/* Action Buttons - Bottom Left */}
                             <div className="absolute bottom-3 left-3 flex items-center gap-2">
                               <Button
                                 onClick={() => handleRequeueSingle(item.id)}
@@ -1231,16 +1157,13 @@ const FailedQueue = () => {
             )}
           </Card>
 
-          {/* Pagination for Reenqueue Table */}
           {reenqueuePagination.total_pages > 1 && (
             <Pagination
               currentPage={reenqueueCurrentPage}
               totalPages={reenqueuePagination.total_pages || 1}
               onPageChange={(page) => {
-                // Immediately update only the reenqueue current page (no re-render of failed queue)
                 setReenqueueState(prev => ({ ...prev, currentPage: page }));
-                
-                // Scroll to the reenqueue table section when changing pages
+
                 const tableSection = document.getElementById('reenqueue-table-section');
                 if (tableSection) {
                   tableSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1254,7 +1177,6 @@ const FailedQueue = () => {
         </>
       )}
 
-      {/* Confirmation Dialog for Delete All */}
       {confirmDialog.show && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
@@ -1267,7 +1189,7 @@ const FailedQueue = () => {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
+
             <div className="mb-4">
               <p className="text-sm text-gray-600 mb-3">
                 This action will permanently delete all brands from the reenqueue list. This action cannot be undone.
@@ -1275,7 +1197,7 @@ const FailedQueue = () => {
               <p className="text-sm text-gray-600 mb-4">
                 Type <strong>"confirm"</strong> to proceed:
               </p>
-              
+
               <input
                 type="text"
                 value={confirmDialog.confirmText}
@@ -1285,7 +1207,7 @@ const FailedQueue = () => {
                 autoFocus
               />
             </div>
-            
+
             <div className="flex gap-3">
               <Button
                 onClick={handleCancelDeleteAll}
@@ -1307,7 +1229,6 @@ const FailedQueue = () => {
         </div>
       )}
 
-      {/* Confirmation Dialog for Requeue All */}
       {requeueConfirmDialog.show && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
@@ -1320,7 +1241,7 @@ const FailedQueue = () => {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
+
             <div className="mb-4">
               <p className="text-sm text-gray-600 mb-3">
                 This action will requeue all brands from the reenqueue list to the pending queue.
@@ -1328,7 +1249,7 @@ const FailedQueue = () => {
               <p className="text-sm text-gray-600 mb-4">
                 Type <strong>"confirm"</strong> to proceed:
               </p>
-              
+
               <input
                 type="text"
                 value={requeueConfirmDialog.confirmText}
@@ -1338,7 +1259,7 @@ const FailedQueue = () => {
                 autoFocus
               />
             </div>
-            
+
             <div className="flex gap-3">
               <Button
                 onClick={handleCancelRequeueAll}

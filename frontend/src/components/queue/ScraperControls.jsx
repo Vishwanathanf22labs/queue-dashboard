@@ -4,6 +4,7 @@ import StartScraperButton from '../scraper/StartScraperButton';
 import StopScraperButton from '../scraper/StopScraperButton';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import ErrorDisplay from '../ui/ErrorDisplay';
+import Badge from '../ui/Badge';
 
 const ScraperControls = ({ disabled = false }) => {
   const [scraperStatus, setScraperStatus] = useState('unknown');
@@ -57,12 +58,10 @@ const ScraperControls = ({ disabled = false }) => {
   }, []);
 
   const handleScraperStart = (result) => {
-    // Refresh status after starting
     fetchScraperStatus();
   };
 
   const handleScraperStop = (result) => {
-    // Refresh status after stopping
     fetchScraperStatus();
   };
 
@@ -87,12 +86,10 @@ const ScraperControls = ({ disabled = false }) => {
   };
 
   const getStatusInfo = (status) => {
-    // Handle specific stopped reasons
     if (status && status.startsWith('stopped(')) {
       const reason = status.replace('stopped(', '').replace(')', '');
       let description = 'The scraper is stopped';
-      
-      // Map specific reasons to descriptions
+
       switch (reason) {
         case 'cooldown NWL':
           description = 'Stopped due to cooldown period for Non-Watchlist brands';
@@ -106,15 +103,15 @@ const ScraperControls = ({ disabled = false }) => {
         default:
           description = `Stopped: ${reason}`;
       }
-      
+
       return {
-        text: status, // Show the full status including reason
+        text: status,
         color: 'text-orange-600',
         bgColor: 'bg-orange-100',
         description: description
       };
     }
-    
+
     switch (status) {
       case 'running':
         return {
@@ -179,19 +176,17 @@ const ScraperControls = ({ disabled = false }) => {
 
   return (
     <div className="space-y-6">
-      {/* Status Card */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-base sm:text-lg font-medium text-gray-900">Scraper Status</h3>
             <p className="text-xs sm:text-sm text-gray-600">{statusInfo.description}</p>
           </div>
-          <div className={`px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-medium ${statusInfo.bgColor} ${statusInfo.color}`}>
+          <Badge variant={isRunning ? 'success' : scraperStatus === 'stopped' || scraperStatus === 'not_running' ? 'error' : 'secondary'} size="sm">
             {statusInfo.text}
-          </div>
+          </Badge>
         </div>
-        
-        {/* Timestamps */}
+
         <div className="mt-4 pt-4 border-t border-gray-200">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -210,7 +205,6 @@ const ScraperControls = ({ disabled = false }) => {
         </div>
       </div>
 
-      {/* Brand Timing Card */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="mb-4">
           <h3 className="text-base sm:text-lg font-medium text-gray-900">Brand Timing</h3>
@@ -222,7 +216,6 @@ const ScraperControls = ({ disabled = false }) => {
           <ErrorDisplay message={brandTimingError} onRetry={fetchBrandTiming} />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Watchlist */}
             <div>
               <h4 className="text-sm font-semibold text-gray-800 mb-2">Watchlist</h4>
               <div className="space-y-2 text-sm">
@@ -243,7 +236,6 @@ const ScraperControls = ({ disabled = false }) => {
               </div>
             </div>
 
-            {/* Non‑watchlist */}
             <div>
               <h4 className="text-sm font-semibold text-gray-800 mb-2">Non‑watchlist</h4>
               <div className="space-y-2 text-sm">
@@ -267,7 +259,6 @@ const ScraperControls = ({ disabled = false }) => {
         )}
       </div>
 
-      {/* Control Buttons */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
         <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">Scraper Controls</h3>
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">

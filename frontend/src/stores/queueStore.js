@@ -30,30 +30,30 @@ const useQueueStore = create((set, get) => ({
   setError: (error) => set({ error }),
   clearError: () => set({ error: null }),
 
-  // Clear all cached data (useful when switching environments)
-  clearAllData: () => set({
-    overview: null,
-    nextBrand: null,
-    nextWatchlistBrand: null,
-    pendingBrands: null,
-    failedBrands: null,
-    reenqueueData: null,
-    watchlistBrands: null,
-    watchlistPendingBrands: null,
-    watchlistFailedBrands: null,
-    brandProcessingQueue: null,
-    watchlistBrandsQueue: null,
-    allRegularBrandProcessingJobs: null,
-    allWatchlistBrandProcessingJobs: null,
-    adUpdateQueue: null,
-    watchlistAdUpdateQueue: null,
-    allRegularAdUpdateJobs: null,
-    allWatchlistAdUpdateJobs: null,
-    scrapedStats: null,
-    separateScrapedStats: null,
-    loading: false,
-    error: null
-  }),
+  clearAllData: () =>
+    set({
+      overview: null,
+      nextBrand: null,
+      nextWatchlistBrand: null,
+      pendingBrands: null,
+      failedBrands: null,
+      reenqueueData: null,
+      watchlistBrands: null,
+      watchlistPendingBrands: null,
+      watchlistFailedBrands: null,
+      brandProcessingQueue: null,
+      watchlistBrandsQueue: null,
+      allRegularBrandProcessingJobs: null,
+      allWatchlistBrandProcessingJobs: null,
+      adUpdateQueue: null,
+      watchlistAdUpdateQueue: null,
+      allRegularAdUpdateJobs: null,
+      allWatchlistAdUpdateJobs: null,
+      scrapedStats: null,
+      separateScrapedStats: null,
+      loading: false,
+      error: null,
+    }),
 
   fetchOverview: async () => {
     try {
@@ -94,10 +94,20 @@ const useQueueStore = create((set, get) => ({
     }
   },
 
-  fetchReenqueueData: async (page = 1, limit = 100, search = null, namespace = null) => {
+  fetchReenqueueData: async (
+    page = 1,
+    limit = 100,
+    search = null,
+    namespace = null
+  ) => {
     try {
       set({ loading: true, error: null });
-      const response = await queueAPI.getReenqueueData(page, limit, search, namespace);
+      const response = await queueAPI.getReenqueueData(
+        page,
+        limit,
+        search,
+        namespace
+      );
       set({ reenqueueData: response.data.data, loading: false });
       return response.data.data;
     } catch (error) {
@@ -210,10 +220,22 @@ const useQueueStore = create((set, get) => ({
     }
   },
 
-  fetchBrandProcessingQueue: async (page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc', search = null) => {
+  fetchBrandProcessingQueue: async (
+    page = 1,
+    limit = 10,
+    sortBy = "normal",
+    sortOrder = "desc",
+    search = null
+  ) => {
     try {
       set({ loading: true, error: null });
-      const response = await queueAPI.getBrandProcessingQueue(page, limit, sortBy, sortOrder, search);
+      const response = await queueAPI.getBrandProcessingQueue(
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+        search
+      );
       set({ brandProcessingQueue: response.data, loading: false });
       return response.data;
     } catch (error) {
@@ -223,10 +245,22 @@ const useQueueStore = create((set, get) => ({
     }
   },
 
-  fetchWatchlistBrandsQueue: async (page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc', search = null) => {
+  fetchWatchlistBrandsQueue: async (
+    page = 1,
+    limit = 10,
+    sortBy = "normal",
+    sortOrder = "desc",
+    search = null
+  ) => {
     try {
       set({ loading: true, error: null });
-      const response = await queueAPI.getWatchlistBrandsQueue(page, limit, sortBy, sortOrder, search);
+      const response = await queueAPI.getWatchlistBrandsQueue(
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+        search
+      );
       set({ watchlistBrandsQueue: response.data, loading: false });
       return response.data;
     } catch (error) {
@@ -239,7 +273,7 @@ const useQueueStore = create((set, get) => ({
   fetchAllRegularBrandProcessingJobs: async () => {
     try {
       set({ loading: true, error: null });
-      const response = await queueAPI.getAllBrandProcessingJobs('regular');
+      const response = await queueAPI.getAllBrandProcessingJobs("regular");
       set({ allRegularBrandProcessingJobs: response.data, loading: false });
       return response.data;
     } catch (error) {
@@ -252,7 +286,7 @@ const useQueueStore = create((set, get) => ({
   fetchAllWatchlistBrandProcessingJobs: async () => {
     try {
       set({ loading: true, error: null });
-      const response = await queueAPI.getAllBrandProcessingJobs('watchlist');
+      const response = await queueAPI.getAllBrandProcessingJobs("watchlist");
       set({ allWatchlistBrandProcessingJobs: response.data, loading: false });
       return response.data;
     } catch (error) {
@@ -262,11 +296,22 @@ const useQueueStore = create((set, get) => ({
     }
   },
 
-  // Ad-update processing store actions
-  fetchAdUpdateQueue: async (page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc', search = null) => {
+  fetchAdUpdateQueue: async (
+    page = 1,
+    limit = 10,
+    sortBy = "normal",
+    sortOrder = "desc",
+    search = null
+  ) => {
     try {
       set({ loading: true, error: null });
-      const response = await queueAPI.getAdUpdateQueue(page, limit, sortBy, sortOrder, search);
+      const response = await queueAPI.getAdUpdateQueue(
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+        search
+      );
       set({ adUpdateQueue: response.data, loading: false });
       return response.data;
     } catch (error) {
@@ -276,10 +321,22 @@ const useQueueStore = create((set, get) => ({
     }
   },
 
-  fetchWatchlistAdUpdateQueue: async (page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc', search = null) => {
+  fetchWatchlistAdUpdateQueue: async (
+    page = 1,
+    limit = 10,
+    sortBy = "normal",
+    sortOrder = "desc",
+    search = null
+  ) => {
     try {
       set({ loading: true, error: null });
-      const response = await queueAPI.getWatchlistAdUpdateQueue(page, limit, sortBy, sortOrder, search);
+      const response = await queueAPI.getWatchlistAdUpdateQueue(
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+        search
+      );
       set({ watchlistAdUpdateQueue: response.data, loading: false });
       return response.data;
     } catch (error) {
@@ -292,7 +349,7 @@ const useQueueStore = create((set, get) => ({
   fetchAllRegularAdUpdateJobs: async () => {
     try {
       set({ loading: true, error: null });
-      const response = await queueAPI.getAllAdUpdateJobs('regular');
+      const response = await queueAPI.getAllAdUpdateJobs("regular");
       set({ allRegularAdUpdateJobs: response.data, loading: false });
       return response.data;
     } catch (error) {
@@ -305,7 +362,7 @@ const useQueueStore = create((set, get) => ({
   fetchAllWatchlistAdUpdateJobs: async () => {
     try {
       set({ loading: true, error: null });
-      const response = await queueAPI.getAllAdUpdateJobs('watchlist');
+      const response = await queueAPI.getAllAdUpdateJobs("watchlist");
       set({ allWatchlistAdUpdateJobs: response.data, loading: false });
       return response.data;
     } catch (error) {
@@ -332,7 +389,10 @@ const useQueueStore = create((set, get) => ({
     try {
       set({ separateScrapedStatsLoading: true, error: null });
       const response = await queueAPI.getSeparateScrapedStats(date, days);
-      set({ separateScrapedStats: response.data, separateScrapedStatsLoading: false });
+      set({
+        separateScrapedStats: response.data,
+        separateScrapedStatsLoading: false,
+      });
       return response.data;
     } catch (error) {
       console.error("Separate Scraped Stats API error:", error);
@@ -402,38 +462,48 @@ const useQueueStore = create((set, get) => ({
     }
   },
 
-  // Edit Brands tab: brand status read/update
   fetchBrandStatus: async (identifier) => {
     try {
       const response = await queueAPI.getBrandStatus(identifier);
       return response.data.data;
     } catch (error) {
       const errorMessage =
-        error.response?.data?.message || error.message || "Failed to fetch brand status";
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to fetch brand status";
       set({ error: errorMessage });
       throw new Error(errorMessage);
     }
   },
   setBrandStatus: async (identifier, status) => {
     try {
-      const response = await queueAPI.updateBrandStatus({ ...identifier, status });
+      const response = await queueAPI.updateBrandStatus({
+        ...identifier,
+        status,
+      });
       return response.data;
     } catch (error) {
       const errorMessage =
-        error.response?.data?.message || error.message || "Failed to update brand status";
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to update brand status";
       set({ error: errorMessage });
       throw new Error(errorMessage);
     }
   },
 
-  // Bulk operations
   bulkPreviewBrands: async (ids, pageIds = []) => {
     try {
-      const response = await queueAPI.bulkPreviewBrands({ ids, page_ids: pageIds });
+      const response = await queueAPI.bulkPreviewBrands({
+        ids,
+        page_ids: pageIds,
+      });
       return response.data;
     } catch (error) {
       const errorMessage =
-        error.response?.data?.message || error.message || "Failed to preview brands";
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to preview brands";
       set({ error: errorMessage });
       throw new Error(errorMessage);
     }
@@ -445,7 +515,9 @@ const useQueueStore = create((set, get) => ({
       return response.data;
     } catch (error) {
       const errorMessage =
-        error.response?.data?.message || error.message || "Failed to apply bulk updates";
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to apply bulk updates";
       set({ error: errorMessage });
       throw new Error(errorMessage);
     }
@@ -487,9 +559,7 @@ const useQueueStore = create((set, get) => ({
     try {
       set({ loading: true, error: null });
       const response = await queueAPI.clearCacheOnly();
-      
-      // Clear only cache-related frontend data (safe approach)
-      // Clear this store's cached data
+
       set({
         overview: null,
         nextBrand: null,
@@ -511,45 +581,44 @@ const useQueueStore = create((set, get) => ({
         scrapedStats: null,
         separateScrapedStats: null,
         loading: false,
-        error: null
+        error: null,
       });
-      
-      // Clear only cache-related localStorage (not admin/login data)
+
       const cacheKeys = [
-        'pipeline-sorting',
-        'queueManagement_pendingSearch',
-        'queueManagement_failedSearch', 
-        'queueManagement_confirmDialog',
-        'watchlistQueues_confirmDialog',
-        'watchlistQueues_requeueConfirmDialog',
-        'failedQueue_confirmDialog',
-        'failedQueue_requeueConfirmDialog',
-        'dashboard_*',
-        'scrapedBrands_*',
-        'proxies_*'
+        "pipeline-sorting",
+        "queueManagement_pendingSearch",
+        "queueManagement_failedSearch",
+        "queueManagement_confirmDialog",
+        "watchlistQueues_confirmDialog",
+        "watchlistQueues_requeueConfirmDialog",
+        "failedQueue_confirmDialog",
+        "failedQueue_requeueConfirmDialog",
+        "dashboard_*",
+        "scrapedBrands_*",
+        "proxies_*",
       ];
-      
-      // Remove specific cache keys only
-      Object.keys(localStorage).forEach(key => {
-        if (cacheKeys.some(pattern => key.includes(pattern.replace('*', '')))) {
+
+      Object.keys(localStorage).forEach((key) => {
+        if (
+          cacheKeys.some((pattern) => key.includes(pattern.replace("*", "")))
+        ) {
           localStorage.removeItem(key);
         }
       });
-      
-      // Clear only cache-related sessionStorage
+
       const sessionCacheKeys = [
-        'queueManagementPageRefreshed',
-        'queueManagementPageVisited',
-        'watchlistQueuesPageRefreshed', 
-        'watchlistQueuesPageVisited',
-        'failedQueuePageRefreshed',
-        'failedQueuePageVisited'
+        "queueManagementPageRefreshed",
+        "queueManagementPageVisited",
+        "watchlistQueuesPageRefreshed",
+        "watchlistQueuesPageVisited",
+        "failedQueuePageRefreshed",
+        "failedQueuePageVisited",
       ];
-      
-      sessionCacheKeys.forEach(key => {
+
+      sessionCacheKeys.forEach((key) => {
         sessionStorage.removeItem(key);
       });
-      
+
       set({ loading: false });
       return response.data;
     } catch (error) {
@@ -874,7 +943,6 @@ const useQueueStore = create((set, get) => ({
     }
   },
 
-  // Utility functions for next brand
   setNextBrand: (nextBrand) => set({ nextBrand }),
   clearNextBrand: () => set({ nextBrand: null }),
 }));

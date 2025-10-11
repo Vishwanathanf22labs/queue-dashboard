@@ -3,7 +3,6 @@ const logger = require("../utils/logger");
 const { QUEUES, BATCH_SIZE } = require("../config/constants");
 const { Op } = require("sequelize");
 
-// Function to get dynamic Redis keys
 function getRedisKeys(environment = 'production') {
   return require("../config/constants").getRedisKeys(environment);
 }
@@ -15,7 +14,6 @@ async function getExistingPageIds(queueType = 'regular', environment = 'producti
   const existingItems = await redis.zrange(queueKey, 0, -1, 'WITHSCORES');
   const existingPageIds = new Set();
 
-  // existingItems is [member1, score1, member2, score2, ...]
   for (let i = 0; i < existingItems.length; i += 2) {
     try {
       const member = existingItems[i];
@@ -33,7 +31,6 @@ async function getExistingPageIds(queueType = 'regular', environment = 'producti
 
 async function addSingleBrandToQueue(brandData, queueType = 'regular', environment = 'production') {
   try {
-    // Require Brand model dynamically to get the latest version
     const { getModels } = require("../models");
     const { Brand } = getModels(environment);
     const REDIS_KEYS = getRedisKeys(environment);
@@ -69,9 +66,7 @@ async function addSingleBrandToQueue(brandData, queueType = 'regular', environme
     const redis = getQueueRedis(queueType, environment);
     const queueKey = REDIS_KEYS[queueType.toUpperCase()].PENDING_BRANDS;
     
-    // Use pipeline for consistency, even for single item
     const pipeline = redis.pipeline();
-    // Add to sorted set with user-provided score (or default to 0)
     const queueScore = score !== undefined && score !== null ? score : 0;
     logger.info(`Adding brand to ${queueType} pending queue: ${JSON.stringify({ id, page_id, score: queueScore, queueItem })}`);
     pipeline.zadd(queueKey, queueScore, queueItem);
@@ -93,7 +88,6 @@ async function addSingleBrandToQueue(brandData, queueType = 'regular', environme
 
 async function addBulkBrandsFromCSVToQueue(brandsData, queueType = 'regular', environment = 'production') {
   try {
-    // Require Brand model dynamically to get the latest version
     const { getModels } = require("../models");
     const { Brand } = getModels(environment);
     const REDIS_KEYS = getRedisKeys(environment);
@@ -156,7 +150,6 @@ async function addBulkBrandsFromCSVToQueue(brandsData, queueType = 'regular', en
           id,
           page_id
         });
-        // Add to sorted set with user-provided score (or default to 0)
         const queueScore = score !== undefined && score !== null ? parseFloat(score) : 0;
         pipeline.zadd(queueKey, queueScore, queueItem);
 
@@ -171,7 +164,6 @@ async function addBulkBrandsFromCSVToQueue(brandsData, queueType = 'regular', en
       }
     }
 
-    // Execute all Redis operations in batch
     if (addedCount > 0) {
       await pipeline.exec();
     }
@@ -200,11 +192,9 @@ async function addBulkBrandsFromCSVToQueue(brandsData, queueType = 'regular', en
 
 async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular', environment = 'production') {
   try {
-    // Require Brand model dynamically to get the latest version
     const { getModels } = require("../models");
     const { Brand } = getModels(environment);
     
-    // Build where clause
     const whereClause = {
       page_id: {
         [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: "" }],
@@ -214,9 +204,7 @@ async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular', e
     let allBrands;
     let filterMessage = '';
 
-    // Handle different filter types
     if (statusFilter === 'watchlist_active') {
-      // Optimized query using EXISTS subquery for better performance
       allBrands = await Brand.findAll({
         where: {
           ...whereClause,
@@ -230,7 +218,6 @@ async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular', e
       });
       filterMessage = 'watchlist active';
     } else if (statusFilter === 'watchlist_inactive') {
-      // Optimized query using EXISTS subquery for better performance
       allBrands = await Brand.findAll({
         where: {
           ...whereClause,
@@ -244,7 +231,6 @@ async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular', e
       });
       filterMessage = 'watchlist inactive';
     } else if (statusFilter === 'watchlist_all') {
-      // All watchlist brands (both active and inactive)
       allBrands = await Brand.findAll({
         where: {
           ...whereClause,
@@ -257,7 +243,6 @@ async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular', e
       });
       filterMessage = 'all watchlist brands';
     } else if (statusFilter === 'regular_active') {
-      // Regular active brands (not in watchlist)
       allBrands = await Brand.findAll({
         where: {
           ...whereClause,
@@ -271,7 +256,6 @@ async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular', e
       });
       filterMessage = 'regular active brands';
     } else if (statusFilter === 'regular_inactive') {
-      // Regular inactive brands (not in watchlist)
       allBrands = await Brand.findAll({
         where: {
           ...whereClause,
@@ -285,7 +269,6 @@ async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular', e
       });
       filterMessage = 'regular inactive brands';
     } else if (statusFilter === 'regular_all') {
-      // All regular brands (both active and inactive, not in watchlist)
       allBrands = await Brand.findAll({
         where: {
           ...whereClause,
@@ -298,7 +281,6 @@ async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular', e
       });
       filterMessage = 'all regular brands';
     } else {
-      // Original logic for 'Active', 'Inactive', or null
       if (statusFilter && ['Active', 'Inactive'].includes(statusFilter)) {
         whereClause.status = statusFilter;
         filterMessage = statusFilter.toLowerCase();
@@ -347,10 +329,9 @@ async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular', e
             id: brand.id,
             page_id: brand.page_id
           });
-          // Add to sorted set with priority score based on filter type
-          let priorityScore = 0; // Default score for regular operations
+          let priorityScore = 0; 
           if (statusFilter === 'watchlist_active' || statusFilter === 'watchlist_inactive' || queueType === 'watchlist') {
-            priorityScore = 1; // Higher priority for all watchlist operations
+            priorityScore = 1; 
           }
           pipeline.zadd(queueKey, priorityScore, queueItem);
           existingPageIds.add(brand.page_id);
@@ -385,7 +366,6 @@ async function addAllBrandsToQueue(statusFilter = null, queueType = 'regular', e
 
 async function searchBrands(query, limit = 8) {
   try {
-    // Require models dynamically to get the latest version
     const { Brand, WatchList } = require("../models");
     
     if (!query || query.trim().length === 0) {
@@ -394,26 +374,19 @@ async function searchBrands(query, limit = 8) {
 
     const searchQuery = query.trim();
     
-    // Normalize search query: remove extra spaces, convert to lowercase for flexible matching
     const normalizedQuery = searchQuery.replace(/\s+/g, ' ').trim();
     
-    // Create comprehensive search variations
     const searchVariations = [
-      // Original variations
       searchQuery,
       normalizedQuery,
       searchQuery.toLowerCase(),
       normalizedQuery.toLowerCase(),
       
-      // Space variations
-      searchQuery.replace(/\s+/g, ''), // Remove all spaces
+      searchQuery.replace(/\s+/g, ''), 
       searchQuery.replace(/\s+/g, '').toLowerCase(),
     ];
     
-    // Intelligent compound word detection - works for any brand name
     if (searchQuery.length > 4 && !searchQuery.includes(' ')) {
-      // First, try to find existing brands that start with the search query
-      // This helps us understand common word patterns in your actual brand names
       const existingBrands = await Brand.findAll({
         where: {
           [Op.or]: [
@@ -426,7 +399,6 @@ async function searchBrands(query, limit = 8) {
         raw: true,
       });
       
-      // Extract common prefixes and suffixes from existing brands
       const commonPrefixes = new Set();
       const commonSuffixes = new Set();
       
@@ -435,7 +407,6 @@ async function searchBrands(query, limit = 8) {
         if (name.length > searchQuery.length) {
           const remaining = name.slice(searchQuery.length);
           if (remaining.length > 2) {
-            // Check if the remaining part is a common word pattern
             if (remaining.match(/^[a-z]+$/)) {
               commonSuffixes.add(remaining);
             }
@@ -443,7 +414,6 @@ async function searchBrands(query, limit = 8) {
         }
       });
       
-      // Also check for brands that contain the search query as a suffix
       const suffixBrands = await Brand.findAll({
         where: {
           [Op.or]: [
@@ -468,9 +438,7 @@ async function searchBrands(query, limit = 8) {
         }
       });
       
-      // Generate variations based on discovered patterns
       [...commonPrefixes, ...commonSuffixes].forEach(word => {
-        // Check if the search query starts with this discovered word
         if (searchQuery.toLowerCase().startsWith(word.toLowerCase())) {
           const remaining = searchQuery.slice(word.length);
           if (remaining.length > 2) {
@@ -484,7 +452,6 @@ async function searchBrands(query, limit = 8) {
           }
         }
         
-        // Check if the search query ends with this discovered word
         if (searchQuery.toLowerCase().endsWith(word.toLowerCase())) {
           const remaining = searchQuery.slice(0, searchQuery.length - word.length);
           if (remaining.length > 2) {
@@ -499,9 +466,7 @@ async function searchBrands(query, limit = 8) {
         }
       });
       
-      // Fallback: Intelligent space insertion at common positions
       if (searchQuery.length > 6) {
-        // Try spaces at positions 3, 4, 5, etc. (avoiding very short words)
         for (let i = 3; i < Math.min(searchQuery.length - 2, 8); i++) {
           const spacedVersion = searchQuery.slice(0, i) + ' ' + searchQuery.slice(i);
           searchVariations.push(
@@ -513,44 +478,34 @@ async function searchBrands(query, limit = 8) {
       }
     }
     
-    // Add space variations for single words (like "commesi" -> "comme si")
     if (searchQuery.length > 3) {
-      // camelCase to space
       searchVariations.push(searchQuery.replace(/([a-z])([A-Z])/g, '$1 $2'));
       searchVariations.push(searchQuery.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase());
       
-      // Try adding spaces between characters for compound words
       if (searchQuery.length > 4) {
         searchVariations.push(searchQuery.replace(/([a-z])([a-z])([A-Z])/g, '$1$2 $3'));
         searchVariations.push(searchQuery.replace(/([a-z])([a-z])([A-Z])/g, '$1$2 $3').toLowerCase());
       }
     }
     
-    // Remove duplicates and empty strings
     const uniqueVariations = [...new Set(searchVariations)].filter(v => v && v.trim().length > 0);
     
 
-    // First, check if there are any brands in the database
     await Brand.count();
     
 
-    // Try the complex search first
     let brands;
     try {
-      // Create search conditions for all variations
       const searchConditions = [];
       
-      // Check if query is numeric (for page_id or brand_id search)
       const isNumericQuery = /^\d+$/.test(searchQuery);
       
       if (isNumericQuery) {
-        // If query is numeric, search by page_id and brand_id
         searchConditions.push(
-          { page_id: searchQuery }, // Keep as string for page_id
+          { page_id: searchQuery }, 
           { id: parseInt(searchQuery) }
         );
         
-        // Also search by the numeric query in name and actual_name columns
         searchConditions.push(
           {
             name: {
@@ -595,28 +550,24 @@ async function searchBrands(query, limit = 8) {
         attributes: ["id", "name", "actual_name", "page_id"],
         limit: limit,
         order: [
-          // Prioritize exact matches (case-insensitive)
           [
             Brand.sequelize.literal(
               `CASE WHEN LOWER(name) = LOWER('${searchQuery}') OR LOWER(actual_name) = LOWER('${searchQuery}') THEN 0 ELSE 1 END`
             ),
             "ASC",
           ],
-          // Prioritize starts-with matches (case-insensitive)
           [
             Brand.sequelize.literal(
               `CASE WHEN LOWER(name) LIKE LOWER('${searchQuery}%') OR LOWER(actual_name) LIKE LOWER('${searchQuery}%') THEN 0 ELSE 1 END`
             ),
             "ASC",
           ],
-          // Prioritize contains matches (case-insensitive)
           [
             Brand.sequelize.literal(
               `CASE WHEN LOWER(name) LIKE LOWER('%${searchQuery}%') OR LOWER(actual_name) LIKE LOWER('%${searchQuery}%') THEN 0 ELSE 1 END`
             ),
             "ASC",
           ],
-          // Prioritize space-normalized matches
           [
             Brand.sequelize.literal(
               `CASE WHEN LOWER(REPLACE(name, ' ', '')) = LOWER('${searchQuery.replace(/\s+/g, '')}') OR LOWER(REPLACE(actual_name, ' ', '')) = LOWER('${searchQuery.replace(/\s+/g, '')}') THEN 0 ELSE 1 END`
@@ -629,13 +580,11 @@ async function searchBrands(query, limit = 8) {
         raw: true,
       });
      } catch (searchError) {
-      // Fallback to simple search with variations
       const simpleSearchConditions = [];
       
-      // For numeric queries, add numeric search conditions to fallback too
       if (isNumericQuery) {
         simpleSearchConditions.push(
-          { page_id: searchQuery }, // Keep as string for page_id
+          { page_id: searchQuery }, 
           { id: parseInt(searchQuery) },
           { name: { [Op.iLike]: `%${searchQuery}%` } },
           { actual_name: { [Op.iLike]: `%${searchQuery}%` } }
@@ -661,12 +610,11 @@ async function searchBrands(query, limit = 8) {
     }
 
 
-        // Limit the number of results to avoid overwhelming the user
         const limitedBrands = brands.slice(0, limit);
         
         return limitedBrands.map((brand) => ({
           brand_id: brand.id,
-          brand_name: brand.actual_name || brand.name, // Use actual_name if available, fallback to name
+          brand_name: brand.actual_name || brand.name, 
           page_id: brand.page_id,
         }));
   } catch (error) {
@@ -677,11 +625,9 @@ async function searchBrands(query, limit = 8) {
 
 async function getBrandCountsByStatus(environment = 'production') {
   try {
-    // Require Brand model dynamically to get the latest version
     const { getModels } = require("../models");
     const { Brand } = getModels(environment);
     
-    // Single optimized query using conditional aggregation for maximum performance
     const result = await Brand.sequelize.query(`
       SELECT 
         COUNT(*) as total,
@@ -724,7 +670,6 @@ async function getBrandCountsByStatus(environment = 'production') {
 
 async function getBrandByIdentifier(identifier) {
   try {
-    // Require Brand model dynamically to get the latest version
     const { Brand } = require("../models");
     
     const { brand_id, page_id } = identifier;
@@ -771,7 +716,6 @@ async function getBrandByIdentifier(identifier) {
 
 async function updateBrandStatus(identifier, status) {
   try {
-    // Require Brand model dynamically to get the latest version
     const { Brand } = require("../models");
     
     const { brand_id, page_id } = identifier;
@@ -795,7 +739,6 @@ async function updateBrandStatus(identifier, status) {
       whereClause.page_id = page_id;
     }
     
-    // First, get the current brand to check its status
     const currentBrand = await Brand.findOne({
       where: whereClause,
       attributes: ["id", "page_id", "name", "status"],
@@ -814,7 +757,6 @@ async function updateBrandStatus(identifier, status) {
       throw new Error(`Brand is already ${status}`);
     }
     
-    // Update the brand status
     const [updatedRowsCount] = await Brand.update(
       { status: status },
       { where: whereClause }
@@ -843,14 +785,12 @@ async function updateBrandStatus(identifier, status) {
 
 async function bulkPreviewBrands(ids, pageIds = []) {
   try {
-    // Require Brand model dynamically to get the latest version
     const { Brand } = require("../models");
     
     if (!ids || ids.length === 0) {
       throw new Error("At least one brand ID is required");
     }
     
-    // Remove duplicates
     const uniqueIds = [...new Set(ids)];
     const uniquePageIds = [...new Set(pageIds)];
     
@@ -863,7 +803,6 @@ async function bulkPreviewBrands(ids, pageIds = []) {
       }
     };
     
-    // Fetch brands by IDs
     if (uniqueIds.length > 0) {
       const brandsById = await Brand.findAll({
         where: { id: uniqueIds },
@@ -873,7 +812,6 @@ async function bulkPreviewBrands(ids, pageIds = []) {
       
       const foundIds = new Set(brandsById.map(b => b.id));
       
-      // Add found brands
       brandsById.forEach(brand => {
         results.items.push({
           id: brand.id,
@@ -884,7 +822,6 @@ async function bulkPreviewBrands(ids, pageIds = []) {
         });
       });
       
-      // Track not found IDs
       uniqueIds.forEach(id => {
         if (!foundIds.has(id)) {
           results.notFound.push({ type: 'id', value: id });
@@ -892,7 +829,6 @@ async function bulkPreviewBrands(ids, pageIds = []) {
       });
     }
     
-    // Fetch brands by page IDs (if any)
     if (uniquePageIds.length > 0) {
       const brandsByPageId = await Brand.findAll({
         where: { page_id: uniquePageIds },
@@ -902,7 +838,6 @@ async function bulkPreviewBrands(ids, pageIds = []) {
       
       const foundPageIds = new Set(brandsByPageId.map(b => b.page_id));
       
-      // Add found brands (avoid duplicates if same brand found by both ID and page_id)
       brandsByPageId.forEach(brand => {
         const existingItem = results.items.find(item => item.id === brand.id);
         if (!existingItem) {
@@ -916,7 +851,6 @@ async function bulkPreviewBrands(ids, pageIds = []) {
         }
       });
       
-      // Track not found page IDs
       uniquePageIds.forEach(pageId => {
         if (!foundPageIds.has(pageId)) {
           results.notFound.push({ type: 'page_id', value: pageId });
@@ -952,7 +886,6 @@ async function bulkApplyStatusUpdates(updates) {
       }
     };
     
-    // Process updates in chunks to avoid overwhelming the database
     const chunkSize = 200;
     for (let i = 0; i < updates.length; i += chunkSize) {
       const chunk = updates.slice(i, i + chunkSize);
@@ -988,7 +921,6 @@ async function bulkApplyStatusUpdates(updates) {
             continue;
           }
           
-          // Use existing updateBrandStatus function
           const identifier = id ? { brand_id: id } : { page_id };
           const result = await updateBrandStatus(identifier, status);
           

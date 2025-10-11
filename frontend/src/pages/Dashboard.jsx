@@ -24,8 +24,8 @@ import WatchlistAdUpdateProcessing from '../components/dashboard/WatchlistAdUpda
 
 const Dashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [initialLoading, setInitialLoading] = useState(true); // New: Covers full initial load
-  
+  const [initialLoading, setInitialLoading] = useState(true);
+
   const {
     overview,
     nextBrand,
@@ -61,7 +61,6 @@ const Dashboard = () => {
     fetchAllWatchlistAdUpdateJobs
   } = useQueueStore();
 
-  // Search states for 4 separate tables
   const [searchStates, setSearchStates] = useState({
     regularBrands: {
       searchTerm: searchParams.get('regularBrandsSearch') || '',
@@ -81,7 +80,6 @@ const Dashboard = () => {
     }
   });
 
-  // Refs for debouncing and stale request prevention
   const searchRefs = useRef({
     regularBrands: '',
     watchlistBrands: '',
@@ -101,56 +99,45 @@ const Dashboard = () => {
   const pendingCount = overview?.queue_counts?.pending || 0;
   const failedCount = overview?.queue_counts?.failed || 0;
   const activeCount = overview?.queue_counts?.active || 0;
-  // Get today's stats from separateScrapedStats
   const today = new Date().toISOString().split('T')[0];
-  
-  // Get today's stats for both regular and watchlist
+
   const todayRegularStats = separateScrapedStats?.regular?.find(stat => stat.date === today);
   const todayWatchlistStats = separateScrapedStats?.watchlist?.find(stat => stat.date === today);
-  
-  // Fallback to most recent day if today's data is not available
+
   const fallbackRegularStats = separateScrapedStats?.regular?.[0];
   const fallbackWatchlistStats = separateScrapedStats?.watchlist?.[0];
-  
+
   const regularStatsToUse = todayRegularStats || fallbackRegularStats;
   const watchlistStatsToUse = todayWatchlistStats || fallbackWatchlistStats;
-  
-  // Combine regular and watchlist stats for total counts
+
   const brandsScrapedToday = (regularStatsToUse?.brands_scraped || 0) + (watchlistStatsToUse?.brands_scraped || 0);
   const adsProcessed = (regularStatsToUse?.ads_processed || 0) + (watchlistStatsToUse?.ads_processed || 0);
   const watchlistBrandsScraped = watchlistStatsToUse?.brands_scraped || 0;
-  
+
   const watchlistPendingCount = overview?.watchlist_stats?.pending_count || 0;
   const watchlistFailedCount = overview?.watchlist_stats?.failed_count || 0;
-  
-  // Calculate completed count using the same logic as Watchlist Status page
+
   const determineScraperStatus = (brand) => {
-    // Check if brand is in watchlist_pending_brands_prod queue
     const isInPending = watchlistPendingBrands?.brands?.some(
       pendingBrand => pendingBrand.page_id === brand.page_id
     );
-    
-    // Check if brand is in watchlist_failed_brands_prod queue
+
     const isInFailed = watchlistFailedBrands?.brands?.some(
       failedBrand => failedBrand.page_id === brand.page_id
     );
 
-    // If brand is in pending queue, show as waiting regardless of active/inactive status
     if (isInPending) {
       return 'waiting';
     }
-    
-    // If brand is in failed queue, show as failed regardless of active/inactive status
+
     if (isInFailed) {
       return 'failed';
     }
 
-    // If brand is inactive and not in any queue, show as inactive
     if (brand.status === 'Inactive') {
       return 'inactive';
     }
 
-    // For active brands not in queues
     if (brand.scraper_status === 'completed' &&
       (!watchlistPendingBrands?.brands || watchlistPendingBrands.brands.length === 0) &&
       (!watchlistFailedBrands?.brands || watchlistFailedBrands.brands.length === 0)) {
@@ -163,7 +150,6 @@ const Dashboard = () => {
 
   const watchlistCompletedCount = overview?.watchlist_stats?.completed_count || 0;
 
-  // Total ads counts are now provided by individual queue APIs
 
   const [state, setState] = useState({
     scraperStatus: 'unknown',
@@ -200,15 +186,14 @@ const Dashboard = () => {
       const response = await queueAPI.getScraperStatus();
       const statusData = response.data;
       const status = statusData?.status || 'unknown';
-      
-      // Store the full status response including startTime and stopTime
-      updateState({ 
+
+      updateState({
         scraperStatus: status,
         scraperStatusData: statusData
       });
     } catch (error) {
       console.error('Failed to fetch scraper status:', error);
-      updateState({ 
+      updateState({
         scraperStatus: 'unknown',
         scraperStatusData: null
       });
@@ -217,12 +202,9 @@ const Dashboard = () => {
     }
   };
 
-  // Note: Removed the override logic that was forcing status to 'running'
-  // Now we show the actual API status from the scraper control service
 
   useEffect(() => {
     if (currentlyProcessing) {
-      // Handle both single brand and array of brands
       const brands = Array.isArray(currentlyProcessing) ? currentlyProcessing : [currentlyProcessing];
       const firstBrand = brands[0];
       const brandId = firstBrand.brand_id;
@@ -257,42 +239,37 @@ const Dashboard = () => {
   const loadData = async () => {
     try {
       updateRefreshState({ isRefreshing: true });
-      
-      // Invalidate cache first to ensure fresh data
+
       try {
         await queueAPI.invalidateQueueCache();
       } catch (cacheError) {
         console.warn('Cache invalidation failed:', cacheError);
-        // Continue with data loading even if cache invalidation fails
       }
 
-      // Clear any cached data in the store to ensure fresh data
       useQueueStore.getState().clearAllData();
-      
-      // Always fetch overview first to get queue counts
+
       const overviewData = await fetchOverview();
-      
-      // Get sorting, pagination, AND search state from URL params
+
       const regularBrandsPage = parseInt(searchParams.get('regularPage')) || 1;
       const regularBrandsSortBy = searchParams.get('regularSortBy') || 'normal';
       const regularBrandsSortOrder = searchParams.get('regularSortOrder') || 'desc';
       const regularBrandsSearch = searchParams.get('regularBrandsSearch') || null;
-      
+
       const watchlistPage = parseInt(searchParams.get('watchlistPage')) || 1;
       const watchlistSortBy = searchParams.get('watchlistSortBy') || 'normal';
       const watchlistSortOrder = searchParams.get('watchlistSortOrder') || 'desc';
       const watchlistBrandsSearch = searchParams.get('watchlistBrandsSearch') || null;
-      
+
       const regularAdUpdatePage = parseInt(searchParams.get('regularAdUpdatePage')) || 1;
       const regularAdUpdateSortBy = searchParams.get('regularAdUpdateSortBy') || 'normal';
       const regularAdUpdateSortOrder = searchParams.get('regularAdUpdateSortOrder') || 'desc';
       const regularAdSearch = searchParams.get('regularAdSearch') || null;
-      
+
       const watchlistAdUpdatePage = parseInt(searchParams.get('watchlistAdUpdatePage')) || 1;
       const watchlistAdUpdateSortBy = searchParams.get('watchlistAdUpdateSortBy') || 'normal';
       const watchlistAdUpdateSortOrder = searchParams.get('watchlistAdUpdateSortOrder') || 'desc';
       const watchlistAdSearch = searchParams.get('watchlistAdSearch') || null;
-      
+
       const promises = [
         fetchBrandProcessingQueue(regularBrandsPage, 10, regularBrandsSortBy, regularBrandsSortOrder, regularBrandsSearch),
         fetchWatchlistBrandsQueue(watchlistPage, 10, watchlistSortBy, watchlistSortOrder, watchlistBrandsSearch),
@@ -307,13 +284,10 @@ const Dashboard = () => {
       ];
 
 
-
-      // Only call next-brand if no pending brands but failed brands exist
       if (overviewData.queue_counts.pending === 0 && overviewData.queue_counts.failed > 0) {
         promises.push(fetchNextBrand());
       }
 
-      // Only call next-watchlist-brand if no watchlist pending but watchlist failed exist
       if (overviewData.watchlist_stats.pending_count === 0 && overviewData.watchlist_stats.failed_count > 0) {
         promises.push(fetchNextWatchlistBrand());
       }
@@ -329,13 +303,12 @@ const Dashboard = () => {
 
   const handleQueuePageChange = async (newPage, sortBy = 'normal', sortOrder = 'desc') => {
     try {
-      // Update URL params
       const newParams = new URLSearchParams(searchParams);
       newParams.set('regularPage', newPage.toString());
       newParams.set('regularSortBy', sortBy);
       newParams.set('regularSortOrder', sortOrder);
       setSearchParams(newParams);
-      
+
       const searchTerm = searchStates.regularBrands.searchTerm;
       await fetchBrandProcessingQueue(newPage, 10, sortBy, sortOrder, searchTerm || null);
     } catch (error) {
@@ -343,14 +316,12 @@ const Dashboard = () => {
     }
   };
 
-  // Search handlers for 4 tables
   const handleRegularBrandsSearch = (value) => {
     setSearchStates(prev => ({
       ...prev,
       regularBrands: { ...prev.regularBrands, searchTerm: value }
     }));
 
-    // Update URL params
     const newParams = new URLSearchParams(searchParams);
     if (value && value.trim()) {
       newParams.set('regularBrandsSearch', value);
@@ -361,12 +332,10 @@ const Dashboard = () => {
     }
     setSearchParams(newParams, { replace: true });
 
-    // Clear existing timer
     if (debounceTimers.current.regularBrands) {
       clearTimeout(debounceTimers.current.regularBrands);
     }
 
-    // Handle empty search immediately
     if (!value || value.trim() === '') {
       searchRefs.current.regularBrands = '';
       setSearchStates(prev => ({
@@ -379,7 +348,6 @@ const Dashboard = () => {
       return;
     }
 
-    // Debounce search
     if (value.trim().length >= 3) {
       setSearchStates(prev => ({
         ...prev,
@@ -390,10 +358,10 @@ const Dashboard = () => {
         searchRefs.current.regularBrands = value;
         const sortBy = searchParams.get('regularSortBy') || 'normal';
         const sortOrder = searchParams.get('regularSortOrder') || 'desc';
-        
+
         try {
           await fetchBrandProcessingQueue(1, 10, sortBy, sortOrder, value);
-          
+
           if (searchRefs.current.regularBrands === value) {
             setSearchStates(prev => ({
               ...prev,
@@ -454,10 +422,10 @@ const Dashboard = () => {
         searchRefs.current.watchlistBrands = value;
         const sortBy = searchParams.get('watchlistSortBy') || 'normal';
         const sortOrder = searchParams.get('watchlistSortOrder') || 'desc';
-        
+
         try {
           await fetchWatchlistBrandsQueue(1, 10, sortBy, sortOrder, value);
-          
+
           if (searchRefs.current.watchlistBrands === value) {
             setSearchStates(prev => ({
               ...prev,
@@ -518,10 +486,10 @@ const Dashboard = () => {
         searchRefs.current.regularAdUpdate = value;
         const sortBy = searchParams.get('regularAdUpdateSortBy') || 'normal';
         const sortOrder = searchParams.get('regularAdUpdateSortOrder') || 'desc';
-        
+
         try {
           await fetchAdUpdateQueue(1, 10, sortBy, sortOrder, value);
-          
+
           if (searchRefs.current.regularAdUpdate === value) {
             setSearchStates(prev => ({
               ...prev,
@@ -582,10 +550,10 @@ const Dashboard = () => {
         searchRefs.current.watchlistAdUpdate = value;
         const sortBy = searchParams.get('watchlistAdUpdateSortBy') || 'normal';
         const sortOrder = searchParams.get('watchlistAdUpdateSortOrder') || 'desc';
-        
+
         try {
           await fetchWatchlistAdUpdateQueue(1, 10, sortBy, sortOrder, value);
-          
+
           if (searchRefs.current.watchlistAdUpdate === value) {
             setSearchStates(prev => ({
               ...prev,
@@ -604,19 +572,18 @@ const Dashboard = () => {
     }
   };
 
-  // Clear search handlers
   const clearRegularBrandsSearch = () => {
     searchRefs.current.regularBrands = '';
     setSearchStates(prev => ({
       ...prev,
       regularBrands: { searchTerm: '', isSearching: false }
     }));
-    
+
     const newParams = new URLSearchParams(searchParams);
     newParams.delete('regularBrandsSearch');
     newParams.set('regularPage', '1');
     setSearchParams(newParams, { replace: true });
-    
+
     const sortBy = searchParams.get('regularSortBy') || 'normal';
     const sortOrder = searchParams.get('regularSortOrder') || 'desc';
     fetchBrandProcessingQueue(1, 10, sortBy, sortOrder, null);
@@ -628,12 +595,12 @@ const Dashboard = () => {
       ...prev,
       watchlistBrands: { searchTerm: '', isSearching: false }
     }));
-    
+
     const newParams = new URLSearchParams(searchParams);
     newParams.delete('watchlistBrandsSearch');
     newParams.set('watchlistPage', '1');
     setSearchParams(newParams, { replace: true });
-    
+
     const sortBy = searchParams.get('watchlistSortBy') || 'normal';
     const sortOrder = searchParams.get('watchlistSortOrder') || 'desc';
     fetchWatchlistBrandsQueue(1, 10, sortBy, sortOrder, null);
@@ -645,12 +612,12 @@ const Dashboard = () => {
       ...prev,
       regularAdUpdate: { searchTerm: '', isSearching: false }
     }));
-    
+
     const newParams = new URLSearchParams(searchParams);
     newParams.delete('regularAdSearch');
     newParams.set('regularAdUpdatePage', '1');
     setSearchParams(newParams, { replace: true });
-    
+
     const sortBy = searchParams.get('regularAdUpdateSortBy') || 'normal';
     const sortOrder = searchParams.get('regularAdUpdateSortOrder') || 'desc';
     fetchAdUpdateQueue(1, 10, sortBy, sortOrder, null);
@@ -662,12 +629,12 @@ const Dashboard = () => {
       ...prev,
       watchlistAdUpdate: { searchTerm: '', isSearching: false }
     }));
-    
+
     const newParams = new URLSearchParams(searchParams);
     newParams.delete('watchlistAdSearch');
     newParams.set('watchlistAdUpdatePage', '1');
     setSearchParams(newParams, { replace: true });
-    
+
     const sortBy = searchParams.get('watchlistAdUpdateSortBy') || 'normal';
     const sortOrder = searchParams.get('watchlistAdUpdateSortOrder') || 'desc';
     fetchWatchlistAdUpdateQueue(1, 10, sortBy, sortOrder, null);
@@ -675,13 +642,12 @@ const Dashboard = () => {
 
   const handleWatchlistPageChange = async (newPage, sortBy = 'normal', sortOrder = 'desc') => {
     try {
-      // Update URL params
       const newParams = new URLSearchParams(searchParams);
       newParams.set('watchlistPage', newPage.toString());
       newParams.set('watchlistSortBy', sortBy);
       newParams.set('watchlistSortOrder', sortOrder);
       setSearchParams(newParams);
-      
+
       const searchTerm = searchStates.watchlistBrands.searchTerm;
       await fetchWatchlistBrandsQueue(newPage, 10, sortBy, sortOrder, searchTerm || null);
     } catch (error) {
@@ -691,13 +657,12 @@ const Dashboard = () => {
 
   const handleQueueSortChange = async (sortBy, sortOrder) => {
     try {
-      // Update URL params
       const newParams = new URLSearchParams(searchParams);
-      newParams.set('regularPage', '1'); // Reset to page 1 when sorting
+      newParams.set('regularPage', '1');
       newParams.set('regularSortBy', sortBy);
       newParams.set('regularSortOrder', sortOrder);
       setSearchParams(newParams);
-      
+
       const searchTerm = searchStates.regularBrands.searchTerm;
       await fetchBrandProcessingQueue(1, 10, sortBy, sortOrder, searchTerm || null);
     } catch (error) {
@@ -707,13 +672,12 @@ const Dashboard = () => {
 
   const handleWatchlistSortChange = async (sortBy, sortOrder) => {
     try {
-      // Update URL params
       const newParams = new URLSearchParams(searchParams);
-      newParams.set('watchlistPage', '1'); // Reset to page 1 when sorting
+      newParams.set('watchlistPage', '1');
       newParams.set('watchlistSortBy', sortBy);
       newParams.set('watchlistSortOrder', sortOrder);
       setSearchParams(newParams);
-      
+
       const searchTerm = searchStates.watchlistBrands.searchTerm;
       await fetchWatchlistBrandsQueue(1, 10, sortBy, sortOrder, searchTerm || null);
     } catch (error) {
@@ -721,16 +685,14 @@ const Dashboard = () => {
     }
   };
 
-  // Ad-update queue handlers
   const handleAdUpdatePageChange = async (newPage, sortBy = 'normal', sortOrder = 'desc') => {
     try {
-      // Update URL params
       const newParams = new URLSearchParams(searchParams);
       newParams.set('regularAdUpdatePage', newPage.toString());
       newParams.set('regularAdUpdateSortBy', sortBy);
       newParams.set('regularAdUpdateSortOrder', sortOrder);
       setSearchParams(newParams);
-      
+
       const searchTerm = searchStates.regularAdUpdate.searchTerm;
       await fetchAdUpdateQueue(newPage, 10, sortBy, sortOrder, searchTerm || null);
     } catch (error) {
@@ -740,13 +702,12 @@ const Dashboard = () => {
 
   const handleWatchlistAdUpdatePageChange = async (newPage, sortBy = 'normal', sortOrder = 'desc') => {
     try {
-      // Update URL params
       const newParams = new URLSearchParams(searchParams);
       newParams.set('watchlistAdUpdatePage', newPage.toString());
       newParams.set('watchlistAdUpdateSortBy', sortBy);
       newParams.set('watchlistAdUpdateSortOrder', sortOrder);
       setSearchParams(newParams);
-      
+
       const searchTerm = searchStates.watchlistAdUpdate.searchTerm;
       await fetchWatchlistAdUpdateQueue(newPage, 10, sortBy, sortOrder, searchTerm || null);
     } catch (error) {
@@ -756,13 +717,12 @@ const Dashboard = () => {
 
   const handleAdUpdateSortChange = async (sortBy, sortOrder) => {
     try {
-      // Update URL params
       const newParams = new URLSearchParams(searchParams);
-      newParams.set('regularAdUpdatePage', '1'); // Reset to page 1 when sorting
+      newParams.set('regularAdUpdatePage', '1');
       newParams.set('regularAdUpdateSortBy', sortBy);
       newParams.set('regularAdUpdateSortOrder', sortOrder);
       setSearchParams(newParams);
-      
+
       const searchTerm = searchStates.regularAdUpdate.searchTerm;
       await fetchAdUpdateQueue(1, 10, sortBy, sortOrder, searchTerm || null);
     } catch (error) {
@@ -772,13 +732,12 @@ const Dashboard = () => {
 
   const handleWatchlistAdUpdateSortChange = async (sortBy, sortOrder) => {
     try {
-      // Update URL params
       const newParams = new URLSearchParams(searchParams);
-      newParams.set('watchlistAdUpdatePage', '1'); // Reset to page 1 when sorting
+      newParams.set('watchlistAdUpdatePage', '1');
       newParams.set('watchlistAdUpdateSortBy', sortBy);
       newParams.set('watchlistAdUpdateSortOrder', sortOrder);
       setSearchParams(newParams);
-      
+
       const searchTerm = searchStates.watchlistAdUpdate.searchTerm;
       await fetchWatchlistAdUpdateQueue(1, 10, sortBy, sortOrder, searchTerm || null);
     } catch (error) {
@@ -835,19 +794,16 @@ const Dashboard = () => {
     };
   }, [refreshInterval]);
 
-  // Updated: Manage full initial load with initialLoading
   useEffect(() => {
     let mounted = true;
-    
-    // Initialize search refs from URL params on mount
+
     searchRefs.current.regularBrands = searchParams.get('regularBrandsSearch') || '';
     searchRefs.current.watchlistBrands = searchParams.get('watchlistBrandsSearch') || '';
     searchRefs.current.regularAdUpdate = searchParams.get('regularAdSearch') || '';
     searchRefs.current.watchlistAdUpdate = searchParams.get('watchlistAdSearch') || '';
-    
+
     const timer = setTimeout(async () => {
       if (!mounted) return;
-      // initialLoading is already true from useState; no need to set again
       try {
         await loadData();
       } finally {
@@ -856,24 +812,21 @@ const Dashboard = () => {
         }
       }
     }, 100);
-    
+
     return () => {
       mounted = false;
       clearTimeout(timer);
     };
   }, []);
 
-  // Reload data when environment changes
   useEffect(() => {
     if (!initialLoading && !environmentLoading) {
-      // Add a small delay to ensure backend environment switch is complete
       const timeoutId = setTimeout(() => {
         loadData().then(() => {
-          // Wait a moment for state to update
           setTimeout(() => {
           }, 100);
         });
-      }, 500); // 500ms delay to ensure backend switch is complete
+      }, 500);
 
       return () => clearTimeout(timeoutId);
     }
@@ -882,19 +835,16 @@ const Dashboard = () => {
   useEffect(() => {
     return () => {
       updateState({ originalStartTime: null });
-      // Cleanup debounce timers on unmount
       Object.values(debounceTimers.current).forEach(timer => {
         if (timer) clearTimeout(timer);
       });
     };
   }, []);
 
-  // Updated: Use initialLoading for the full initial gate
   if (initialLoading) {
     return <LoadingSpinner />;
   }
 
-  // Show loading overlay when environment is changing
   if (environmentLoading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -950,7 +900,6 @@ const Dashboard = () => {
         adsProcessed={adsProcessed}
       />
 
-      {/* Always show both cards - only badge colors change based on status */}
       <WatchlistProcessingStatus
         currentlyProcessing={currentlyProcessing}
         watchlistPendingCount={watchlistPendingCount}
@@ -970,29 +919,29 @@ const Dashboard = () => {
         failedCount={failedCount}
       />
 
-        <RegularBrandProcessing
-          allBrandProcessingData={allRegularBrandProcessingJobs}
-          loading={loading}
-          error={error}
-        />
+      <RegularBrandProcessing
+        allBrandProcessingData={allRegularBrandProcessingJobs}
+        loading={loading}
+        error={error}
+      />
 
-        <WatchlistBrandProcessing
-          allBrandProcessingData={allWatchlistBrandProcessingJobs}
-          loading={loading}
-          error={error}
-        />
+      <WatchlistBrandProcessing
+        allBrandProcessingData={allWatchlistBrandProcessingJobs}
+        loading={loading}
+        error={error}
+      />
 
-        <RegularAdUpdateProcessing
-          allAdUpdateData={allRegularAdUpdateJobs}
-          loading={loading}
-          error={error}
-        />
+      <RegularAdUpdateProcessing
+        allAdUpdateData={allRegularAdUpdateJobs}
+        loading={loading}
+        error={error}
+      />
 
-        <WatchlistAdUpdateProcessing
-          allAdUpdateData={allWatchlistAdUpdateJobs}
-          loading={loading}
-          error={error}
-        />
+      <WatchlistAdUpdateProcessing
+        allAdUpdateData={allWatchlistAdUpdateJobs}
+        loading={loading}
+        error={error}
+      />
 
       <QuickActions
         pendingCount={pendingCount}
@@ -1001,7 +950,7 @@ const Dashboard = () => {
         watchlistFailedCount={watchlistFailedCount}
       />
 
-      <WatchlistAdsCountTable 
+      <WatchlistAdsCountTable
         watchlistBrandsQueue={watchlistBrandsQueue}
         loading={loading}
         error={error}
@@ -1013,7 +962,7 @@ const Dashboard = () => {
         isSearching={searchStates.watchlistBrands.isSearching}
       />
 
-      <BrandProcessingQueue 
+      <BrandProcessingQueue
         brandProcessingQueue={brandProcessingQueue}
         loading={loading}
         error={error}
@@ -1025,7 +974,7 @@ const Dashboard = () => {
         isSearching={searchStates.regularBrands.isSearching}
       />
 
-      <WatchlistAdUpdateQueue 
+      <WatchlistAdUpdateQueue
         watchlistAdUpdateQueue={watchlistAdUpdateQueue}
         loading={loading}
         error={error}
@@ -1037,7 +986,7 @@ const Dashboard = () => {
         isSearching={searchStates.watchlistAdUpdate.isSearching}
       />
 
-      <RegularAdUpdateQueue 
+      <RegularAdUpdateQueue
         adUpdateQueue={adUpdateQueue}
         loading={loading}
         error={error}

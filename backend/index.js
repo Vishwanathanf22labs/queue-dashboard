@@ -48,19 +48,16 @@ app.use("/api/environment", environmentRoutes);
 app.use("/api/queue/settings", settingsRoutes);
 app.use("/api/ip-stats", ipStatsRoutes);
 
-
 const server = app.listen(PORT, () => {
   console.log(`Queue Dashboard API running on port ${PORT}`);
 });
 
-// Wait for all Redis connections to be ready
 Promise.all([
   new Promise((resolve) => globalRedis.on("ready", resolve)),
   new Promise((resolve) => watchlistRedis.on("ready", resolve)),
   new Promise((resolve) => regularRedis.on("ready", resolve))
 ]).then(() => {
   console.log("All Redis instances are ready for operations");
-  // Scraper status initialization removed - status will be set manually through API
 });
 
 process.on("SIGTERM", () => {

@@ -12,16 +12,13 @@ const SortButton = ({
 
   const handleClick = () => {
     if (sortBy === 'normal') {
-      // Only call onSortChange if not already on normal sorting with desc order
       if (!(isActive && currentSortOrder === 'desc')) {
         onSortChange('normal', 'desc');
       }
     } else if (isActive) {
-      // Toggle between asc and desc
       const newOrder = currentSortOrder === 'desc' ? 'asc' : 'desc';
       onSortChange(sortBy, newOrder);
     } else {
-      // Set new sort field with desc as default
       onSortChange(sortBy, 'desc');
     }
   };
@@ -30,7 +27,7 @@ const SortButton = ({
     if (sortBy === 'normal') {
       return <ArrowUpDown className="h-4 w-4" />;
     }
-    
+
     if (!isActive) {
       return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
     }
@@ -42,11 +39,11 @@ const SortButton = ({
 
   const getButtonClass = () => {
     const baseClass = "inline-flex items-center px-3 py-2 border text-sm font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500";
-    
+
     if (isActive) {
       return `${baseClass} border-blue-600 text-blue-600 bg-blue-50 hover:bg-blue-100`;
     }
-    
+
     return `${baseClass} border-gray-300 text-gray-700 bg-white hover:bg-gray-50`;
   };
 

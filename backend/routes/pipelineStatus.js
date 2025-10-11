@@ -7,18 +7,15 @@ const {
   searchBrandsPipelineStatus,
 } = require("../services/pipeline");
 
-// Get scraping status for a specific brand
 router.get("/brand/:brandId", async (req, res) => {
   try {
     const { brandId } = req.params;
     const { date } = req.query;
     
-    // Validate brandId
     if (!brandId || isNaN(brandId)) {
       return res.status(400).json({ error: "Valid brand ID is required" });
     }
     
-    // Validate date format if provided
     if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return res.status(400).json({ error: "Date must be in YYYY-MM-DD format" });
     }
@@ -31,7 +28,6 @@ router.get("/brand/:brandId", async (req, res) => {
   }
 });
 
-// Get scraping status for all brands - OPTIMIZED VERSION
 router.get("/all", async (req, res) => {
   try {
     console.log(`[PIPELINE DEBUG] Environment: ${req.environment}`);
@@ -39,8 +35,6 @@ router.get("/all", async (req, res) => {
     const perPage = parseInt(req.query.perPage) || parseInt(req.query.limit) || 10;
     const { date, sortBy, sortOrder, lastId } = req.query;
     
-    
-    // Validate pagination parameters
     if (page < 1) {
       return res.status(400).json({ error: "Page must be greater than 0" });
     }
@@ -49,12 +43,10 @@ router.get("/all", async (req, res) => {
       return res.status(400).json({ error: "PerPage must be between 1 and 100" });
     }
     
-    // Validate date format if provided
     if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return res.status(400).json({ error: "Date must be in YYYY-MM-DD format" });
     }
     
-    // Validate sorting parameters
     const validSortBy = ['normal', 'active_ads'];
     const validSortOrder = ['asc', 'desc'];
     
@@ -66,27 +58,22 @@ router.get("/all", async (req, res) => {
       return res.status(400).json({ error: "Invalid sortOrder parameter" });
     }
     
-    // Check for ETag support
     const clientETag = req.headers['if-none-match'];
     
     const result = await getAllBrandsScrapingStatus(page, perPage, date, sortBy, sortOrder, lastId, req.environment);
     
-    // Handle ETag response
     if (result.statusCode === 304) {
       return res.status(304).set('ETag', result.etag).end();
     }
     
-    // Set ETag header if available
     if (result.etag) {
       res.set('ETag', result.etag);
       
-      // Check if client has same ETag
       if (clientETag === result.etag) {
         return res.status(304).end();
       }
     }
     
-    // Wrap result in data object to match frontend expectations
     res.json({ data: result });
   } catch (error) {
     console.error("Error getting all brands scraping status:", error);
@@ -94,14 +81,12 @@ router.get("/all", async (req, res) => {
   }
 });
 
-// Get scraping status for all brands (watchlist and regular separately)
 router.get("/all/separate", async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const { date } = req.query;
     
-    // Validate pagination parameters
     if (page < 1) {
       return res.status(400).json({ error: "Page must be greater than 0" });
     }
@@ -110,12 +95,10 @@ router.get("/all/separate", async (req, res) => {
       return res.status(400).json({ error: "Limit must be between 1 and 100" });
     }
     
-    // Validate date format if provided
     if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return res.status(400).json({ error: "Date must be in YYYY-MM-DD format" });
     }
     
-    // Use the main function since getAllBrandsScrapingStatusSeparate doesn't exist
     const result = await getAllBrandsScrapingStatus(page, limit, date, 'normal', 'desc', null, req.environment);
     res.json(result);
   } catch (error) {
@@ -124,33 +107,27 @@ router.get("/all/separate", async (req, res) => {
   }
 });
 
-// Get overall pipeline statistics - separate endpoint with caching
 router.get("/overall-stats", async (req, res) => {
   try {
     console.log(`[PIPELINE OVERALL STATS DEBUG] Environment: ${req.environment}`);
     const { date } = req.query;
     
-    // Validate date format if provided
     if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return res.status(400).json({ error: "Date must be in YYYY-MM-DD format" });
     }
     
-    // Check for ETag support
     const clientETag = req.headers['if-none-match'];
     
     const result = await getOverallPipelineStats(date, req.environment);
     
-    // Set ETag header if available
     if (result.etag) {
       res.set('ETag', result.etag);
       
-      // Check if client has same ETag
       if (clientETag === result.etag) {
         return res.status(304).end();
       }
     }
     
-    // Return the result directly
     res.json({ data: result });
   } catch (error) {
     console.error("Error getting overall pipeline stats:", error);
@@ -158,7 +135,6 @@ router.get("/overall-stats", async (req, res) => {
   }
 });
 
-// Search pipeline status across all brands - OPTIMIZED VERSION
 router.get("/search", async (req, res) => {
   try {
     const query = req.query.query;
@@ -175,7 +151,6 @@ router.get("/search", async (req, res) => {
     const result = await searchBrandsPipelineStatus(query.trim(), date, req.environment);
     
     if (result.success) {
-      // Return the result directly as it already has the correct structure
       res.status(200).json(result);
     } else {
       res.status(500).json(result);

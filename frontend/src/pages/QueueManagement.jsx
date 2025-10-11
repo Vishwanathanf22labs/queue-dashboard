@@ -24,19 +24,13 @@ const QueueManagement = () => {
   const pendingSearchRef = useRef('');
   const failedSearchRef = useRef('');
   const isInitialMountRef = useRef(true);
-  
-  // Helper function to get initial confirmation dialog state from localStorage
-  // Only restore on page refresh (when the component mounts fresh)
+
   const getInitialConfirmDialogState = () => {
     try {
-      // Check if this is a page refresh by looking for a specific flag
       const isPageRefresh = sessionStorage.getItem('queueManagementPageRefreshed') === 'true';
       const wasPageVisited = sessionStorage.getItem('queueManagementPageVisited') === 'true';
-      
-      // Only restore if it's a page refresh AND the page was previously visited
-      // If page was not visited, it's a fresh navigation, not a refresh
+
       if (isPageRefresh && wasPageVisited) {
-        // Clear the flag and check for saved confirmation dialog state
         sessionStorage.removeItem('queueManagementPageRefreshed');
         const saved = localStorage.getItem('queueManagement_confirmDialog');
         if (saved) {
@@ -48,10 +42,8 @@ const QueueManagement = () => {
           };
         }
       } else {
-        // Clear any stale refresh flags
         sessionStorage.removeItem('queueManagementPageRefreshed');
       }
-      // If not a page refresh, clear any existing dialog state
       localStorage.removeItem('queueManagement_confirmDialog');
       return {
         showConfirmDialog: false,
@@ -67,11 +59,10 @@ const QueueManagement = () => {
     }
   };
 
-  // State for confirmation dialog persistence
   const [confirmDialogState, setConfirmDialogState] = useState(getInitialConfirmDialogState);
-  
+
   const { onAdminLogin } = useAdminLogin();
-  
+
   const {
     loading: storeLoading,
     error: storeError,
@@ -118,7 +109,6 @@ const QueueManagement = () => {
     }
   });
 
-  // Store original totals that don't change during search
   const [originalTotals, setOriginalTotals] = useState({
     pendingCount: 0,
     failedCount: 0,
@@ -137,18 +127,17 @@ const QueueManagement = () => {
       ...prev,
       pending: { ...prev.pending, ...updates }
     }));
-    
-    // Update URL parameters for persistence (except search)
+
     if (updates.currentPage !== undefined || updates.itemsPerPage !== undefined) {
       const newSearchParams = new URLSearchParams(searchParams);
-      
+
       if (updates.currentPage !== undefined) {
         newSearchParams.set('pendingPage', updates.currentPage.toString());
       }
       if (updates.itemsPerPage !== undefined) {
         newSearchParams.set('pendingLimit', updates.itemsPerPage.toString());
       }
-      
+
       setSearchParams(newSearchParams, { replace: true });
     }
   };
@@ -158,18 +147,17 @@ const QueueManagement = () => {
       ...prev,
       failed: { ...prev.failed, ...updates }
     }));
-    
-    // Update URL parameters for persistence (except search)
+
     if (updates.currentPage !== undefined || updates.itemsPerPage !== undefined) {
       const newSearchParams = new URLSearchParams(searchParams);
-      
+
       if (updates.currentPage !== undefined) {
         newSearchParams.set('failedPage', updates.currentPage.toString());
       }
       if (updates.itemsPerPage !== undefined) {
         newSearchParams.set('failedLimit', updates.itemsPerPage.toString());
       }
-      
+
       setSearchParams(newSearchParams, { replace: true });
     }
   };
@@ -181,31 +169,27 @@ const QueueManagement = () => {
   };
 
   const loadPendingBrands = useCallback(async (searchTerm = null, page = null) => {
-    // Single state update for loading
-    updatePendingState({ 
-      loading: true, 
+    updatePendingState({
+      loading: true,
       error: null,
       ...(searchTerm ? { isSearching: true } : {})
     });
-    
+
     try {
       const pageToLoad = page || pending.currentPage;
       const response = await queueAPI.getPendingBrands(pageToLoad, pending.itemsPerPage, searchTerm);
 
-      // Only update results if they match the current search term
       const currentSearch = pendingSearchRef.current;
       const searchToCheck = searchTerm || '';
-      
-      // If search terms don't match, ignore this response (it's stale)
+
       if (searchToCheck !== currentSearch) {
         updatePendingState({ isSearching: false, loading: false });
-        return; 
+        return;
       }
 
       const brands = response.data.data?.brands || [];
       const totalCount = response.data.data?.pagination?.total_items || 0;
 
-      // Single final state update
       updatePendingState({
         brands,
         totalCount,
@@ -214,7 +198,6 @@ const QueueManagement = () => {
         loading: false
       });
 
-      // Update original totals only when not searching
       if (!searchTerm) {
         setOriginalTotals(prev => ({
           ...prev,
@@ -223,43 +206,39 @@ const QueueManagement = () => {
         }));
       }
     } catch (error) {
-      updatePendingState({ 
-        error: error.message || 'Failed to load pending brands', 
-        isSearching: false, 
-        loading: false 
+      updatePendingState({
+        error: error.message || 'Failed to load pending brands',
+        isSearching: false,
+        loading: false
       });
       toast.error('Failed to load pending brands');
     }
   }, [pending.itemsPerPage]);
 
   const loadFailedBrands = useCallback(async (searchTerm = null, page = null) => {
-    // Single state update for loading
-    updateFailedState({ 
-      loading: true, 
+    updateFailedState({
+      loading: true,
       error: null,
       ...(searchTerm ? { isSearching: true } : {})
     });
-    
+
     try {
       const pageToLoad = page || failed.currentPage;
       const response = await queueAPI.getFailedBrands(pageToLoad, failed.itemsPerPage, searchTerm);
 
-      // Only update results if they match the current search term
       const currentSearch = failedSearchRef.current;
       const searchToCheck = searchTerm || '';
-      
-      
-      // If search terms don't match, ignore this response (it's stale)
+
+
       if (searchToCheck !== currentSearch) {
         updateFailedState({ isSearching: false, loading: false });
-        return; 
+        return;
       }
 
       const brands = response.data.data?.brands || [];
       const totalCount = response.data.data?.pagination?.total_items || 0;
 
 
-      // Single final state update
       updateFailedState({
         brands,
         totalCount,
@@ -268,7 +247,6 @@ const QueueManagement = () => {
         loading: false
       });
 
-      // Update original totals only when not searching
       if (!searchTerm) {
         setOriginalTotals(prev => ({
           ...prev,
@@ -277,10 +255,10 @@ const QueueManagement = () => {
         }));
       }
     } catch (error) {
-      updateFailedState({ 
-        error: error.message || 'Failed to load failed brands', 
-        isSearching: false, 
-        loading: false 
+      updateFailedState({
+        error: error.message || 'Failed to load failed brands',
+        isSearching: false,
+        loading: false
       });
       toast.error('Failed to load failed brands');
     }
@@ -288,8 +266,6 @@ const QueueManagement = () => {
 
 
   useEffect(() => {
-    // Load both pending and failed brands on component mount
-    // Check if there are URL search parameters and load accordingly
     const pendingPage = parseInt(searchParams.get('pendingPage')) || 1;
     const pendingSearch = localStorage.getItem('queueManagement_pendingSearch') || '';
     const pendingLimit = parseInt(searchParams.get('pendingLimit')) || 10;
@@ -298,7 +274,6 @@ const QueueManagement = () => {
     const failedLimit = parseInt(searchParams.get('failedLimit')) || 10;
 
 
-    // Update state from URL parameters and localStorage fallback
     setState(prev => ({
       ...prev,
       pending: {
@@ -329,41 +304,32 @@ const QueueManagement = () => {
       loadFailedBrands();
     }
 
-    // Mark initial mount as complete
     setTimeout(() => {
       isInitialMountRef.current = false;
     }, 100);
-  }, []); // Empty dependencies - only run once on mount
+  }, []);
 
-  // Load pending brands when pending page changes
   useEffect(() => {
-    // Skip initial mount - let mount useEffect handle it
     if (isInitialMountRef.current) {
       return;
     }
-    
-    // Only load pending brands when pending page changes
+
     loadPendingBrands(null, pending.currentPage);
   }, [pending.currentPage]);
 
-  // Load failed brands when failed page changes
   useEffect(() => {
-    // Skip initial mount - let mount useEffect handle it
     if (isInitialMountRef.current) {
       return;
     }
-    
-    // Only load failed brands when failed page changes
+
     loadFailedBrands(null, failed.currentPage);
   }, [failed.currentPage]);
 
-  // Debounced search for pending queue
   useEffect(() => {
-    // Don't run on initial mount to prevent duplicate calls
     if (isInitialMountRef.current) {
       return;
     }
-    
+
     if (pending.searchTerm && pending.searchTerm.trim() !== '') {
       const timeoutId = setTimeout(() => {
         if (pending.searchTerm.trim().length >= 3) {
@@ -374,20 +340,16 @@ const QueueManagement = () => {
 
       return () => clearTimeout(timeoutId);
     } else if (pending.searchTerm === '') {
-      // Handle clearing search - load normal data
       pendingSearchRef.current = '';
       loadPendingBrands();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending.searchTerm]);
 
-  // Debounced search for failed queue
   useEffect(() => {
-    // Don't run on initial mount to prevent duplicate calls
     if (isInitialMountRef.current) {
       return;
     }
-    
+
     if (failed.searchTerm && failed.searchTerm.trim() !== '') {
       const timeoutId = setTimeout(() => {
         if (failed.searchTerm.trim().length >= 3) {
@@ -398,33 +360,25 @@ const QueueManagement = () => {
 
       return () => clearTimeout(timeoutId);
     } else if (failed.searchTerm === '') {
-      // Handle clearing search - load normal data
       failedSearchRef.current = '';
       loadFailedBrands();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [failed.searchTerm]);
 
-  // Detect page refresh and set flag
   useEffect(() => {
-    // Detect if this is a page refresh (not initial load)
     const isInitialLoad = !sessionStorage.getItem('queueManagementPageVisited');
-    
+
     if (!isInitialLoad) {
-      // This is a page refresh, set the flag
       sessionStorage.setItem('queueManagementPageRefreshed', 'true');
     } else {
-      // This is initial load, mark page as visited
       sessionStorage.setItem('queueManagementPageVisited', 'true');
     }
 
-    // Cleanup function to clear the visited flag when navigating away
     return () => {
       sessionStorage.removeItem('queueManagementPageVisited');
     };
   }, []);
 
-  // Save confirmation dialog state to localStorage whenever it changes
   useEffect(() => {
     if (confirmDialogState.showConfirmDialog) {
       localStorage.setItem('queueManagement_confirmDialog', JSON.stringify(confirmDialogState));
@@ -437,7 +391,6 @@ const QueueManagement = () => {
   const handlePendingSearch = (searchTerm) => {
     updatePendingState({ searchTerm });
 
-    // Save to localStorage only
     if (searchTerm && searchTerm.trim()) {
       localStorage.setItem('queueManagement_pendingSearch', searchTerm);
     } else {
@@ -446,14 +399,12 @@ const QueueManagement = () => {
 
     if (!searchTerm || searchTerm.trim() === '') {
       updatePendingState({ currentPage: 1 });
-      // Don't call loadPendingBrands here - let useEffect handle it
     }
   };
 
   const handleFailedSearch = (searchTerm) => {
     updateFailedState({ searchTerm });
 
-    // Save to localStorage only
     if (searchTerm && searchTerm.trim()) {
       localStorage.setItem('queueManagement_failedSearch', searchTerm);
     } else {
@@ -462,31 +413,23 @@ const QueueManagement = () => {
 
     if (!searchTerm || searchTerm.trim() === '') {
       updateFailedState({ currentPage: 1 });
-      // Don't call loadFailedBrands here - let useEffect handle it
     }
   };
 
   const clearPendingSearch = () => {
     pendingSearchRef.current = '';
     updatePendingState({ searchTerm: '', currentPage: 1 });
-    
-    // Clear localStorage only
+
     localStorage.removeItem('queueManagement_pendingSearch');
-    
-    // Don't call loadPendingBrands here - let useEffect handle it
   };
 
   const clearFailedSearch = () => {
     failedSearchRef.current = '';
     updateFailedState({ searchTerm: '', currentPage: 1 });
-    
-    // Clear localStorage only
+
     localStorage.removeItem('queueManagement_failedSearch');
-    
-    // Don't call loadFailedBrands here - let useEffect handle it
   };
 
-  // Auto-refresh hook
   const refreshFn = useCallback(async () => {
     try {
       await Promise.all([loadPendingBrands(), loadFailedBrands()]);
@@ -584,11 +527,9 @@ const QueueManagement = () => {
 
       if (targetQueue === 'failed') {
         response = await movePendingToFailed(brandIdentifier);
-        // When moving from pending to failed, refresh both queues
         await Promise.all([handlePendingRefresh(), handleFailedRefresh()]);
       } else {
         response = await moveFailedToPending(brandIdentifier);
-        // When moving from failed to pending, refresh both queues
         await Promise.all([handlePendingRefresh(), handleFailedRefresh()]);
       }
 
@@ -633,7 +574,7 @@ const QueueManagement = () => {
     }
   };
 
-  
+
   if (adminLoading) {
     return <LoadingSpinner />;
   }
@@ -682,7 +623,7 @@ const QueueManagement = () => {
       </div>
 
       <Card>
-        <QueueControls 
+        <QueueControls
           isProcessingAction={isProcessingAction}
           onAdminAction={handleAdminAction}
           confirmDialogState={confirmDialogState}
@@ -691,7 +632,7 @@ const QueueManagement = () => {
         />
       </Card>
 
-      <QueueStats 
+      <QueueStats
         pendingCount={originalTotals.pendingCount}
         failedCount={originalTotals.failedCount}
         totalBrands={originalTotals.totalBrands}
@@ -701,20 +642,19 @@ const QueueManagement = () => {
         pending={pending}
         onSearch={handlePendingSearch}
         onClearSearch={clearPendingSearch}
-          onPageChange={(page) => {
-            updatePendingState({ currentPage: page });
-            
-            // Prevent scroll jump by keeping pagination in view
+        onPageChange={(page) => {
+          updatePendingState({ currentPage: page });
+
           setTimeout(() => {
             const paginationElement = document.getElementById('pending-queue-pagination');
             if (paginationElement) {
-              paginationElement.scrollIntoView({ 
-                behavior: 'instant', 
+              paginationElement.scrollIntoView({
+                behavior: 'instant',
                 block: 'center',
                 inline: 'nearest'
               });
             }
-          }, 100); // Increased delay to ensure table re-render is complete
+          }, 100);
         }}
         onMoveBrand={handleMoveBrand}
         onRemoveBrand={handleRemoveBrand}
@@ -726,25 +666,23 @@ const QueueManagement = () => {
         failed={failed}
         onSearch={handleFailedSearch}
         onClearSearch={clearFailedSearch}
-          onPageChange={(page) => {
-            updateFailedState({ currentPage: page });
-            
-            // Update URL parameters
-            const newParams = new URLSearchParams(searchParams);
-            newParams.set('failedPage', page.toString());
-            setSearchParams(newParams);
-            
-            // Prevent scroll jump by keeping pagination in view
+        onPageChange={(page) => {
+          updateFailedState({ currentPage: page });
+
+          const newParams = new URLSearchParams(searchParams);
+          newParams.set('failedPage', page.toString());
+          setSearchParams(newParams);
+
           setTimeout(() => {
             const paginationElement = document.getElementById('failed-queue-pagination');
             if (paginationElement) {
-              paginationElement.scrollIntoView({ 
-                behavior: 'instant', 
+              paginationElement.scrollIntoView({
+                behavior: 'instant',
                 block: 'center',
                 inline: 'nearest'
               });
             }
-          }, 100); // Increased delay to ensure table re-render is complete
+          }, 100);
         }}
         onMoveBrand={handleMoveBrand}
         onRemoveBrand={handleRemoveBrand}

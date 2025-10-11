@@ -20,7 +20,12 @@ async function getQueueOverview(req, res) {
 
 async function getPendingBrands(req, res) {
   try {
-    const { page = 1, limit = 10, search = null, queueType = 'regular' } = req.query;
+    const {
+      page = 1,
+      limit = 10,
+      search = null,
+      queueType = "regular",
+    } = req.query;
     const pendingBrands = await queueService.getPendingBrands(
       parseInt(page),
       parseInt(limit),
@@ -46,7 +51,12 @@ async function getPendingBrands(req, res) {
 
 async function getFailedBrands(req, res) {
   try {
-    const { page = 1, limit = 10, search = null, queueType = 'regular' } = req.query;
+    const {
+      page = 1,
+      limit = 10,
+      search = null,
+      queueType = "regular",
+    } = req.query;
     const failedBrands = await queueService.getFailedBrands(
       parseInt(page),
       parseInt(limit),
@@ -72,7 +82,9 @@ async function getFailedBrands(req, res) {
 
 async function getCurrentlyProcessing(req, res) {
   try {
-    const currentlyProcessing = await queueService.getCurrentlyProcessing(req.environment);
+    const currentlyProcessing = await queueService.getCurrentlyProcessing(
+      req.environment
+    );
     res.status(200).json({
       success: true,
       data: currentlyProcessing,
@@ -90,8 +102,11 @@ async function getCurrentlyProcessing(req, res) {
 
 async function getNextBrand(req, res) {
   try {
-    const { queueType = 'regular' } = req.query;
-    const nextBrands = await queueService.getNextBrand(queueType, req.environment);
+    const { queueType = "regular" } = req.query;
+    const nextBrands = await queueService.getNextBrand(
+      queueType,
+      req.environment
+    );
     res.status(200).json({
       success: true,
       data: nextBrands,
@@ -147,9 +162,16 @@ async function getQueueStats(req, res) {
 
 async function getBrandProcessingQueue(req, res) {
   try {
-    const { page = 1, limit = 10, queueType = 'regular', sortBy = 'normal', sortOrder = 'desc', search = null } = req.query;
-    const ifNoneMatch = req.headers['if-none-match'];
-    
+    const {
+      page = 1,
+      limit = 10,
+      queueType = "regular",
+      sortBy = "normal",
+      sortOrder = "desc",
+      search = null,
+    } = req.query;
+    const ifNoneMatch = req.headers["if-none-match"];
+
     const processingData = await queueService.getBrandProcessingQueue(
       parseInt(page),
       parseInt(limit),
@@ -161,15 +183,13 @@ async function getBrandProcessingQueue(req, res) {
       req.environment
     );
 
-    // Handle ETag caching
     if (processingData.status === 304) {
-      res.set('ETag', processingData.etag);
+      res.set("ETag", processingData.etag);
       return res.status(304).end();
     }
 
-    // Set ETag header for future requests
     if (processingData.etag) {
-      res.set('ETag', processingData.etag);
+      res.set("ETag", processingData.etag);
     }
 
     res.status(200).json(processingData);
@@ -185,9 +205,15 @@ async function getBrandProcessingQueue(req, res) {
 
 async function getWatchlistBrandsQueue(req, res) {
   try {
-    const { page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc', search = null } = req.query;
-    const ifNoneMatch = req.headers['if-none-match'];
-    
+    const {
+      page = 1,
+      limit = 10,
+      sortBy = "normal",
+      sortOrder = "desc",
+      search = null,
+    } = req.query;
+    const ifNoneMatch = req.headers["if-none-match"];
+
     const watchlistData = await queueService.getWatchlistBrandsQueue(
       parseInt(page),
       parseInt(limit),
@@ -198,15 +224,13 @@ async function getWatchlistBrandsQueue(req, res) {
       req.environment
     );
 
-    // Handle ETag caching
     if (watchlistData.status === 304) {
-      res.set('ETag', watchlistData.etag);
+      res.set("ETag", watchlistData.etag);
       return res.status(304).end();
     }
 
-    // Set ETag header for future requests
     if (watchlistData.etag) {
-      res.set('ETag', watchlistData.etag);
+      res.set("ETag", watchlistData.etag);
     }
 
     res.status(200).json(watchlistData);
@@ -226,7 +250,10 @@ async function getBrandsScrapedStats(req, res) {
 
     let stats;
     if (days) {
-      stats = await queueService.getBrandsScrapedStatsForDays(parseInt(days), req.environment);
+      stats = await queueService.getBrandsScrapedStatsForDays(
+        parseInt(days),
+        req.environment
+      );
     } else {
       stats = await queueService.getBrandsScrapedStats(date, req.environment);
     }
@@ -248,9 +275,15 @@ async function getSeparateBrandsScrapedStats(req, res) {
 
     let stats;
     if (days) {
-      stats = await queueService.getSeparateBrandsScrapedStatsForDays(parseInt(days), req.environment);
+      stats = await queueService.getSeparateBrandsScrapedStatsForDays(
+        parseInt(days),
+        req.environment
+      );
     } else {
-      stats = await queueService.getSeparateBrandsScrapedStats(date, req.environment);
+      stats = await queueService.getSeparateBrandsScrapedStats(
+        date,
+        req.environment
+      );
     }
 
     res.status(200).json(stats);
@@ -375,7 +408,12 @@ async function changeBrandScore(req, res) {
   try {
     const { queueType, brandName, newScore } = req.body;
 
-    if (!queueType || !brandName || newScore === undefined || newScore === null) {
+    if (
+      !queueType ||
+      !brandName ||
+      newScore === undefined ||
+      newScore === null
+    ) {
       return res.status(400).json({
         success: false,
         message: "Queue type, brand identifier, and new score are required",
@@ -383,10 +421,16 @@ async function changeBrandScore(req, res) {
       });
     }
 
-    if (queueType !== 'pending' && queueType !== 'failed' && queueType !== 'watchlist_pending' && queueType !== 'watchlist_failed') {
+    if (
+      queueType !== "pending" &&
+      queueType !== "failed" &&
+      queueType !== "watchlist_pending" &&
+      queueType !== "watchlist_failed"
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Queue type must be 'pending', 'failed', 'watchlist_pending', or 'watchlist_failed'",
+        message:
+          "Queue type must be 'pending', 'failed', 'watchlist_pending', or 'watchlist_failed'",
         timestamp: new Date().toISOString(),
       });
     }
@@ -399,7 +443,12 @@ async function changeBrandScore(req, res) {
       });
     }
 
-    const result = await queueService.changeBrandScore(queueType, brandName, parseFloat(newScore), req.environment);
+    const result = await queueService.changeBrandScore(
+      queueType,
+      brandName,
+      parseFloat(newScore),
+      req.environment
+    );
 
     res.status(200).json({
       success: true,
@@ -445,24 +494,22 @@ async function getReenqueueData(req, res) {
 
 async function getAllBrandProcessingJobs(req, res) {
   try {
-    const { queueType = 'regular' } = req.query;
-    const ifNoneMatch = req.headers['if-none-match'];
-    
+    const { queueType = "regular" } = req.query;
+    const ifNoneMatch = req.headers["if-none-match"];
+
     const processingData = await queueService.getAllBrandProcessingJobs(
       queueType,
       ifNoneMatch,
       req.environment
     );
 
-    // Handle ETag caching
     if (processingData.status === 304) {
-      res.set('ETag', processingData.etag);
+      res.set("ETag", processingData.etag);
       return res.status(304).end();
     }
 
-    // Set ETag header for future requests
     if (processingData.etag) {
-      res.set('ETag', processingData.etag);
+      res.set("ETag", processingData.etag);
     }
 
     res.status(200).json(processingData);
@@ -503,9 +550,16 @@ module.exports = {
 
 async function getAdUpdateQueue(req, res) {
   try {
-    const { page = 1, limit = 10, queueType = 'regular', sortBy = 'normal', sortOrder = 'desc', search = null } = req.query;
-    const ifNoneMatch = req.headers['if-none-match'];
-    
+    const {
+      page = 1,
+      limit = 10,
+      queueType = "regular",
+      sortBy = "normal",
+      sortOrder = "desc",
+      search = null,
+    } = req.query;
+    const ifNoneMatch = req.headers["if-none-match"];
+
     const processingData = await adUpdateProcessingService.getAdUpdateQueue(
       parseInt(page),
       parseInt(limit),
@@ -517,15 +571,13 @@ async function getAdUpdateQueue(req, res) {
       req.environment
     );
 
-    // Handle ETag caching
     if (processingData.status === 304) {
-      res.set('ETag', processingData.etag);
+      res.set("ETag", processingData.etag);
       return res.status(304).end();
     }
 
-    // Set ETag header for future requests
     if (processingData.etag) {
-      res.set('ETag', processingData.etag);
+      res.set("ETag", processingData.etag);
     }
 
     res.status(200).json(processingData);
@@ -541,27 +593,32 @@ async function getAdUpdateQueue(req, res) {
 
 async function getWatchlistAdUpdateQueue(req, res) {
   try {
-    const { page = 1, limit = 10, sortBy = 'normal', sortOrder = 'desc', search = null } = req.query;
-    const ifNoneMatch = req.headers['if-none-match'];
-    
-    const watchlistData = await adUpdateProcessingService.getWatchlistAdUpdateQueue(
-      parseInt(page),
-      parseInt(limit),
-      sortBy,
-      sortOrder,
-      ifNoneMatch,
-      search
-    );
+    const {
+      page = 1,
+      limit = 10,
+      sortBy = "normal",
+      sortOrder = "desc",
+      search = null,
+    } = req.query;
+    const ifNoneMatch = req.headers["if-none-match"];
 
-    // Handle ETag caching
+    const watchlistData =
+      await adUpdateProcessingService.getWatchlistAdUpdateQueue(
+        parseInt(page),
+        parseInt(limit),
+        sortBy,
+        sortOrder,
+        ifNoneMatch,
+        search
+      );
+
     if (watchlistData.status === 304) {
-      res.set('ETag', watchlistData.etag);
+      res.set("ETag", watchlistData.etag);
       return res.status(304).end();
     }
 
-    // Set ETag header for future requests
     if (watchlistData.etag) {
-      res.set('ETag', watchlistData.etag);
+      res.set("ETag", watchlistData.etag);
     }
 
     res.status(200).json(watchlistData);
@@ -577,24 +634,22 @@ async function getWatchlistAdUpdateQueue(req, res) {
 
 async function getAllAdUpdateJobs(req, res) {
   try {
-    const { queueType = 'regular' } = req.query;
-    const ifNoneMatch = req.headers['if-none-match'];
-    
+    const { queueType = "regular" } = req.query;
+    const ifNoneMatch = req.headers["if-none-match"];
+
     const allJobsData = await adUpdateProcessingService.getAllAdUpdateJobs(
       queueType,
       ifNoneMatch,
       req.environment
     );
 
-    // Handle ETag caching
     if (allJobsData.status === 304) {
-      res.set('ETag', allJobsData.etag);
+      res.set("ETag", allJobsData.etag);
       return res.status(304).end();
     }
 
-    // Set ETag header for future requests
     if (allJobsData.etag) {
-      res.set('ETag', allJobsData.etag);
+      res.set("ETag", allJobsData.etag);
     }
 
     res.status(200).json(allJobsData);
@@ -611,20 +666,16 @@ async function getAllAdUpdateJobs(req, res) {
 async function invalidateQueueCache(req, res) {
   try {
     logger.info("Cache invalidation request received");
-    
-    // Respond immediately to prevent frontend hanging
+
     res.status(200).json({
       success: true,
       message: "Queue cache invalidation started",
       timestamp: new Date().toISOString(),
     });
-    
-    // Invalidate all queue caches asynchronously (fire and forget)
-    // This runs in the background without blocking the response
-    cacheUtils.invalidateQueueCache().catch(error => {
+
+    cacheUtils.invalidateQueueCache().catch((error) => {
       logger.error("Background cache invalidation error:", error);
     });
-    
   } catch (error) {
     logger.error("Error in invalidateQueueCache:", error);
     res.status(500).json({

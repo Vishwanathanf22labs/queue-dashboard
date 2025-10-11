@@ -6,18 +6,17 @@ export const api = axios.create({
   withCredentials: true,
 });
 
-// Add environment header and cache-busting interceptor
 api.interceptors.request.use((config) => {
-  // Add environment header to every request
   const environment = useEnvironmentStore.getState().currentEnvironment;
-  config.headers['X-Environment'] = environment;
-  
-  // Add timestamp to prevent caching after environment switch
-  const envSwitchTimestamp = localStorage.getItem('environment_switch_timestamp');
+  config.headers["X-Environment"] = environment;
+
+  const envSwitchTimestamp = localStorage.getItem(
+    "environment_switch_timestamp"
+  );
   if (envSwitchTimestamp) {
     config.params = {
       ...config.params,
-      _t: envSwitchTimestamp
+      _t: envSwitchTimestamp,
     };
   }
   return config;

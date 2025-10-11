@@ -44,7 +44,6 @@ const SearchInput = ({
   }, [value]);
 
   const handleChange = (value) => {
-    // The Input component passes the value directly, not an event object
     setState(prev => ({ ...prev, internalValue: value }));
 
     if (refs.current.debounce) {

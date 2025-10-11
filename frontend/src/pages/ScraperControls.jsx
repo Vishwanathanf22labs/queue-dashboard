@@ -14,7 +14,6 @@ const ScraperControlsPage = () => {
   const [componentKey, setComponentKey] = useState(0);
   const { onAdminLogin } = useAdminLogin();
 
-  // Auto-refresh hook - remounts children to refresh both sections
   const refreshFn = useCallback(() => {
     try {
       setComponentKey(k => k + 1);
@@ -41,14 +40,13 @@ const ScraperControlsPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header with Admin Access Badge */}
         <div className="mb-6 sm:mb-8">
           <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Scraper Controls</h1>
               <p className="text-xs sm:text-sm lg:text-base text-gray-600">Monitor and control scraper status</p>
             </div>
-            
+
             <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-3">
               {isAdmin ? (
                 <div className="flex items-center space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-green-100 text-green-800 rounded-lg">

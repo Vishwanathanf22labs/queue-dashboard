@@ -4,14 +4,13 @@ const { getAdminConfig } = require("../config/environmentConfig");
 let adminStatusCache = {
   isAdmin: false,
   timestamp: 0,
-  cacheDuration: 30000 // 30 seconds cache
+  cacheDuration: 30000,
 };
 
 const login = async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    // Get admin credentials based on current environment
     const adminConfig = getAdminConfig();
     const ADMIN_USERNAME = adminConfig.username;
     const ADMIN_PASSWORD = adminConfig.password;
@@ -27,11 +26,10 @@ const login = async (req, res) => {
         path: "/",
       });
 
-     
       adminStatusCache = {
         isAdmin: true,
         timestamp: Date.now(),
-        cacheDuration: 30000
+        cacheDuration: 30000,
       };
 
       logger.info(`Admin login successful for user: ${username}`);
@@ -65,15 +63,14 @@ const logout = async (req, res) => {
     res.clearCookie("adminSession", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax", 
+      sameSite: "lax",
       path: "/",
     });
 
-   
     adminStatusCache = {
       isAdmin: false,
       timestamp: Date.now(),
-      cacheDuration: 30000
+      cacheDuration: 30000,
     };
 
     logger.info("Admin logout successful");
@@ -92,19 +89,21 @@ const logout = async (req, res) => {
   }
 };
 
-
 const getStatus = async (req, res) => {
   try {
     const now = Date.now();
-    
-    // Check if cache is still valid
-    if (adminStatusCache.timestamp && (now - adminStatusCache.timestamp) < adminStatusCache.cacheDuration) {
-      // Return cached result without logging
+
+    if (
+      adminStatusCache.timestamp &&
+      now - adminStatusCache.timestamp < adminStatusCache.cacheDuration
+    ) {
       return res.json({
         success: true,
         isAdmin: adminStatusCache.isAdmin,
-        message: adminStatusCache.isAdmin ? "Admin session active" : "No admin session",
-        cached: true
+        message: adminStatusCache.isAdmin
+          ? "Admin session active"
+          : "No admin session",
+        cached: true,
       });
     }
 
@@ -112,25 +111,24 @@ const getStatus = async (req, res) => {
     let isAdmin = false;
 
     if (adminSession) {
-      // Check if session is valid
       isAdmin = true;
     }
 
-    // Update cache
     adminStatusCache = {
       isAdmin,
       timestamp: now,
-      cacheDuration: 30000
+      cacheDuration: 30000,
     };
 
-    // Only log when cache expires and we actually check the session
-    logger.info(`Admin status check: ${isAdmin ? 'Active session' : 'No session'}`);
+    logger.info(
+      `Admin status check: ${isAdmin ? "Active session" : "No session"}`
+    );
 
     res.json({
       success: true,
       isAdmin,
       message: isAdmin ? "Admin session active" : "No admin session",
-      cached: false
+      cached: false,
     });
   } catch (error) {
     logger.error("Error checking admin status:", error);
@@ -142,7 +140,6 @@ const getStatus = async (req, res) => {
   }
 };
 
-// Generate a secure session token
 const generateSessionToken = () => {
   const timestamp = Date.now().toString();
   const random = Math.random().toString(36).substring(2);

@@ -31,7 +31,7 @@ const PriorityQueueManager = ({ disabled = false }) => {
       formData: {
         ...prev.formData,
         queueType,
-        newScore: '' // Clear the score/position when changing queue type
+        newScore: ''
       },
       showQueueDropdown: false
     }));
@@ -60,7 +60,6 @@ const PriorityQueueManager = ({ disabled = false }) => {
       return;
     }
 
-    // Additional validation for list queue position
     if (isListQueue(state.formData.queueType) && value < 1) {
       setState(prev => ({
         ...prev,
@@ -116,24 +115,20 @@ const PriorityQueueManager = ({ disabled = false }) => {
     }));
   }, []);
 
-  // Helper function to determine if queue is a list (position-based)
   const isListQueue = (queueType) => {
     return queueType === 'failed' || queueType === 'watchlist_failed';
   };
 
-  // Helper function to determine if queue is a sorted set (score-based)
   const isSortedSetQueue = (queueType) => {
     return queueType === 'pending' || queueType === 'watchlist_pending';
   };
 
-  // Dynamic labels and placeholders based on queue type
   const isListQueueSelected = isListQueue(state.formData.queueType);
   const scoreLabel = isListQueueSelected ? 'New Position' : 'New Score';
   const scorePlaceholder = isListQueueSelected
     ? 'Enter position (1 for first, 2 for second, etc.)'
     : 'Enter score (e.g., 1 for priority, 0 for normal)';
 
-  // Dynamic description based on queue type
   const getDescription = () => {
     if (isListQueueSelected) {
       const queueName = state.formData.queueType === 'failed' ? 'failed' : 'watchlist failed';

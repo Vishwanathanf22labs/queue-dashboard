@@ -1,4 +1,3 @@
-// Load environment variables FIRST before any other imports
 require("dotenv").config();
 
 const { Sequelize } = require("sequelize");
@@ -6,9 +5,8 @@ const { getDatabaseConfig } = require("./environmentConfig");
 
 const connections = {
   production: null,
-  stage: null
+  stage: null,
 };
-
 
 function createConnection(environment) {
   const dbConfig = getDatabaseConfig(environment);
@@ -19,7 +17,6 @@ function createConnection(environment) {
     database: mydb,
     port: dbPort,
   } = dbConfig;
-
 
   if (!password) {
     throw new Error(
@@ -56,11 +53,10 @@ function createConnection(environment) {
   });
 }
 
-
-function getDatabaseConnection(environment = 'production') {
+function getDatabaseConnection(environment = "production") {
   if (!connections[environment]) {
     connections[environment] = createConnection(environment);
-    
+
     connections[environment]
       .authenticate()
       .then(() => {
@@ -70,24 +66,25 @@ function getDatabaseConnection(environment = 'production') {
         );
       })
       .catch((err) => {
-        console.error(`Database connection failed [${environment}]:`, err.message);
+        console.error(
+          `Database connection failed [${environment}]:`,
+          err.message
+        );
       });
   }
   return connections[environment];
 }
 
-
 console.log("Initializing database connections for all environments...");
-getDatabaseConnection('production');
-getDatabaseConnection('stage');
+getDatabaseConnection("production");
+getDatabaseConnection("stage");
 
-
-const sequelize = getDatabaseConnection('production');
-
+const sequelize = getDatabaseConnection("production");
 
 async function reinitializeDatabase() {
-
-  console.log("reinitializeDatabase called - No action needed (multi-environment support enabled)");
+  console.log(
+    "reinitializeDatabase called - No action needed (multi-environment support enabled)"
+  );
   return sequelize;
 }
 

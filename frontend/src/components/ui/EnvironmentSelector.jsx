@@ -14,15 +14,15 @@ const EnvironmentSelector = ({ onEnvironmentChange, currentEnvironment = 'produc
   });
 
   const environments = [
-    { 
-      key: 'production', 
-      label: 'Production', 
+    {
+      key: 'production',
+      label: 'Production',
       description: 'Live production environment',
       color: 'bg-red-50 border-red-200 text-red-800'
     },
-    { 
-      key: 'stage', 
-      label: 'Stage', 
+    {
+      key: 'stage',
+      label: 'Stage',
       description: 'Development/staging environment',
       color: 'bg-blue-50 border-blue-200 text-blue-800'
     }
@@ -40,7 +40,6 @@ const EnvironmentSelector = ({ onEnvironmentChange, currentEnvironment = 'produc
 
     setIsChanging(true);
     try {
-      // Call the environment change handler
       await onEnvironmentChange(environment);
       setSelectedEnv(environment);
       setEnvStatus(prev => ({
@@ -80,7 +79,6 @@ const EnvironmentSelector = ({ onEnvironmentChange, currentEnvironment = 'produc
 
   return (
     <div className="relative">
-      {/* Environment Selector Button */}
       <Button
         onClick={() => setIsOpen(!isOpen)}
         variant="outline"
@@ -95,11 +93,9 @@ const EnvironmentSelector = ({ onEnvironmentChange, currentEnvironment = 'produc
         )}
       </Button>
 
-      {/* Environment Selection Modal */}
       {isOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-auto">
-            {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">Select Environment</h3>
@@ -117,16 +113,14 @@ const EnvironmentSelector = ({ onEnvironmentChange, currentEnvironment = 'produc
               </Button>
             </div>
 
-            {/* Environment Options */}
             <div className="p-6 space-y-3">
               {environments.map((env) => (
                 <div
                   key={env.key}
-                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                    selectedEnv === env.key
-                      ? `${env.color} border-current`
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${selectedEnv === env.key
+                    ? `${env.color} border-current`
+                    : 'border-gray-200 hover:border-gray-300'
+                    }`}
                   onClick={() => setSelectedEnv(env.key)}
                 >
                   <div className="flex items-center justify-between">
@@ -147,7 +141,6 @@ const EnvironmentSelector = ({ onEnvironmentChange, currentEnvironment = 'produc
               ))}
             </div>
 
-            {/* Action Buttons */}
             <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
               <Button
                 onClick={() => setIsOpen(false)}

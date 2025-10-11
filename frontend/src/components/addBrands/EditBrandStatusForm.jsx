@@ -15,7 +15,6 @@ const EditBrandStatusForm = ({ disabled = false }) => {
   const [currentStatus, setCurrentStatus] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // CSV bulk edit states
   const [csvData, setCsvData] = useState(null);
   const [previewData, setPreviewData] = useState(null);
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -23,14 +22,13 @@ const EditBrandStatusForm = ({ disabled = false }) => {
   const [confirmDialog, setConfirmDialog] = useState({ show: false, confirmText: '' });
   const fileInputRef = useRef(null);
 
-  // Load persisted data on mount
   useEffect(() => {
     try {
       const savedCsvData = localStorage.getItem('bulkEdit_csvData');
       const savedPreviewData = localStorage.getItem('bulkEdit_previewData');
       const savedShowBulkSection = localStorage.getItem('bulkEdit_showBulkSection');
       const savedConfirmDialog = localStorage.getItem('bulkEdit_confirmDialog');
-      
+
       if (savedCsvData) {
         setCsvData(JSON.parse(savedCsvData));
       }
@@ -71,13 +69,11 @@ const EditBrandStatusForm = ({ disabled = false }) => {
   const handleClear = () => {
     setSelectedBrand(null);
     setCurrentStatus(null);
-    // Clear URL search params
     const newParams = new URLSearchParams(searchParams);
     newParams.delete('search');
     setSearchParams(newParams);
   };
 
-  // CSV handling functions
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -95,7 +91,7 @@ const EditBrandStatusForm = ({ disabled = false }) => {
           toast.error('Error parsing CSV: ' + results.errors[0].message);
           return;
         }
-        
+
         setCsvData(results.data);
         localStorage.setItem('bulkEdit_csvData', JSON.stringify(results.data));
         toast.success(`CSV loaded: ${results.data.length} rows`);
@@ -113,35 +109,29 @@ const EditBrandStatusForm = ({ disabled = false }) => {
   };
 
   const getBestBrandName = (brand, csvRow) => {
-    // Priority: CSV name > DB actual_name > DB name (if not generic)
     const csvName = csvRow?.name;
     const dbActualName = brand?.actual_name;
     const dbName = brand?.name;
-    
-    // Check if a name is generic (just "Brand" or just numbers)
+
     const isGeneric = (name) => {
       if (!name) return true;
       const trimmed = name.trim();
       return trimmed === 'Brand' || /^\d+$/.test(trimmed) || trimmed.length <= 2;
     };
-    
-    
-    // ALWAYS use CSV name if available, even if it seems generic
+
+
     if (csvName && csvName.trim()) {
       return csvName.trim();
     }
-    
-    // Use actual_name if available and not generic
+
     if (dbActualName && !isGeneric(dbActualName)) {
       return dbActualName;
     }
-    
-    // Use DB name if not generic
+
     if (dbName && !isGeneric(dbName)) {
       return dbName;
     }
-    
-    // Fallback to any available name
+
     return csvName || dbActualName || dbName || 'Unknown Brand';
   };
 
@@ -153,18 +143,15 @@ const EditBrandStatusForm = ({ disabled = false }) => {
 
     try {
       setBulkLoading(true);
-      
-      // Extract IDs and page IDs from CSV
+
       const ids = [];
       const pageIds = [];
-      
+
       csvData.forEach(row => {
-        // Try to get ID from 'id' column
         if (row.id && !isNaN(row.id)) {
           ids.push(parseInt(row.id));
         }
-        
-        // Try to extract page_id from ads_library_url
+
         if (row.ads_library_url) {
           const pageId = extractPageIdFromUrl(row.ads_library_url);
           if (pageId) {
@@ -179,33 +166,27 @@ const EditBrandStatusForm = ({ disabled = false }) => {
       }
 
       const result = await bulkPreviewBrands(ids, pageIds);
-      
-      // Enhance the result with CSV data for better brand names
+
       const enhancedData = {
         ...result.data,
         items: result.data.items.map(brand => {
-          // Find corresponding CSV row - try both ID and page_id matching
           let csvRow = csvData.find(row => {
-            // Match by ID
             if (row.id && parseInt(row.id) === brand.id) return true;
-            // Match by page_id from ads_library_url
             if (row.ads_library_url) {
               const pageId = extractPageIdFromUrl(row.ads_library_url);
               if (pageId === brand.page_id) return true;
             }
             return false;
           });
-          
-          // If no match found, try to find by any available identifier
+
           if (!csvRow) {
             csvRow = csvData.find(row => {
-              // Try matching by any available field
               return (row.id && parseInt(row.id) === brand.id) ||
-                     (row.page_id && row.page_id === brand.page_id) ||
-                     (row.ads_library_url && extractPageIdFromUrl(row.ads_library_url) === brand.page_id);
+                (row.page_id && row.page_id === brand.page_id) ||
+                (row.ads_library_url && extractPageIdFromUrl(row.ads_library_url) === brand.page_id);
             });
           }
-          
+
           return {
             ...brand,
             displayName: getBestBrandName(brand, csvRow),
@@ -213,19 +194,18 @@ const EditBrandStatusForm = ({ disabled = false }) => {
           };
         })
       };
-      
+
       setPreviewData(enhancedData);
       localStorage.setItem('bulkEdit_previewData', JSON.stringify(enhancedData));
-      
-      // Show detailed breakdown
+
       const { items, notFound, duplicates } = result.data;
       const totalProcessed = ids.length + pageIds.length;
       const duplicatesCount = (duplicates.ids || 0) + (duplicates.pageIds || 0);
       const notFoundCount = notFound.length;
-      
-      
+
+
       toast.success(`Preview loaded: ${items.length} brands found (${duplicatesCount} duplicates, ${notFoundCount} not found)`);
-      
+
     } catch (error) {
       toast.error(error.message || 'Failed to preview brands');
     } finally {
@@ -235,7 +215,7 @@ const EditBrandStatusForm = ({ disabled = false }) => {
 
   const handleBulkStatusChange = (index, newStatus) => {
     if (!previewData) return;
-    
+
     const updatedItems = [...previewData.items];
     updatedItems[index] = { ...updatedItems[index], newStatus };
     const updatedPreviewData = { ...previewData, items: updatedItems };
@@ -245,7 +225,7 @@ const EditBrandStatusForm = ({ disabled = false }) => {
 
   const handleBulkSetAll = (status) => {
     if (!previewData) return;
-    
+
     const updatedItems = previewData.items.map(item => ({
       ...item,
       newStatus: status
@@ -275,7 +255,7 @@ const EditBrandStatusForm = ({ disabled = false }) => {
 
     try {
       setBulkLoading(true);
-      
+
       const updates = previewData.items
         .filter(item => item.newStatus && item.newStatus !== item.currentStatus)
         .map(item => ({
@@ -289,10 +269,9 @@ const EditBrandStatusForm = ({ disabled = false }) => {
       }
 
       const result = await bulkApplyStatusUpdates(updates);
-      
+
       toast.success(`Bulk update completed: ${result.data.totals.updated} updated, ${result.data.totals.skipped} skipped, ${result.data.totals.errors} errors`);
-      
-      // Clear the bulk section
+
       setPreviewData(null);
       setCsvData(null);
       setConfirmDialog({ show: false, confirmText: '' });
@@ -302,7 +281,7 @@ const EditBrandStatusForm = ({ disabled = false }) => {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-      
+
     } catch (error) {
       toast.error(error.message || 'Failed to apply bulk updates');
     } finally {
@@ -333,16 +312,14 @@ const EditBrandStatusForm = ({ disabled = false }) => {
       );
       setCurrentStatus(res.data.status);
       toast.success(res.message || 'Status updated');
-      
-      // Clear search and URL after successful update
+
       setTimeout(() => {
         setSelectedBrand(null);
         setCurrentStatus(null);
-        // Clear URL search params
         const newParams = new URLSearchParams(searchParams);
         newParams.delete('search');
         setSearchParams(newParams);
-      }, 2000); // Clear after 2 seconds to show the success
+      }, 2000);
     } catch (error) {
       toast.error(error.message || 'Failed to update status');
     } finally {
@@ -378,10 +355,9 @@ const EditBrandStatusForm = ({ disabled = false }) => {
                   </p>
                 </div>
                 <div className="ml-4 flex items-center space-x-3">
-                  <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${
-                    currentStatus === 'Active' ? 'bg-green-100 text-green-700' :
+                  <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${currentStatus === 'Active' ? 'bg-green-100 text-green-700' :
                     currentStatus === 'Inactive' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
-                  }`}>
+                    }`}>
                     {currentStatus || '—'}
                   </span>
                   <div className="flex space-x-2">
@@ -414,7 +390,6 @@ const EditBrandStatusForm = ({ disabled = false }) => {
         </div>
       </div>
 
-      {/* Bulk Edit from CSV Section */}
       <div className="mt-8 border-t border-gray-200 pt-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base sm:text-lg font-medium text-gray-900">Bulk Edit from CSV</h3>
@@ -434,7 +409,6 @@ const EditBrandStatusForm = ({ disabled = false }) => {
 
         {showBulkSection && (
           <div className="space-y-4">
-            {/* CSV Upload */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Upload CSV File
@@ -449,7 +423,6 @@ const EditBrandStatusForm = ({ disabled = false }) => {
               />
             </div>
 
-            {/* CSV Data Info */}
             {csvData && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <p className="text-sm text-blue-800">
@@ -467,7 +440,6 @@ const EditBrandStatusForm = ({ disabled = false }) => {
               </div>
             )}
 
-            {/* Preview Table */}
             {previewData && (
               <div className="space-y-4 relative">
                 <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3 border border-gray-200">
@@ -527,10 +499,9 @@ const EditBrandStatusForm = ({ disabled = false }) => {
                           <td className="px-3 py-2 text-sm text-gray-900">{item.page_id}</td>
                           <td className="px-3 py-2 text-sm text-gray-900">{item.displayName || item.name}</td>
                           <td className="px-3 py-2 text-sm">
-                            <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${
-                              item.currentStatus === 'Active' ? 'bg-green-100 text-green-700' :
+                            <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${item.currentStatus === 'Active' ? 'bg-green-100 text-green-700' :
                               item.currentStatus === 'Inactive' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
-                            }`}>
+                              }`}>
                               {item.currentStatus}
                             </span>
                           </td>
@@ -559,7 +530,6 @@ const EditBrandStatusForm = ({ disabled = false }) => {
                   </table>
                 </div>
 
-                {/* Apply Button */}
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
@@ -603,7 +573,6 @@ const EditBrandStatusForm = ({ disabled = false }) => {
               </div>
             )}
 
-            {/* Processing Summary */}
             {previewData && (
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 shadow-sm">
                 <h5 className="text-sm font-semibold text-blue-900 mb-3 flex items-center">
@@ -637,7 +606,6 @@ const EditBrandStatusForm = ({ disabled = false }) => {
               </div>
             )}
 
-            {/* Not Found Items */}
             {previewData && previewData.notFound && previewData.notFound.length > 0 && (
               <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-4 shadow-sm">
                 <h5 className="text-sm font-semibold text-amber-900 mb-3 flex items-center">
@@ -660,11 +628,9 @@ const EditBrandStatusForm = ({ disabled = false }) => {
         )}
       </div>
 
-      {/* Confirm Dialog */}
       {confirmDialog.show && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 relative">
-            {/* Close button */}
             <button
               onClick={() => {
                 setConfirmDialog({ show: false, confirmText: '' });
@@ -676,7 +642,7 @@ const EditBrandStatusForm = ({ disabled = false }) => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-            
+
             <h3 className="text-lg font-medium text-gray-900 mb-4 pr-8">
               Confirm Bulk Update
             </h3>

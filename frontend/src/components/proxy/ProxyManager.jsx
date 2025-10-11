@@ -76,7 +76,6 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies, disabled = false }) => {
       return;
     }
 
-    // Validate namespace
     const namespaceValidation = validateNamespace(state.formData.namespace);
     if (!namespaceValidation.success) {
       toast.error(namespaceValidation.error);
@@ -88,7 +87,6 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies, disabled = false }) => {
       return;
     }
 
-    // Validate viewport
     const viewportValidation = validateViewport(state.formData.viewport);
     if (!viewportValidation.success) {
       toast.error(viewportValidation.error);
@@ -136,7 +134,6 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies, disabled = false }) => {
   return (
     <Card title="Add New Proxy">
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Row 1: IP Address and Port */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
             label="IP Address"
@@ -161,7 +158,6 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies, disabled = false }) => {
           />
         </div>
 
-        {/* Row 2: Version and Country */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -192,7 +188,6 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies, disabled = false }) => {
           />
         </div>
 
-        {/* Row 3: Protocol and Namespace */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -233,7 +228,6 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies, disabled = false }) => {
           </div>
         </div>
 
-        {/* Row 4: Username and Password */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
             label="Username"
@@ -260,7 +254,6 @@ const ProxyManager = ({ onProxyAdded, onRefreshProxies, disabled = false }) => {
           />
         </div>
 
-        {/* Row 5: User Agent and Viewport */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
             label="User Agent"

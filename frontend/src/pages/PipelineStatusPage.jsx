@@ -27,8 +27,6 @@ import useAutoRefresh from '../hooks/useAutoRefresh';
 
 const PipelineStatusPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-
-  // State management
   const [data, setData] = useState({
     brands: [],
     pagination: {
@@ -41,7 +39,6 @@ const PipelineStatusPage = () => {
     }
   });
 
-  // Separate state for overall stats
   const [overallStats, setOverallStats] = useState(null);
   const [overallStatsLoading, setOverallStatsLoading] = useState(false);
 
@@ -54,7 +51,6 @@ const PipelineStatusPage = () => {
   );
   const [searchTerm, setSearchTerm] = useState('');
 
-  // FIXED: Separate state for input value and actual selected date
   const [dateInputValue, setDateInputValue] = useState(
     searchParams.get('date') || new Date().toISOString().split('T')[0]
   );
@@ -62,23 +58,18 @@ const PipelineStatusPage = () => {
     searchParams.get('date') || new Date().toISOString().split('T')[0]
   );
 
-  // Search state management
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
 
-  // Sorting state management
   const { sortBy, sortOrder, updateSorting } = usePipelineSorting('normal', 'desc');
 
-  // Debounced search term to avoid excessive API calls
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
-  // 🚀 Search with request ID to prevent stale results (ULTIMATE FIX)
   const searchAbortRef = useRef(null);
   const currentSearchRef = useRef('');
-  
+
   const searchBrands = useCallback(async (query) => {
-    // Cancel previous search request if still pending
     if (searchAbortRef.current) {
       searchAbortRef.current.abort();
     }
@@ -93,18 +84,15 @@ const PipelineStatusPage = () => {
 
     try {
       setIsSearching(true);
-      
-      // Store current search query
+
       currentSearchRef.current = query;
-      
-      // Create new AbortController for this request
+
       searchAbortRef.current = new AbortController();
-      
+
       const response = await pipelineAPI.searchBrandsStatus(query, selectedDate, {
         signal: searchAbortRef.current.signal
       });
 
-      // 🔥 CRITICAL: Only update UI if this response matches current search term
       if (!searchAbortRef.current.signal.aborted && currentSearchRef.current === query) {
         if (response.data && response.data.success) {
           setSearchResults(response.data.data.brands || []);
@@ -115,37 +103,31 @@ const PipelineStatusPage = () => {
         }
       }
     } catch (error) {
-      // Ignore cancelled requests
       if (error.name !== 'AbortError' && error.name !== 'CanceledError') {
         console.error('Error searching brands:', error);
-        // Only clear if this was the current search
         if (currentSearchRef.current === query) {
           setSearchResults([]);
           setShowSearchResults(false);
         }
       }
     } finally {
-      // Only reset loading if this was the current search
       if (currentSearchRef.current === query) {
         setIsSearching(false);
       }
     }
   }, [selectedDate]);
 
-  // Clear search function with request cancellation and URL cleanup
   const clearSearch = useCallback(() => {
     setSearchTerm('');
     setShowSearchResults(false);
     setSearchResults([]);
     setIsSearching(false);
     setDebouncedSearchTerm('');
-    
-    // Remove search parameter from URL
+
     const newSearchParams = new URLSearchParams(searchParams);
     newSearchParams.delete('search');
     setSearchParams(newSearchParams, { replace: true });
-    
-    // Cancel any pending search requests
+
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
@@ -154,14 +136,11 @@ const PipelineStatusPage = () => {
     }
   }, [searchParams, setSearchParams]);
 
-  // 🚀 Simple search handler with stale result prevention and URL persistence
   const handleSearch = useCallback((query) => {
     setSearchTerm(query);
-    
-    // Update current search reference immediately
+
     currentSearchRef.current = query;
-    
-    // Update URL parameters to persist search
+
     const newSearchParams = new URLSearchParams(searchParams);
     if (query && query.trim().length >= 3) {
       newSearchParams.set('search', query);
@@ -169,15 +148,13 @@ const PipelineStatusPage = () => {
       newSearchParams.delete('search');
     }
     setSearchParams(newSearchParams, { replace: true });
-    
-    // Clear results immediately if empty or too short
+
     if (!query.trim() || query.trim().length < 3) {
       setShowSearchResults(false);
       setSearchResults([]);
       setIsSearching(false);
       currentSearchRef.current = '';
-      
-      // Cancel any pending search
+
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
@@ -186,24 +163,21 @@ const PipelineStatusPage = () => {
       }
       return;
     }
-    
-    // Debounce the actual search
+
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
-    
+
     debounceTimerRef.current = setTimeout(() => {
-      // Double-check current search term before making API call
       if (currentSearchRef.current === query) {
         searchBrands(query);
       }
     }, 300);
   }, [searchBrands, searchParams, setSearchParams]);
 
-  // Refs for cleanup
+
   const debounceTimerRef = useRef(null);
-  
-  // Cleanup on unmount
+
   useEffect(() => {
     return () => {
       if (debounceTimerRef.current) {
@@ -212,15 +186,13 @@ const PipelineStatusPage = () => {
     };
   }, []);
 
-  // Get display brands (search results or paginated data)
   const displayBrands = showSearchResults ? (Array.isArray(searchResults) ? searchResults : []) : (Array.isArray(data.brands) ? data.brands : []);
 
-  // Separate function to fetch overall stats
   const fetchOverallStats = useCallback(async () => {
     try {
       setOverallStatsLoading(true);
       const response = await pipelineAPI.getOverallStats(selectedDate);
-      
+
       if (response.data && response.data.data && response.data.data.overallStats) {
         setOverallStats(response.data.data.overallStats);
       } else {
@@ -235,7 +207,6 @@ const PipelineStatusPage = () => {
     }
   }, [selectedDate]);
 
-  // Memoize API call to prevent unnecessary calls
   const fetchPipelineStatus = useCallback(async (page = currentPage, sortByParam = null, sortOrderParam = null) => {
     try {
       setError(null);
@@ -267,9 +238,8 @@ const PipelineStatusPage = () => {
       setRefreshing(false);
       setPageLoading(false);
     }
-  }, [selectedDate, sortBy, sortOrder]); // Removed currentPage from deps to prevent infinite loops
+  }, [selectedDate, sortBy, sortOrder]);
 
-  // Read search parameter from URL on component mount and restore search
   useEffect(() => {
     const urlSearchTerm = searchParams.get('search');
     if (urlSearchTerm && urlSearchTerm.trim().length >= 3) {
@@ -277,43 +247,37 @@ const PipelineStatusPage = () => {
       currentSearchRef.current = urlSearchTerm;
       searchBrands(urlSearchTerm);
     }
-  }, []); // Only run on mount
+  }, []);
 
-  // Fetch overall stats only when date changes (not on pagination/sorting)
   useEffect(() => {
     if (!showSearchResults) {
       fetchOverallStats();
     }
   }, [selectedDate, showSearchResults, fetchOverallStats]);
 
-  // Fetch pipeline data when pagination/sorting changes
   useEffect(() => {
     if (!showSearchResults) {
       fetchPipelineStatus(currentPage);
     }
   }, [showSearchResults, currentPage, sortBy, sortOrder, fetchPipelineStatus]);
 
-  // FIXED: Debounced date change effect to prevent immediate API calls while typing
   useEffect(() => {
-    // Validate date format (YYYY-MM-DD) before making API call
     const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(dateInputValue);
 
     if (!isValidDate) return;
 
-    // Only update if the date actually changed
     if (dateInputValue === selectedDate) return;
 
     const timer = setTimeout(() => {
-      setLoading(true); 
+      setLoading(true);
       setSelectedDate(dateInputValue);
       setCurrentPage(1);
       setSearchParams({ date: dateInputValue });
-    }, 700); 
+    }, 700);
 
     return () => clearTimeout(timer);
   }, [dateInputValue, selectedDate, setSearchParams]);
 
-  // Auto-refresh hook
   const refreshFn = useCallback(async () => {
     try {
       await fetchPipelineStatus(currentPage);
@@ -328,37 +292,14 @@ const PipelineStatusPage = () => {
     [currentPage, selectedDate, sortBy, sortOrder]
   );
 
-  // Memoize handlers to prevent unnecessary re-renders
   const handleRefresh = useCallback(async () => {
     await manualRefresh();
   }, [manualRefresh]);
 
-  // const handlePageChange = useCallback(async (newPage) => {
-  //   setPageLoading(true);
-  //   setCurrentPage(newPage);
-    
-  //   // Update URL parameters to persist page number
-  //   const newSearchParams = new URLSearchParams(searchParams);
-  //   newSearchParams.set('page', newPage.toString());
-  //   if (selectedDate) {
-  //     newSearchParams.set('date', selectedDate);
-  //   }
-  //   setSearchParams(newSearchParams);
-    
-  //   try {
-  //     await fetchPipelineStatus(newPage);
-  //   } catch (error) {
-  //     console.error('Error changing page:', error);
-  //   } finally {
-  //     setPageLoading(false);
-  //   }
-  // }, [fetchPipelineStatus, searchParams, setSearchParams, selectedDate]);
-
   const handlePageChange = useCallback((newPage) => {
-    setPageLoading(true);  // ✅ Keep this for the loading indicator
+    setPageLoading(true);
     setCurrentPage(newPage);
 
-    // Update URL parameters to persist page number
     const newSearchParams = new URLSearchParams(searchParams);
     newSearchParams.set('page', newPage.toString());
     if (selectedDate) {
@@ -366,36 +307,30 @@ const PipelineStatusPage = () => {
     }
     setSearchParams(newSearchParams);
 
-    // The useEffect will automatically trigger fetchPipelineStatus when currentPage changes
   }, [searchParams, setSearchParams, selectedDate]);
 
   const handleSortChange = useCallback((field, order) => {
-    // Don't do anything if the sort parameters haven't actually changed
     if (field === sortBy && order === sortOrder) {
       return;
     }
-    
+
     setPageLoading(true);
     updateSorting(field, order);
-    setCurrentPage(1); // Reset to page 1 when sorting changes
-    
-    // Update URL parameters to reset page to 1
+    setCurrentPage(1);
+
     const newSearchParams = new URLSearchParams(searchParams);
     newSearchParams.set('page', '1');
     if (selectedDate) {
       newSearchParams.set('date', selectedDate);
     }
     setSearchParams(newSearchParams);
-    
-    // The useEffect will automatically trigger fetchPipelineStatus when sortBy/sortOrder changes
+
   }, [updateSorting, searchParams, setSearchParams, selectedDate, sortBy, sortOrder]);
 
-  // FIXED: New date input change handler that only updates the input value
   const handleDateInputChange = useCallback((e) => {
     setDateInputValue(e.target.value);
   }, []);
 
-  // UPDATED: getStatusIcon function remains the same
   const getStatusIcon = useCallback((status, completed) => {
     const completedStatuses = [
       'Started', 'Completed',
@@ -513,8 +448,7 @@ const PipelineStatusPage = () => {
 
   const formatDate = useCallback((dateString) => {
     if (!dateString) return '';
-    
-    // If it's a YYYY-MM-DD string, parse it directly without timezone conversion
+
     if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
       const [year, month, day] = dateString.split('-');
       const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
@@ -524,10 +458,9 @@ const PipelineStatusPage = () => {
         day: 'numeric'
       });
     }
-    
-    // If it's an ISO timestamp, extract just the date part to avoid timezone issues
+
     if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(dateString)) {
-      const datePart = dateString.split('T')[0]; // Extract YYYY-MM-DD part
+      const datePart = dateString.split('T')[0];
       const [year, month, day] = datePart.split('-');
       const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
       return date.toLocaleDateString('en-US', {
@@ -536,8 +469,7 @@ const PipelineStatusPage = () => {
         day: 'numeric'
       });
     }
-    
-    // For other date formats, use the original logic
+
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -548,18 +480,16 @@ const PipelineStatusPage = () => {
   const getProgressIndicator = useCallback((completed, total, status) => {
     if (total === 0) return null;
 
-    // For COMPLETED status, show 100% progress regardless of URL completion
     let displayCompleted = completed;
     let displayTotal = total;
     let percentage = Math.round((completed / total) * 100);
 
     if (status === 'COMPLETED') {
-      displayCompleted = total; // Show all files as completed
+      displayCompleted = total;
       displayTotal = total;
       percentage = 100;
     }
 
-    // Return only the text count without progress bar
     return (
       <div className="mt-1">
         <span className="text-xs text-gray-500">
@@ -569,10 +499,8 @@ const PipelineStatusPage = () => {
     );
   }, []);
 
-  // Memoize brand card component to prevent unnecessary re-renders
   const BrandCard = React.memo(({ brand }) => (
     <Card key={brand.brandId} className="hover:shadow-lg transition-shadow duration-200 relative overflow-hidden">
-      {/* Watchlist Badge - Top Left Corner */}
       {brand.isWatchlist && (
         <div className="absolute top-3 left-3 z-10">
           <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">
@@ -581,7 +509,6 @@ const PipelineStatusPage = () => {
         </div>
       )}
 
-      {/* Brand Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1 min-w-0 overflow-hidden" style={{ paddingTop: brand.isWatchlist ? '32px' : '0' }}>
           <h3 className="text-lg font-semibold text-gray-900 break-words overflow-hidden"
@@ -601,9 +528,7 @@ const PipelineStatusPage = () => {
         </div>
       </div>
 
-      {/* Pipeline Stages */}
       <div className="space-y-3">
-        {/* Scraping Status */}
         <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             {getStatusIcon(brand.scraping?.status, brand.scraping?.completed)}
@@ -623,7 +548,6 @@ const PipelineStatusPage = () => {
           </div>
         </div>
 
-        {/* DB Stored Status */}
         <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             {getStatusIcon(brand.dbStored?.status, brand.dbStored?.completed)}
@@ -643,7 +567,6 @@ const PipelineStatusPage = () => {
           </div>
         </div>
 
-        {/* Typesense Status */}
         <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             {getStatusIcon(brand.typesense?.status, brand.typesense?.completed)}
@@ -652,7 +575,6 @@ const PipelineStatusPage = () => {
               <p className="text-xs text-gray-500 break-words">
                 {getStatusText(brand.typesense?.status, brand.typesense?.completed)}
               </p>
-              {/* Progress indicator for Typesense */}
               {getProgressIndicator(
                 brand.typesense?.adsWithTypesense || 0,
                 brand.typesense?.totalAds || 0,
@@ -669,7 +591,6 @@ const PipelineStatusPage = () => {
           </div>
         </div>
 
-        {/* File Upload Status with enhanced display */}
         <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             {getStatusIcon(brand.fileUpload?.status, brand.fileUpload?.completed)}
@@ -678,7 +599,6 @@ const PipelineStatusPage = () => {
               <p className={`text-xs ${getStatusColor(brand.fileUpload?.status, brand.fileUpload?.completed)} break-words`}>
                 {getStatusText(brand.fileUpload?.status, brand.fileUpload?.completed)}
               </p>
-              {/* Enhanced progress indicator for file upload */}
               {getProgressIndicator(
                 brand.fileUpload?.mediaWithAllUrls || 0,
                 brand.fileUpload?.totalMedia || 0,
@@ -695,7 +615,6 @@ const PipelineStatusPage = () => {
                     : `${brand.fileUpload.mediaWithAllUrls}/${brand.fileUpload.totalMedia} files`
                   }
                 </p>
-                {/* Show queue and failed counts */}
                 {(brand.fileUpload?.mediaInQueue > 0 || brand.fileUpload?.mediaFailed > 0) && (
                   <div className="flex flex-col gap-1">
                     {brand.fileUpload.mediaInQueue > 0 && (
@@ -716,7 +635,6 @@ const PipelineStatusPage = () => {
         </div>
       </div>
 
-      {/* Enhanced additional info section */}
       {(brand.typesense?.adsInQueue > 0 || brand.typesense?.adsFailed > 0 ||
         brand.fileUpload?.mediaInQueue > 0 || brand.fileUpload?.mediaFailed > 0) && (
           <div className="mt-4 pt-3 border-t border-gray-200">
@@ -725,7 +643,6 @@ const PipelineStatusPage = () => {
               <span className="text-xs font-medium text-gray-600">Queue Status</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-              {/* Typesense Queue Info */}
               {(brand.typesense?.adsInQueue > 0 || brand.typesense?.adsFailed > 0) && (
                 <div className="space-y-1">
                   <span className="font-medium text-gray-600">Typesense:</span>
@@ -742,7 +659,6 @@ const PipelineStatusPage = () => {
                 </div>
               )}
 
-              {/* File Upload Queue Info */}
               {(brand.fileUpload?.mediaInQueue > 0 || brand.fileUpload?.mediaFailed > 0) && (
                 <div className="space-y-1">
                   <span className="font-medium text-gray-600">Files:</span>
@@ -762,7 +678,6 @@ const PipelineStatusPage = () => {
           </div>
         )}
 
-      {/* External Link Icon - Bottom Right */}
       {brand.pageId && (
         <button
           onClick={() => {
@@ -792,7 +707,6 @@ const PipelineStatusPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
-      {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center py-6 gap-4">
@@ -804,7 +718,6 @@ const PipelineStatusPage = () => {
             </div>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto min-w-0">
-              {/* FIXED: Date Picker with separate input value */}
               <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
                 <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0 sm:hidden" />
                 <div className="relative w-full sm:w-auto min-w-0">
@@ -837,15 +750,11 @@ const PipelineStatusPage = () => {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 overflow-x-hidden">
-        {/* Error Display */}
         {error && <ErrorDisplay error={error} className="mb-6" />}
 
-        {/* Overall Stats Cards - Only show when not in search mode */}
         {!showSearchResults && overallStats && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            {/* Scraping Stats */}
             <Card className="p-3">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -869,7 +778,6 @@ const PipelineStatusPage = () => {
               </div>
             </Card>
 
-            {/* DB Stored Stats */}
             <Card className="p-3">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -897,7 +805,6 @@ const PipelineStatusPage = () => {
               </div>
             </Card>
 
-            {/* Typesense Stats */}
             <Card className="p-3">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -929,7 +836,6 @@ const PipelineStatusPage = () => {
               </div>
             </Card>
 
-            {/* File Upload Stats */}
             <Card className="p-3">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -967,7 +873,6 @@ const PipelineStatusPage = () => {
           </div>
         )}
 
-        {/* Loading indicator for overall stats */}
         {!showSearchResults && overallStatsLoading && (
           <Card className="mb-6 p-4">
             <div className="flex items-center justify-center">
@@ -977,7 +882,6 @@ const PipelineStatusPage = () => {
           </Card>
         )}
 
-        {/* Sorting Controls - Only show when not in search mode */}
         {!showSearchResults && (
           <Card className="mb-4">
             <div className="flex flex-nowrap gap-1 overflow-x-auto">
@@ -1004,7 +908,6 @@ const PipelineStatusPage = () => {
           </Card>
         )}
 
-        {/* Search and Filters */}
         <Card className="mb-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
@@ -1029,7 +932,6 @@ const PipelineStatusPage = () => {
           </div>
         </Card>
 
-        {/* Brand Cards Grid */}
         {isSearching ? (
           <div className="text-center py-12">
             <div className="flex items-center justify-center">
@@ -1052,7 +954,6 @@ const PipelineStatusPage = () => {
           </div>
         )}
 
-        {/* Pagination - Only show when not in search mode and not searching */}
         {!showSearchResults && !isSearching && data.pagination.pages > 1 && (
           <Card>
             <div className="relative">
@@ -1076,7 +977,6 @@ const PipelineStatusPage = () => {
           </Card>
         )}
 
-        {/* Search Results Info */}
         {showSearchResults && (
           <Card className="text-center py-4">
             <div className="text-sm text-gray-600">
@@ -1091,7 +991,6 @@ const PipelineStatusPage = () => {
           </Card>
         )}
 
-        {/* Footer */}
         <div className="mt-8 text-center text-sm text-gray-500">
           <p>Last updated: {new Date().toLocaleString()}</p>
           {data.date && (

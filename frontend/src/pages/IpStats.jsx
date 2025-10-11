@@ -192,11 +192,9 @@ const IpStats = () => {
     }
   }, [searchParams, loadIpStats, setSearchParams]);
 
-  // Combined effect for loading brands - prevents duplicate calls
   useEffect(() => {
     if (!selectedIp) return;
 
-    // Handle search with debouncing
     if (searchTerm && searchTerm.trim() !== '') {
       if (searchTerm.trim().length >= 3) {
         const timeoutId = setTimeout(() => {
@@ -206,17 +204,13 @@ const IpStats = () => {
         return () => clearTimeout(timeoutId);
       }
     } else {
-      // Load brands immediately for non-search cases
       loadBrands(selectedIp, currentPage, '', sortBy, sortOrder);
     }
   }, [selectedIp, currentPage, searchTerm, sortBy, sortOrder, loadBrands]);
 
-  // Reload data when environment changes
   useEffect(() => {
-    // Only trigger if environment actually changed
     if (!environmentLoading && !isInitialMountRef.current && previousEnvironmentRef.current !== currentEnvironment) {
       previousEnvironmentRef.current = currentEnvironment;
-      // Reload IP stats for new environment
       loadIpStats(false);
     }
   }, [currentEnvironment, environmentLoading, loadIpStats]);
@@ -297,7 +291,6 @@ const IpStats = () => {
       }
 
       await loadIpStats(false);
-      // loadBrands will be triggered automatically by useEffect when loadIpStats completes
       toast.success('IP stats refreshed successfully');
     } catch (error) {
       console.error('IP stats refresh failed:', error);
@@ -447,8 +440,8 @@ const IpStats = () => {
                     key={ipStat.ip}
                     onClick={() => handleTabChange(ipStat.ip)}
                     className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-medium transition-colors text-xs md:text-sm ${selectedIp === ipStat.ip
-                        ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-gray-200'
+                      ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-gray-200'
                       }`}
                   >
                     <Server className="h-3 w-3 md:h-4 md:w-4" />
@@ -550,8 +543,7 @@ const IpStats = () => {
                       <span>Showing: {dataState.brands.length}</span>
                     </div>
                   </div>
-                  
-                  {/* Mobile Sorting Button */}
+
                   <div className="md:hidden flex justify-center">
                     <button
                       onClick={() => handleSortChange('adsCount')}
@@ -591,7 +583,6 @@ const IpStats = () => {
                 </div>
               ) : (
                 <>
-                  {/* Desktop Table View */}
                   <div className="hidden md:block">
                     <Table
                       data={dataState.brands}
@@ -605,12 +596,10 @@ const IpStats = () => {
                     />
                   </div>
 
-                  {/* Mobile Card View */}
                   <div className="md:hidden divide-y divide-gray-200">
                     {dataState.brands.map((brand, index) => (
                       <div key={brand._id || index} className="p-4 hover:bg-gray-50 transition-colors">
                         <div className="space-y-3">
-                          {/* S.No and Brand Name */}
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
@@ -646,7 +635,6 @@ const IpStats = () => {
                             )}
                           </div>
 
-                          {/* Brand ID and Page ID */}
                           <div className="grid grid-cols-2 gap-2 text-xs">
                             <div>
                               <div className="flex items-center gap-1 text-gray-500 mb-1">
@@ -668,7 +656,6 @@ const IpStats = () => {
                             </div>
                           </div>
 
-                          {/* Ads Count */}
                           <div className="flex items-center justify-between pt-2 border-t border-gray-100">
                             <span className="text-xs font-medium text-gray-500">Ads Count</span>
                             <span className="text-sm font-bold text-gray-900">

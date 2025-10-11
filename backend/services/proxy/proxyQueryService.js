@@ -1,60 +1,51 @@
 const { getGlobalRedis } = require("../../utils/redisSelector");
 const logger = require("../../utils/logger");
 
-// Function to get dynamic Redis keys
 function getRedisKeys() {
   return require("../../config/constants").REDIS_KEYS;
 }
 
-/**
- * Format disabled timestamp (handles both Unix timestamp and ISO string)
- */
+
 function formatDisabledTimestamp(disabledAt) {
   if (!disabledAt) return { date: null, time: null };
-  
+
   let date;
-  // Check if it's a Unix timestamp (numeric string)
   if (/^\d+$/.test(disabledAt)) {
     date = new Date(parseInt(disabledAt));
   } else {
     date = new Date(disabledAt);
   }
-  
+
   return {
-    date: date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    date: date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     }),
-    time: date.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit', 
+    time: date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
       second: '2-digit',
-      hour12: true 
+      hour12: true
     })
   };
 }
 
-/**
- * Get all proxies with pagination and filters
- */
+
 async function getProxies(page = 1, limit = 10, filter = "all", search = "", environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys();
     const PROXY_IPS_KEY = REDIS_KEYS.GLOBAL.PROXY_IPS;
-    
+
     const start = (page - 1) * limit;
     const end = start + limit - 1;
-    
-    // Get all proxy keys
+
     const proxyKeys = await getGlobalRedis(environment).keys(`${PROXY_IPS_KEY}:*`);
-    
-    // Get all proxy data from hashes
+
     let allProxies = [];
     for (const key of proxyKeys) {
       const proxyData = await getGlobalRedis(environment).hgetall(key);
       if (Object.keys(proxyData).length > 0) {
-        // Parse the proxy key to extract IP, port, username, password
         const keyParts = key.split(':');
         const proxy = {
           id: key,
@@ -64,8 +55,7 @@ async function getProxies(page = 1, limit = 10, filter = "all", search = "", env
           password: keyParts[4],
           ...proxyData
         };
-        
-        // Check for proxy lock
+
         const lockKey = `proxy:lock:${keyParts[1]}:${keyParts[2]}:${keyParts[3]}:${keyParts[4]}`;
         const lockData = await getGlobalRedis().get(lockKey);
         if (lockData) {
@@ -77,15 +67,14 @@ async function getProxies(page = 1, limit = 10, filter = "all", search = "", env
           proxy.lock_worker = null;
           proxy.lock_key = null;
         }
-        
+
         allProxies.push(proxy);
       }
     }
-    
-    // Apply search filter first
+
     if (search && search.trim()) {
       const searchTerm = search.toLowerCase().trim();
-      
+
       allProxies = allProxies.filter(proxy => {
         return (
           proxy.ip?.toLowerCase().includes(searchTerm) ||
@@ -96,13 +85,11 @@ async function getProxies(page = 1, limit = 10, filter = "all", search = "", env
         );
       });
     }
-    
-    // Apply filters
+
     if (filter === "working") {
       logger.info(`Applying working filter`);
       const beforeFilter = allProxies.length;
-      
-      // Debug: Log some proxy data to see the structure
+
       if (allProxies.length > 0) {
         logger.info(`Sample proxy data:`, {
           id: allProxies[0].id,
@@ -112,7 +99,7 @@ async function getProxies(page = 1, limit = 10, filter = "all", search = "", env
           successCount: allProxies[0].successCount
         });
       }
-      
+
       allProxies = allProxies.filter(proxy => {
         const isActive = proxy.active === "true";
         logger.info(`Proxy ${proxy.id}: active="${proxy.active}" (type: ${typeof proxy.active}), isActive: ${isActive}`);
@@ -122,8 +109,7 @@ async function getProxies(page = 1, limit = 10, filter = "all", search = "", env
     } else if (filter === "failed") {
       logger.info(`Applying failed filter`);
       const beforeFilter = allProxies.length;
-      
-      // Debug: Log some proxy data to see the structure
+
       if (allProxies.length > 0) {
         logger.info(`Sample proxy data:`, {
           id: allProxies[0].id,
@@ -133,7 +119,7 @@ async function getProxies(page = 1, limit = 10, filter = "all", search = "", env
           successCount: allProxies[0].successCount
         });
       }
-      
+
       allProxies = allProxies.filter(proxy => {
         const isInactive = proxy.active === "false";
         logger.info(`Proxy ${proxy.id}: active="${proxy.active}" (type: ${typeof proxy.active}), isInactive: ${isInactive}`);
@@ -141,18 +127,17 @@ async function getProxies(page = 1, limit = 10, filter = "all", search = "", env
       });
       logger.info(`Failed filter reduced proxies from ${beforeFilter} to ${allProxies.length}`);
     }
-    
+
     const totalProxies = allProxies.length;
     const proxies = allProxies.slice(start, end);
-    
+
     const parsedProxies = proxies.map(proxy => {
       const failCount = parseInt(proxy.failCount || 0);
       const successCount = parseInt(proxy.successCount || 0);
       const usageCount = failCount + successCount;
-      
-      // Use stored creation date if available, otherwise fallback to current date
+
       const createdDate = proxy.created_at ? new Date(proxy.created_at) : new Date();
-      
+
       return {
         ...proxy,
         failCount: failCount,
@@ -160,22 +145,20 @@ async function getProxies(page = 1, limit = 10, filter = "all", search = "", env
         usage_count: usageCount,
         is_working: proxy.active === "true",
         active: proxy.active === "true",
-        // Add failure reason logic - use stored failure_reason or fallback to status-based logic
         failure_reason: proxy.failure_reason || (proxy.deActivate ? "cooldown" : (proxy.active === "false" ? "health_check_failed" : null)),
-        // Use country from Redis if available, otherwise default
         country: proxy.country || "Unknown",
         type: proxy.type || "http",
         added_at: proxy.created_at || createdDate.toISOString(),
-        added_date: proxy.added_date || createdDate.toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
+        added_date: proxy.added_date || createdDate.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
         }),
-        added_time: proxy.added_time || createdDate.toLocaleTimeString('en-US', { 
-          hour: '2-digit', 
-          minute: '2-digit', 
+        added_time: proxy.added_time || createdDate.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
           second: '2-digit',
-          hour12: true 
+          hour12: true
         }),
         status: proxy.active === "true" ? "active" : "inactive",
         last_used: null,
@@ -185,7 +168,7 @@ async function getProxies(page = 1, limit = 10, filter = "all", search = "", env
         disabled_time: proxy.disabled_time || (proxy.disabledAt ? formatDisabledTimestamp(proxy.disabledAt).time : null)
       };
     });
-    
+
     return {
       success: true,
       message: "Proxies retrieved successfully",
@@ -208,18 +191,14 @@ async function getProxies(page = 1, limit = 10, filter = "all", search = "", env
   }
 }
 
-/**
- * Get available working proxies only
- */
+
 async function getAvailableProxies() {
   try {
     const REDIS_KEYS = getRedisKeys();
     const PROXY_IPS_KEY = REDIS_KEYS.GLOBAL.PROXY_IPS;
-    
-    // Get all proxy keys
+
     const proxyKeys = await getGlobalRedis().keys(`${PROXY_IPS_KEY}:*`);
-    
-    // Get all proxy data from hashes
+
     const allProxies = [];
     for (const key of proxyKeys) {
       const proxyData = await getGlobalRedis().hgetall(key);
@@ -236,7 +215,7 @@ async function getAvailableProxies() {
         allProxies.push(proxy);
       }
     }
-    
+
     const activeProxies = allProxies
       .filter(proxy => proxy.active === "true")
       .sort((a, b) => {
@@ -244,7 +223,7 @@ async function getAvailableProxies() {
         const bUsage = parseInt(b.failCount || 0) + parseInt(b.successCount || 0);
         return aUsage - bUsage;
       });
-    
+
     return {
       success: true,
       message: "Available proxies retrieved successfully",
@@ -274,18 +253,14 @@ async function getAvailableProxies() {
   }
 }
 
-/**
- * Get last month proxies only
- */
+
 async function getLastMonthProxies() {
   try {
     const REDIS_KEYS = getRedisKeys();
     const PROXY_IPS_KEY = REDIS_KEYS.GLOBAL.PROXY_IPS;
-    
-    // Get all proxy keys
+
     const proxyKeys = await getGlobalRedis().keys(`${PROXY_IPS_KEY}:*`);
-    
-    // Get all proxy data from hashes
+
     const allProxies = [];
     for (const key of proxyKeys) {
       const proxyData = await getGlobalRedis().hgetall(key);
@@ -302,15 +277,14 @@ async function getLastMonthProxies() {
         allProxies.push(proxy);
       }
     }
-    
+
     const lastMonthProxies = allProxies
       .sort((a, b) => {
-        // Sort by usage count (most used first)
         const aUsage = parseInt(a.failCount || 0) + parseInt(a.successCount || 0);
         const bUsage = parseInt(b.failCount || 0) + parseInt(b.successCount || 0);
         return bUsage - aUsage;
       });
-    
+
     return {
       success: true,
       message: "Last month proxies retrieved successfully",
@@ -319,10 +293,9 @@ async function getLastMonthProxies() {
         proxies: lastMonthProxies.map(proxy => {
           const failCount = parseInt(proxy.failCount || 0);
           const successCount = parseInt(proxy.successCount || 0);
-          
-          // Use stored creation date if available, otherwise fallback to current date
+
           const createdDate = proxy.created_at ? new Date(proxy.created_at) : new Date();
-          
+
           return {
             id: proxy.id,
             ip: proxy.ip,
@@ -330,16 +303,16 @@ async function getLastMonthProxies() {
             country: proxy.country || "Unknown",
             type: proxy.type || "http",
             added_at: proxy.created_at || createdDate.toISOString(),
-            added_date: proxy.added_date || createdDate.toLocaleDateString('en-US', { 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
+            added_date: proxy.added_date || createdDate.toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
             }),
-            added_time: proxy.added_time || createdDate.toLocaleTimeString('en-US', { 
-              hour: '2-digit', 
-              minute: '2-digit', 
+            added_time: proxy.added_time || createdDate.toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit',
               second: '2-digit',
-              hour12: true 
+              hour12: true
             }),
             is_working: proxy.active === "true",
             usage_count: failCount + successCount,
@@ -357,17 +330,14 @@ async function getLastMonthProxies() {
   }
 }
 
-/**
- * Get next available proxy for use
- */
+
 async function getNextProxy() {
   try {
     const REDIS_KEYS = getRedisKeys();
     const PROXY_IPS_KEY = REDIS_KEYS.GLOBAL.PROXY_IPS;
-    
-    // Get all proxy keys
+
     const proxyKeys = await getGlobalRedis().keys(`${PROXY_IPS_KEY}:*`);
-    
+
     if (proxyKeys.length === 0) {
       return {
         success: false,
@@ -376,7 +346,6 @@ async function getNextProxy() {
       };
     }
 
-    // Get all proxy data from hashes
     const allProxies = [];
     for (const key of proxyKeys) {
       const proxyData = await getGlobalRedis().hgetall(key);
@@ -394,7 +363,6 @@ async function getNextProxy() {
       }
     }
 
-    // Find active proxy with least usage
     let bestProxy = null;
     let minUsage = Infinity;
 
@@ -416,19 +384,15 @@ async function getNextProxy() {
       };
     }
 
-    // Update success count
     const newSuccessCount = parseInt(bestProxy.successCount || 0) + 1;
 
-    // Update in Redis hash
     await getGlobalRedis().hset(bestProxy.id, {
       successCount: newSuccessCount.toString()
     });
 
-    // Format response
     const failCount = parseInt(bestProxy.failCount || 0);
     const usageCount = failCount + newSuccessCount;
-    
-    // Use stored creation date if available, otherwise fallback to current date
+
     const createdDate = bestProxy.created_at ? new Date(bestProxy.created_at) : new Date();
 
     return {
@@ -442,20 +406,19 @@ async function getNextProxy() {
         is_working: true,
         active: true,
         failure_reason: null,
-        // Add default values for UI compatibility
         country: bestProxy.country || "Unknown",
         type: bestProxy.type || "http",
         added_at: bestProxy.created_at || createdDate.toISOString(),
-        added_date: bestProxy.added_date || createdDate.toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
+        added_date: bestProxy.added_date || createdDate.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
         }),
-        added_time: bestProxy.added_time || createdDate.toLocaleTimeString('en-US', { 
-          hour: '2-digit', 
-          minute: '2-digit', 
+        added_time: bestProxy.added_time || createdDate.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
           second: '2-digit',
-          hour12: true 
+          hour12: true
         }),
         status: "active",
         last_used: new Date().toISOString(),
@@ -469,24 +432,19 @@ async function getNextProxy() {
   }
 }
 
-/**
- * Get proxy statistics
- */
+
 async function getProxyStats(environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys();
     const PROXY_IPS_KEY = REDIS_KEYS.GLOBAL.PROXY_IPS;
-    
-    // Get all proxy keys
+
     const proxyKeys = await getGlobalRedis(environment).keys(`${PROXY_IPS_KEY}:*`);
     const totalProxies = proxyKeys.length;
-    
-    // Get all proxy data from hashes (same logic as getProxies)
+
     const allProxies = [];
     for (const key of proxyKeys) {
       const proxyData = await getGlobalRedis(environment).hgetall(key);
       if (Object.keys(proxyData).length > 0) {
-        // Parse the proxy key to extract IP, port, username, password
         const keyParts = key.split(':');
         const proxy = {
           id: key,
@@ -496,33 +454,30 @@ async function getProxyStats(environment = 'production') {
           password: keyParts[4],
           ...proxyData
         };
-        
+
         allProxies.push(proxy);
       }
     }
-    
+
     let activeCount = 0;
     let totalUsage = 0;
     let totalSuccessCount = 0;
     let totalFailedCount = 0;
     let lockedProxiesCount = 0;
-    
-    // Get all proxy lock keys to count locked proxies
+
     const lockKeys = await getGlobalRedis(environment).keys("proxy:lock:*");
-    
+
     allProxies.forEach(proxy => {
       if (proxy.active === "true") activeCount++;
-      
-      // Get success/fail counts from proxy data
+
       const successCount = parseInt(proxy.successCount || proxy.success_count || proxy.success || 0);
       const failCount = parseInt(proxy.failCount || proxy.fail_count || proxy.failed || 0);
-      
+
       totalUsage += successCount + failCount;
       totalSuccessCount += successCount;
       totalFailedCount += failCount;
     });
 
-    // Count locked proxies by checking if any proxy has a lock
     lockedProxiesCount = lockKeys.length;
 
     logger.info(`Proxy stats calculated: total=${totalProxies}, active=${activeCount}, usage=${totalUsage}, success=${totalSuccessCount}, failed=${totalFailedCount}, locked=${lockedProxiesCount}`);
@@ -532,7 +487,7 @@ async function getProxyStats(environment = 'production') {
       message: "Proxy stats retrieved successfully",
       data: {
         total_proxies: totalProxies,
-        active_proxies: activeCount,  // ✅ FIXED: Now shows actual active count
+        active_proxies: activeCount,
         working_proxies: activeCount,
         total_usage: totalUsage,
         total_success_count: totalSuccessCount,
@@ -548,18 +503,14 @@ async function getProxyStats(environment = 'production') {
   }
 }
 
-/**
- * Search proxies by various criteria
- */
+
 async function searchProxies(query, criteria = "all") {
   try {
     const REDIS_KEYS = getRedisKeys();
     const PROXY_IPS_KEY = REDIS_KEYS.GLOBAL.PROXY_IPS;
-    
-    // Get all proxy keys
+
     const proxyKeys = await getGlobalRedis().keys(`${PROXY_IPS_KEY}:*`);
-    
-    // Get all proxy data from hashes
+
     const allProxies = [];
     for (const key of proxyKeys) {
       const proxyData = await getGlobalRedis().hgetall(key);
@@ -576,10 +527,10 @@ async function searchProxies(query, criteria = "all") {
         allProxies.push(proxy);
       }
     }
-    
+
     const searchResults = allProxies.filter(proxy => {
       const searchTerm = query.toLowerCase();
-      
+
       switch (criteria) {
         case "ip":
           return proxy.ip.toLowerCase().includes(searchTerm);
@@ -597,7 +548,7 @@ async function searchProxies(query, criteria = "all") {
           );
       }
     });
-    
+
     return {
       success: true,
       message: "Search completed successfully",
@@ -627,14 +578,12 @@ async function searchProxies(query, criteria = "all") {
   }
 }
 
-/**
- * Get proxy management statistics (added/removed counts)
- */
+
 async function getProxyManagementStats(environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys();
     const stats = await getGlobalRedis(environment).hgetall(REDIS_KEYS.GLOBAL.PROXY_STATS);
-    
+
     return {
       success: true,
       message: "Proxy management stats retrieved successfully",
@@ -651,12 +600,10 @@ async function getProxyManagementStats(environment = 'production') {
   }
 }
 
-/**
- * Format worker name for display (e.g., "watchlist-1" -> "WL-1", "non-watchlist-1" -> "NWL-1")
- */
+
 function formatWorkerName(workerName) {
   if (!workerName) return null;
-  
+
   if (workerName.startsWith('watchlist-')) {
     const number = workerName.replace('watchlist-', '');
     return `WL-${number}`;
@@ -664,8 +611,7 @@ function formatWorkerName(workerName) {
     const number = workerName.replace('non-watchlist-', '');
     return `NWL-${number}`;
   }
-  
-  // For any other format, return as is
+
   return workerName;
 }
 
@@ -675,6 +621,6 @@ module.exports = {
   getLastMonthProxies,
   getNextProxy,
   getProxyStats,
-  getProxyManagementStats, // ✅ NEW: Added this function
+  getProxyManagementStats,
   searchProxies
 };

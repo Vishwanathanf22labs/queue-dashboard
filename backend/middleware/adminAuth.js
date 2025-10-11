@@ -14,8 +14,6 @@ const adminAuth = (req, res, next) => {
     }
 
     if (isValidSessionToken(adminSession)) {
-      // Note: Admin status endpoint is now cached to reduce repeated API calls
-      // This middleware still logs on every protected route access
       logger.info("Admin access granted via session cookie");
       req.isAdmin = true;
       req.adminUser = "admin";

@@ -96,4 +96,3 @@ const AdMediaItem = getDatabaseConnection().define(
 );
 
 module.exports = AdMediaItem;
-

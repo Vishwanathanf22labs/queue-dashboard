@@ -1,6 +1,9 @@
-// Export all pipeline services - Updated
 const { getBrandScrapingStatus } = require("./brandScrapingService");
-const { getAllBrandsScrapingStatus, getOverallPipelineStats, searchBrandsPipelineStatus } = require("./allBrandsScrapingService");
+const {
+  getAllBrandsScrapingStatus,
+  getOverallPipelineStats,
+  searchBrandsPipelineStatus,
+} = require("./allBrandsScrapingService");
 const { getScrapingStats } = require("./scrapingStatsService");
 const { getTypesenseStatus } = require("./typesenseService");
 const { getFileUploadStatus } = require("./fileUploadService");

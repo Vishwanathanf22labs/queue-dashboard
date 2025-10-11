@@ -41,7 +41,6 @@ const AddBrands = () => {
     localStorage.setItem('addBrands_activeTab', activeTab);
   }, [activeTab]);
 
-  // Handle loading state after all hooks are called
   if (adminLoading) {
     return <LoadingSpinner />;
   }
@@ -105,7 +104,7 @@ const AddBrands = () => {
 
         <Card>
           {activeTab === 'single' && (
-            <SingleBrandForm 
+            <SingleBrandForm
               loading={loading}
               isSubmitting={isSubmitting}
               onSubmittingChange={(value) => updateFormState({ isSubmitting: value })}
@@ -114,7 +113,7 @@ const AddBrands = () => {
           )}
 
           {activeTab === 'csv' && (
-            <CsvUploadForm 
+            <CsvUploadForm
               loading={loading}
               isSubmitting={isSubmitting}
               onSubmittingChange={(value) => updateFormState({ isSubmitting: value })}
@@ -123,7 +122,7 @@ const AddBrands = () => {
           )}
 
           {activeTab === 'all' && (
-            <AddAllBrandsForm 
+            <AddAllBrandsForm
               loading={loading}
               isSubmitting={isSubmitting}
               onSubmittingChange={(value) => updateFormState({ isSubmitting: value })}

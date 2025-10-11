@@ -14,7 +14,6 @@ async function getBrandsScrapedStats(date = null, environment = 'production') {
 
     logger.info(`Stats data for ${statsKey} [${environment}]:`, allStats);
 
-    // Return all the stats fields from your Redis
     const brandsStats = {
       date: targetDate,
       brands_scraped: parseInt(allStats.brands_scrapped || 0),
@@ -36,13 +35,11 @@ async function getBrandsScrapedStatsForDays(days = 7, environment = 'production'
     const today = new Date();
     const dateStrings = [];
 
-    // 🚀 OPTIMIZATION 1: Pre-calculate all date strings
     for (let i = 0; i < days; i++) {
       const date = new Date(today.getTime() - i * MILLISECONDS_PER_DAY);
       dateStrings.push(date.toISOString().split("T")[0]);
     }
 
-    // 🚀 OPTIMIZATION 2: Use Redis pipeline for batch operations
     const pipeline = getGlobalRedis(environment).pipeline();
     dateStrings.forEach((dateString) => {
       const statsKey = `${REDIS_KEYS.GLOBAL.STATS_PREFIX}${dateString}`;
@@ -51,9 +48,8 @@ async function getBrandsScrapedStatsForDays(days = 7, environment = 'production'
 
     const results = await pipeline.exec();
 
-    // 🚀 OPTIMIZATION 3: Process all results at once
     const stats = results.map((result, index) => {
-      const allStats = result[1] || {}; // result[1] contains the actual data
+      const allStats = result[1] || {};
       const dateString = dateStrings[index];
 
       return {
@@ -67,7 +63,7 @@ async function getBrandsScrapedStatsForDays(days = 7, environment = 'production'
 
     return {
       period: `Last ${days} days`,
-      stats: stats.reverse(), // Most recent first
+      stats: stats.reverse(),
     };
   } catch (error) {
     logger.error("Error in getBrandsScrapedStatsForDays:", error);
@@ -75,16 +71,10 @@ async function getBrandsScrapedStatsForDays(days = 7, environment = 'production'
   }
 }
 
-/**
- * Get separate stats for watchlist and regular brands
- * @param {string} date - Date in YYYY-MM-DD format (optional, defaults to today)
- * @param {string} environment - 'production' or 'stage' (defaults to 'production')
- */
 async function getSeparateBrandsScrapedStats(date = null, environment = 'production') {
   try {
     const targetDate = date || new Date().toISOString().split("T")[0];
-    
-    // Get stats from both Redis instances for the specified environment
+
     const [watchlistStats, regularStats] = await Promise.all([
       getStatsFromRedis(getWatchlistRedisInstance(environment), targetDate, 'watchlist'),
       getStatsFromRedis(getRegularRedisInstance(environment), targetDate, 'regular')
@@ -107,13 +97,11 @@ async function getSeparateBrandsScrapedStatsForDays(days = 7, environment = 'pro
     const today = new Date();
     const dateStrings = [];
 
-    // Pre-calculate all date strings
     for (let i = 0; i < days; i++) {
       const date = new Date(today.getTime() - i * MILLISECONDS_PER_DAY);
       dateStrings.push(date.toISOString().split("T")[0]);
     }
 
-    // Get stats for all dates from both Redis instances for the specified environment
     const [watchlistStats, regularStats] = await Promise.all([
       getStatsForDaysFromRedis(getWatchlistRedisInstance(environment), dateStrings, 'watchlist'),
       getStatsForDaysFromRedis(getRegularRedisInstance(environment), dateStrings, 'regular')
@@ -129,7 +117,6 @@ async function getSeparateBrandsScrapedStatsForDays(days = 7, environment = 'pro
   }
 }
 
-// Helper function to get stats from a specific Redis instance
 async function getStatsFromRedis(redis, targetDate, type) {
   try {
     const statsKey = `${REDIS_KEYS[type.toUpperCase()].STATS_PREFIX}${targetDate}`;
@@ -137,7 +124,7 @@ async function getStatsFromRedis(redis, targetDate, type) {
 
     return {
       date: targetDate,
-      brands_scraped: parseInt(allStats.brands_scrapped || 0), // Fixed: brands_scrapped (double 'p')
+      brands_scraped: parseInt(allStats.brands_scrapped || 0),
       brands_processed: parseInt(allStats.brands_processed || 0),
       brands_scrapped_failed: parseInt(allStats.brands_scrapped_failed || 0),
       ads_processed: parseInt(allStats.ads_processed || 0),
@@ -154,7 +141,6 @@ async function getStatsFromRedis(redis, targetDate, type) {
   }
 }
 
-// Helper function to get stats for multiple days from a specific Redis instance
 async function getStatsForDaysFromRedis(redis, dateStrings, type) {
   try {
     const pipeline = redis.pipeline();
@@ -180,7 +166,7 @@ async function getStatsForDaysFromRedis(redis, dateStrings, type) {
       } else {
         stats.push({
           date: dateStrings[index],
-          brands_scraped: parseInt(data.brands_scrapped || 0), // Fixed: brands_scrapped (double 'p')
+          brands_scraped: parseInt(data.brands_scrapped || 0),
           brands_processed: parseInt(data.brands_processed || 0),
           brands_scrapped_failed: parseInt(data.brands_scrapped_failed || 0),
           ads_processed: parseInt(data.ads_processed || 0),

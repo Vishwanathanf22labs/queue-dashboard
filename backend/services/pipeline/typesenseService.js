@@ -3,10 +3,7 @@ const { Op } = require("sequelize");
 const { getCacheKey, getCachedData, setCachedData } = require("../utils/cacheUtils");
 const { getTypesenseBullQueueData, getTypesenseFailedQueueData } = require("../utils/redisUtils");
 
-/**
- * Check Typesense status for a brand based on ads and Redis Bull queues
- * FIXED: Proper status logic implementation based on requirements
- */
+
 async function getTypesenseStatus(
   brandId,
   targetDate,
@@ -21,11 +18,9 @@ async function getTypesenseStatus(
     const cached = await getCachedData(cacheKey, environment);
     if (cached) return cached;
 
-    // FIXED: Count ads by typesense_updated_at on target date
     const startDate = new Date(targetDate + "T00:00:00.000Z");
     const endDate = new Date(targetDate + "T23:59:59.999Z");
 
-    // Count total ads processed on target date (typesense_updated_at)
     const totalAdsProcessedToday = await Ad.count({
       where: {
         brand_id: brandId,
@@ -49,7 +44,6 @@ async function getTypesenseStatus(
       return result;
     }
 
-    // Count ads with typesense_id among those processed today
     const adsWithTypesenseCount = await Ad.count({
       where: {
         brand_id: brandId,
@@ -64,11 +58,9 @@ async function getTypesenseStatus(
 
     const adsWithoutTypesenseCount = totalAdsProcessedToday - adsWithTypesenseCount;
 
-    // FIXED: Use counts from typesense_updated_at
-    const totalAds = totalAdsProcessedToday; // Total ads processed on target date
-    const adsProcessedTodayCount = totalAdsProcessedToday; // All counted ads were processed today
+    const totalAds = totalAdsProcessedToday; 
+    const adsProcessedTodayCount = totalAdsProcessedToday; 
 
-    // FIXED: If all ads processed today have typesense_id, mark as completed
     if (adsWithTypesenseCount === totalAds) {
       const result = {
         status: "COMPLETED",
@@ -83,18 +75,15 @@ async function getTypesenseStatus(
       return result;
     }
 
-    // FIXED: Check Redis queues for ads without typesense_id
     let adsInQueue = 0;
     let adsFailed = 0;
 
-    // Get Redis data if not provided
     if (!bullJobData && !failedJobData) {
       bullJobData = await getTypesenseBullQueueData(queueType, environment);
       failedJobData = await getTypesenseFailedQueueData(queueType, environment);
     }
 
     if (bullJobData || failedJobData) {
-      // Get ads that were processed today but don't have typesense_id
       const adsProcessedTodayWithoutTypesense = await Ad.findAll({
         where: {
           brand_id: brandId,
@@ -114,15 +103,13 @@ async function getTypesenseStatus(
         } else if (bullJobData && bullJobData.has(adId)) {
           adsInQueue++;
         } else {
-          adsFailed++; // Not in queue and not failed = actually failed
+          adsFailed++; 
         }
       }
     } else {
-      // If no Redis data, assume all without typesense_id are failed
       adsFailed = adsWithoutTypesenseCount;
     }
 
-    // FIXED: If some ads processed today don't have typesense_id
     if (adsWithTypesenseCount > 0 && adsWithTypesenseCount < totalAds) {
       let status, message;
       
@@ -147,7 +134,6 @@ async function getTypesenseStatus(
       return result;
     }
 
-    // FIXED: If no ads processed today have typesense_id
     if (adsWithTypesenseCount === 0) {
       let status, message;
       
@@ -172,7 +158,6 @@ async function getTypesenseStatus(
       return result;
     }
 
-    // This should never be reached due to the conditions above
     const result = {
       status: "NOT_PROCESSED",
       message: "Typesense indexing status unknown",

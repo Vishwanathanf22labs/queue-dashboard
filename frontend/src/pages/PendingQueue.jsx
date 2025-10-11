@@ -19,13 +19,12 @@ const PendingQueue = () => {
   const currentSearchRef = useRef('');
   const isInitialMountRef = useRef(true);
   const [searchParams, setSearchParams] = useSearchParams();
-  
-  // Separate state for original totals (for static display)
+
   const [originalTotals, setOriginalTotals] = useState({
     total_items: 0,
     total_pages: 0
   });
-  
+
   const [queueState, setQueueState] = useState({
     searchTerm: searchParams.get('search') || '',
     currentPage: parseInt(searchParams.get('page')) || 1,
@@ -79,7 +78,7 @@ const PendingQueue = () => {
                 <span title={`Score: ${score}`}>
                   {value || 'Unknown Brand'}
                   {score !== 'N/A' && (
-                    <span className="text-gray-400 font-medium ml-1">({score})</span>
+                    <span className="text-blue-600 font-bold ml-1 text-base">({score})</span>
                   )}
                 </span>
               </div>
@@ -134,7 +133,6 @@ const PendingQueue = () => {
 
   const loadPendingBrands = useCallback(async (searchTerm = null, pageOverride = null) => {
     try {
-      // Set loading states appropriately
       if (searchTerm) {
         updateQueueState({ isSearching: true, error: null });
       } else {
@@ -144,14 +142,12 @@ const PendingQueue = () => {
       const pageToLoad = searchTerm ? 1 : (pageOverride || currentPage);
       const response = await fetchPendingBrands(pageToLoad, itemsPerPage, searchTerm);
 
-      // Only update results if they match the current search term
       const currentSearch = currentSearchRef.current;
       const searchToCheck = searchTerm || '';
-      
-      // If search terms don't match, ignore this response (it's stale)
+
       if (searchToCheck !== currentSearch) {
         updateQueueState({ isSearching: false });
-        return; 
+        return;
       }
 
       let brands = [];
@@ -175,7 +171,6 @@ const PendingQueue = () => {
         isSearching: false
       });
 
-      // Store original totals only when not searching (for static display)
       if (!searchTerm) {
         setOriginalTotals({
           total_items: pagination.total_items || 0,
@@ -191,9 +186,7 @@ const PendingQueue = () => {
     }
   }, [fetchPendingBrands, itemsPerPage]);
 
-  // Initial load effect - runs only once on mount
   useEffect(() => {
-    // Load initial data based on URL parameters
     const initialSearch = searchParams.get('search') || '';
     const initialPage = parseInt(searchParams.get('page')) || 1;
 
@@ -205,15 +198,12 @@ const PendingQueue = () => {
       loadPendingBrands(null, initialPage);
     }
 
-    // Mark initial mount as complete
     setTimeout(() => {
       isInitialMountRef.current = false;
     }, 100);
-  }, []); // Empty dependency array - only run once
+  }, []);
 
-  // Handle page changes (when not searching)
   useEffect(() => {
-    // Skip initial mount and when searching
     if (isInitialMountRef.current || (searchTerm && searchTerm.trim().length >= 3)) {
       return;
     }
@@ -221,9 +211,7 @@ const PendingQueue = () => {
     loadPendingBrands(null, currentPage);
   }, [currentPage, loadPendingBrands]);
 
-  // Handle search with debouncing
   useEffect(() => {
-    // Skip initial mount to prevent duplicate calls
     if (isInitialMountRef.current) {
       return;
     }
@@ -238,13 +226,11 @@ const PendingQueue = () => {
 
       return () => clearTimeout(timeoutId);
     } else if (searchTerm === '') {
-      // Handle clearing search - load normal data
       currentSearchRef.current = '';
       loadPendingBrands(null, 1);
     }
   }, [searchTerm, loadPendingBrands]);
 
-  // Auto-refresh hook
   const refreshFn = useCallback(async () => {
     try {
       if (searchTerm && searchTerm.trim().length >= 3) {
@@ -265,27 +251,23 @@ const PendingQueue = () => {
 
   const handleRefresh = async () => {
     await manualRefresh();
-    // Toast is now handled in refreshFn
   };
 
   const handleSearch = (searchValue) => {
-    // Update search term in state immediately (for input display)
     updateQueueState({ searchTerm: searchValue });
 
-    // Update URL parameters
     const newParams = new URLSearchParams(searchParams);
     if (searchValue && searchValue.trim()) {
       newParams.set('search', searchValue);
-      newParams.set('page', '1'); // Reset to page 1 on search
+      newParams.set('page', '1');
     } else {
       newParams.delete('search');
-      newParams.set('page', '1'); // Reset to page 1 when clearing search
+      newParams.set('page', '1');
     }
     setSearchParams(newParams, { replace: true });
 
     if (!searchValue || searchValue.trim() === '') {
       updateQueueState({ currentPage: 1 });
-      // The useEffect will handle loading the data
     }
   };
 
@@ -293,19 +275,16 @@ const PendingQueue = () => {
     currentSearchRef.current = '';
     updateQueueState({ searchTerm: '', currentPage: 1 });
 
-    // Update URL parameters
     const newParams = new URLSearchParams(searchParams);
     newParams.delete('search');
     newParams.set('page', '1');
     setSearchParams(newParams, { replace: true });
 
-    // The useEffect will handle loading the data
   };
 
   const handlePageChange = (page) => {
     updateQueueState({ currentPage: page });
 
-    // Update URL parameters
     const newParams = new URLSearchParams(searchParams);
     newParams.set('page', page.toString());
     setSearchParams(newParams, { replace: true });
@@ -314,12 +293,10 @@ const PendingQueue = () => {
   const filteredBrands = brands;
   const totalPages = pagination.total_pages || 1;
 
-  // Show loading state while initial data is loading
   if (loading && brands.length === 0 && !isSearching) {
     return <LoadingSpinner />;
   }
 
-  // Show error state if there's an error
   if (error && !isSearching && brands.length === 0) {
     return <ErrorDisplay message={error} onRetry={() => loadPendingBrands()} />;
   }
@@ -410,7 +387,6 @@ const PendingQueue = () => {
         </div>
       </Card>
 
-      {/* Desktop Table View */}
       <Card className="hidden md:block">
         {isSearching ? (
           <div className="text-center py-12 sm:py-16">
@@ -442,7 +418,6 @@ const PendingQueue = () => {
         )}
       </Card>
 
-      {/* Mobile Cards View */}
       <div className="md:hidden space-y-3">
         {isSearching ? (
           <Card>
@@ -479,10 +454,8 @@ const PendingQueue = () => {
             return (
               <Card key={`${brandId}-${index}`} className="p-4 relative pb-12">
                 <div className="space-y-3">
-                  {/* Header with Position and Brand Name */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      {/* Position Circle */}
                       <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                         <span className="text-sm font-medium text-blue-600">
                           {position}
@@ -491,14 +464,12 @@ const PendingQueue = () => {
                       <h3 className="font-semibold text-gray-900 text-lg" title={`Score: ${score}`}>
                         {brandName}
                         {score !== 'N/A' && (
-                          <span className="text-gray-400 font-medium ml-1">({score})</span>
+                          <span className="text-blue-600 font-bold ml-1 text-xl">({score})</span>
                         )}
                       </h3>
                     </div>
                     <Badge variant="info">Pending</Badge>
                   </div>
-
-                  {/* Details Grid */}
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-gray-500">Brand ID:</span>
@@ -510,7 +481,6 @@ const PendingQueue = () => {
                     </div>
                   </div>
 
-                  {/* External Link Icon - Bottom Right */}
                   {pageId && pageId !== 'N/A' && (
                     <button
                       onClick={() => {

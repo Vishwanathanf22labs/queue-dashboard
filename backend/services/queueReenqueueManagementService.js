@@ -1,37 +1,30 @@
 const { getQueueRedis, getGlobalRedis } = require("../utils/redisSelector");
 const logger = require("../utils/logger");
 
-// Function to get dynamic Redis keys
+
 function getRedisKeys(environment = 'production') {
   return require("../config/constants").getRedisKeys(environment);
 }
 
-/**
- * Requeue a single brand from reenqueue list to pending queue
- * @param {string} itemId - The id of the item to requeue
- * @param {string} namespace - 'watchlist' or 'non-watchlist'
- * @param {string} environment - Environment ('production' or 'stage')
- * @returns {Object} - Success status
- */
+
 async function requeueSingleBrand(itemId, namespace, environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys(environment);
     const reenqueueKey = REDIS_KEYS.GLOBAL.REENQUEUE_KEY;
-    
+
     if (!reenqueueKey) {
       throw new Error("REENQUEUE_KEY is not configured");
     }
 
-    // Get global Redis connection dynamically
+
     const globalRedis = getGlobalRedis(environment);
-    
-    // Get all items from reenqueue list
+
     const allItems = await globalRedis.lrange(reenqueueKey, 0, -1);
-    
+
     let itemToRequeue = null;
     let itemIndex = -1;
 
-    // Find the item to requeue
+
     for (let i = 0; i < allItems.length; i++) {
       try {
         const parsed = JSON.parse(allItems[i]);
@@ -45,11 +38,12 @@ async function requeueSingleBrand(itemId, namespace, environment = 'production')
       }
     }
 
+
     if (!itemToRequeue) {
       throw new Error("Item not found in reenqueue list");
     }
 
-    // If page_id is missing, fetch it from database
+
     if (!itemToRequeue.page_id && itemToRequeue.id) {
       try {
         const { Brand } = require("../models");
@@ -58,7 +52,7 @@ async function requeueSingleBrand(itemId, namespace, environment = 'production')
           attributes: ["id", "page_id"],
           raw: true,
         });
-        
+
         if (brand && brand.page_id) {
           itemToRequeue.page_id = brand.page_id;
         }
@@ -67,25 +61,26 @@ async function requeueSingleBrand(itemId, namespace, environment = 'production')
       }
     }
 
-    // Determine which queue to add to based on namespace
+
     const queueType = namespace === 'watchlist' ? 'watchlist' : 'regular';
     const queueRedis = getQueueRedis(queueType, environment);
-    const pendingQueueKey = queueType === 'watchlist' 
-      ? REDIS_KEYS.WATCHLIST.PENDING_BRANDS 
+    const pendingQueueKey = queueType === 'watchlist'
+      ? REDIS_KEYS.WATCHLIST.PENDING_BRANDS
       : REDIS_KEYS.REGULAR.PENDING_BRANDS;
 
-    // Add to pending queue with score 100
+
     const queueData = JSON.stringify({
       id: itemToRequeue.id,
       page_id: itemToRequeue.page_id
     });
-    
+
     await queueRedis.zadd(pendingQueueKey, 100, queueData);
-    
-    // Remove from reenqueue list
+
     await globalRedis.lrem(reenqueueKey, 1, allItems[itemIndex]);
 
+
     logger.info(`Requeued brand ${itemId} to ${queueType} pending queue with score 100`);
+
 
     return {
       success: true,
@@ -98,44 +93,38 @@ async function requeueSingleBrand(itemId, namespace, environment = 'production')
   }
 }
 
-/**
- * Requeue all brands from reenqueue list to pending queue
- * @param {string} namespace - 'watchlist' or 'non-watchlist'
- * @param {string} environment - Environment ('production' or 'stage')
- * @returns {Object} - Success status with count
- */
+
 async function requeueAllBrands(namespace, environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys(environment);
     const reenqueueKey = REDIS_KEYS.GLOBAL.REENQUEUE_KEY;
-    
+
     if (!reenqueueKey) {
       throw new Error("REENQUEUE_KEY is not configured");
     }
 
-    // Get global Redis connection dynamically
+
     const globalRedis = getGlobalRedis(environment);
 
-    // Get all items from reenqueue list
+
     const allItems = await globalRedis.lrange(reenqueueKey, 0, -1);
-    
-    // Determine which queue to add to based on namespace
+
     const queueType = namespace === 'watchlist' ? 'watchlist' : 'regular';
     const queueRedis = getQueueRedis(queueType, environment);
-    const pendingQueueKey = queueType === 'watchlist' 
-      ? REDIS_KEYS.WATCHLIST.PENDING_BRANDS 
+    const pendingQueueKey = queueType === 'watchlist'
+      ? REDIS_KEYS.WATCHLIST.PENDING_BRANDS
       : REDIS_KEYS.REGULAR.PENDING_BRANDS;
+
 
     let requeuedCount = 0;
     const itemsToRemove = [];
 
-    // Process items matching the namespace
+
     for (const item of allItems) {
       try {
         const parsed = JSON.parse(item);
-        
+
         if (parsed.namespace === namespace) {
-          // If page_id is missing, fetch it from database
           let pageId = parsed.page_id;
           if (!pageId && parsed.id) {
             try {
@@ -145,7 +134,7 @@ async function requeueAllBrands(namespace, environment = 'production') {
                 attributes: ["id", "page_id"],
                 raw: true,
               });
-              
+
               if (brand && brand.page_id) {
                 pageId = brand.page_id;
               }
@@ -153,8 +142,7 @@ async function requeueAllBrands(namespace, environment = 'production') {
               logger.error("Error fetching page_id for requeue all:", dbError);
             }
           }
-          
-          // Add to pending queue with score 100
+
           const queueData = JSON.stringify({
             id: parsed.id,
             page_id: pageId
@@ -168,12 +156,14 @@ async function requeueAllBrands(namespace, environment = 'production') {
       }
     }
 
-    // Remove all requeued items from reenqueue list
+
     for (const item of itemsToRemove) {
       await globalRedis.lrem(reenqueueKey, 1, item);
     }
 
+
     logger.info(`Requeued ${requeuedCount} brands to ${queueType} pending queue with score 100`);
+
 
     return {
       success: true,
@@ -187,31 +177,25 @@ async function requeueAllBrands(namespace, environment = 'production') {
   }
 }
 
-/**
- * Delete a single brand from reenqueue list
- * @param {string} itemId - The id of the item to delete
- * @param {string} namespace - 'watchlist' or 'non-watchlist'
- * @param {string} environment - Environment ('production' or 'stage')
- * @returns {Object} - Success status
- */
+
 async function deleteSingleBrand(itemId, namespace, environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys(environment);
     const reenqueueKey = REDIS_KEYS.GLOBAL.REENQUEUE_KEY;
-    
+
     if (!reenqueueKey) {
       throw new Error("REENQUEUE_KEY is not configured");
     }
 
-    // Get global Redis connection dynamically
+
     const globalRedis = getGlobalRedis(environment);
 
-    // Get all items from reenqueue list
+
     const allItems = await globalRedis.lrange(reenqueueKey, 0, -1);
-    
+
     let itemToDelete = null;
 
-    // Find the item to delete
+
     for (const item of allItems) {
       try {
         const parsed = JSON.parse(item);
@@ -224,14 +208,17 @@ async function deleteSingleBrand(itemId, namespace, environment = 'production') 
       }
     }
 
+
     if (!itemToDelete) {
       throw new Error("Item not found in reenqueue list");
     }
 
-    // Remove from reenqueue list
+
     await globalRedis.lrem(reenqueueKey, 1, itemToDelete);
 
+
     logger.info(`Deleted brand ${itemId} from reenqueue list`);
+
 
     return {
       success: true,
@@ -243,34 +230,29 @@ async function deleteSingleBrand(itemId, namespace, environment = 'production') 
   }
 }
 
-/**
- * Delete all brands from reenqueue list by namespace
- * @param {string} namespace - 'watchlist' or 'non-watchlist'
- * @param {string} environment - Environment ('production' or 'stage')
- * @returns {Object} - Success status with count
- */
+
 async function deleteAllBrands(namespace, environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys(environment);
     const reenqueueKey = REDIS_KEYS.GLOBAL.REENQUEUE_KEY;
-    
+
     if (!reenqueueKey) {
       throw new Error("REENQUEUE_KEY is not configured");
     }
 
-    // Get global Redis connection dynamically
+
     const globalRedis = getGlobalRedis(environment);
 
-    // Get all items from reenqueue list
+
     const allItems = await globalRedis.lrange(reenqueueKey, 0, -1);
-    
+
     let deletedCount = 0;
 
-    // Delete items matching the namespace
+
     for (const item of allItems) {
       try {
         const parsed = JSON.parse(item);
-        
+
         if (parsed.namespace === namespace) {
           await globalRedis.lrem(reenqueueKey, 1, item);
           deletedCount++;
@@ -280,7 +262,9 @@ async function deleteAllBrands(namespace, environment = 'production') {
       }
     }
 
+
     logger.info(`Deleted ${deletedCount} brands from reenqueue list (namespace: ${namespace})`);
+
 
     return {
       success: true,
@@ -292,6 +276,7 @@ async function deleteAllBrands(namespace, environment = 'production') {
     throw error;
   }
 }
+
 
 module.exports = {
   requeueSingleBrand,

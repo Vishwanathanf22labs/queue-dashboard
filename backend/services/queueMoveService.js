@@ -2,7 +2,6 @@ const { getQueueRedis, getGlobalRedis } = require("../utils/redisSelector");
 const logger = require("../utils/logger");
 const { QUEUES } = require("../config/constants");
 
-// Function to get dynamic Redis keys
 function getRedisKeys(environment = 'production') {
   return require("../config/constants").getRedisKeys(environment);
 }
@@ -19,7 +18,6 @@ async function movePendingToFailed(queueId, queueType = "regular", environment =
     const pendingQueueKey = REDIS_KEYS[queueType.toUpperCase()].PENDING_BRANDS;
     const failedQueueKey = REDIS_KEYS[queueType.toUpperCase()].FAILED_BRANDS;
 
-    // Get all pending brands with scores from sorted set
     const pendingBrands = await redis.zrange(
       pendingQueueKey,
       0,
@@ -30,7 +28,6 @@ async function movePendingToFailed(queueId, queueType = "regular", environment =
     let brandToMove = null;
     let brandMember = null;
 
-    // pendingBrands is [member1, score1, member2, score2, ...]
     for (let i = 0; i < pendingBrands.length; i += 2) {
       try {
         const member = pendingBrands[i];
@@ -55,7 +52,6 @@ async function movePendingToFailed(queueId, queueType = "regular", environment =
       );
     }
 
-    // Remove from pending sorted set
     await redis.zrem(pendingQueueKey, brandMember);
 
     const failedBrandData = {
@@ -132,7 +128,6 @@ async function moveFailedToPending(brandId, queueType = "regular", environment =
       page_id: brandToMove.page_id,
     };
 
-    // Add to pending sorted set with default score 3
     const defaultScore = 3;
     await redis.zadd(
       pendingQueueKey,
@@ -164,10 +159,8 @@ async function moveAllPendingToFailed(environment = 'production') {
     
     logger.info("Moving ALL regular pending brands to failed queue");
 
-    // Get only regular Redis instance
     const regularRedis = getQueueRedis("regular", environment);
 
-    // Get pending brands from regular queue only
     const regularPendingBrands = await regularRedis.zrange(
       REDIS_KEYS.REGULAR.PENDING_BRANDS,
       0,
@@ -187,7 +180,6 @@ async function moveAllPendingToFailed(environment = 'production') {
     const movedBrands = [];
     const regularPipeline = regularRedis.pipeline();
 
-    // Process regular pending brands
     for (let i = 0; i < regularPendingBrands.length; i += 2) {
       try {
         const member = regularPendingBrands[i];
@@ -212,10 +204,8 @@ async function moveAllPendingToFailed(environment = 'production') {
       }
     }
 
-    // Clear regular pending queue
     regularPipeline.del(REDIS_KEYS.REGULAR.PENDING_BRANDS);
 
-    // Execute regular pipeline only
     await regularPipeline.exec();
 
     logger.info(
@@ -239,10 +229,8 @@ async function moveAllFailedToPending(environment = 'production') {
     
     logger.info("Moving ALL regular failed brands to pending queue");
 
-    // Get only regular Redis instance
     const regularRedis = getQueueRedis("regular", environment);
 
-    // Get failed brands from regular queue only
     const regularFailedBrands = await regularRedis.lrange(REDIS_KEYS.REGULAR.FAILED_BRANDS, 0, -1);
 
     const totalFailedCount = regularFailedBrands.length;
@@ -257,7 +245,6 @@ async function moveAllFailedToPending(environment = 'production') {
     const movedBrands = [];
     const regularPipeline = regularRedis.pipeline();
 
-    // Process regular failed brands
     for (const failedBrand of regularFailedBrands) {
       try {
         const brandData = JSON.parse(failedBrand);
@@ -267,7 +254,6 @@ async function moveAllFailedToPending(environment = 'production') {
           page_id: brandData.page_id,
         };
 
-        // Add to pending sorted set with default score 3
         const defaultScore = 3;
         regularPipeline.zadd(
           REDIS_KEYS.REGULAR.PENDING_BRANDS,
@@ -280,10 +266,8 @@ async function moveAllFailedToPending(environment = 'production') {
       }
     }
 
-    // Clear regular failed queue
     regularPipeline.del(REDIS_KEYS.REGULAR.FAILED_BRANDS);
 
-    // Execute regular pipeline only
     await regularPipeline.exec();
 
     logger.info(
@@ -301,17 +285,14 @@ async function moveAllFailedToPending(environment = 'production') {
   }
 }
 
-// NEW FUNCTION: Move only watchlist failed brands to pending queue
 async function moveWatchlistFailedToPending(environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys(environment);
     
     logger.info("Moving watchlist failed brands to pending queue");
 
-    // Get watchlist Redis instance
     const watchlistRedis = getQueueRedis("watchlist", environment);
 
-    // Get all failed brands from Redis
     const failedBrands = await watchlistRedis.lrange(
       REDIS_KEYS.WATCHLIST.FAILED_BRANDS,
       0,
@@ -325,10 +306,8 @@ async function moveWatchlistFailedToPending(environment = 'production') {
       };
     }
 
-    // Get watchlist brands to identify which failed brands are in watchlist
     const { Brand, WatchList } = require("../models");
 
-    // First get all watchlist brand_ids
     const watchlistItems = await WatchList.findAll({
       attributes: ["brand_id"],
       raw: true,
@@ -341,7 +320,6 @@ async function moveWatchlistFailedToPending(environment = 'production') {
       };
     }
 
-    // Get the brand details for watchlist brands
     const watchlistBrandIds = watchlistItems.map((item) => item.brand_id);
     const watchlistBrands = await Brand.findAll({
       where: {
@@ -351,12 +329,10 @@ async function moveWatchlistFailedToPending(environment = 'production') {
       raw: true,
     });
 
-    // Create a set of watchlist page_ids for fast lookup
     const watchlistPageIds = new Set(
       watchlistBrands.map((brand) => brand.page_id)
     );
 
-    // Filter failed brands to only include watchlist brands
     const watchlistFailedBrands = [];
     const pipeline = watchlistRedis.pipeline();
     let movedCount = 0;
@@ -366,14 +342,12 @@ async function moveWatchlistFailedToPending(environment = 'production') {
         const brandData = JSON.parse(failedBrand);
         const pageId = brandData.page_id;
 
-        // Only move if this failed brand is in the watchlist
         if (watchlistPageIds.has(pageId)) {
           const pendingBrandData = {
             id: brandData.id || brandData.brand_id || brandData.queue_id,
             page_id: pageId,
           };
 
-          // Add to watchlist pending sorted set with default score 3
           const defaultScore = 3;
           pipeline.zadd(
             REDIS_KEYS.WATCHLIST.PENDING_BRANDS,
@@ -395,7 +369,6 @@ async function moveWatchlistFailedToPending(environment = 'production') {
       };
     }
 
-    // Remove the moved brands from failed queue
     for (const failedBrand of failedBrands) {
       try {
         const brandData = JSON.parse(failedBrand);
@@ -432,7 +405,6 @@ async function moveWatchlistFailedToPending(environment = 'production') {
   }
 }
 
-// NEW FUNCTION: Move all watchlist brands from database to pending queue with score 1
 async function moveWatchlistToPending(environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys(environment);
@@ -441,7 +413,6 @@ async function moveWatchlistToPending(environment = 'production') {
       "Moving all watchlist brands from database to pending queue with score 1"
     );
 
-    // Get all watchlist brands from database
     const { getModels } = require("../models");
     const { Brand, WatchList } = getModels(environment);
 
@@ -457,7 +428,6 @@ async function moveWatchlistToPending(environment = 'production') {
       };
     }
 
-    // Get the brand details for watchlist brands
     const watchlistBrandIds = watchlistItems.map((item) => item.brand_id);
     const watchlistBrands = await Brand.findAll({
       where: {
@@ -474,10 +444,8 @@ async function moveWatchlistToPending(environment = 'production') {
       };
     }
 
-    // Get watchlist Redis instance
     const watchlistRedis = getQueueRedis("watchlist", environment);
 
-    // Get existing pending brands to avoid duplicates
     const existingPendingItems = await watchlistRedis.zrange(
       REDIS_KEYS.WATCHLIST.PENDING_BRANDS,
       0,
@@ -494,7 +462,6 @@ async function moveWatchlistToPending(environment = 'production') {
       }
     }
 
-    // Filter out brands that are already in pending queue
     const brandsToAdd = watchlistBrands.filter(
       (brand) => !existingPageIds.has(brand.page_id)
     );
@@ -506,7 +473,6 @@ async function moveWatchlistToPending(environment = 'production') {
       };
     }
 
-    // Add brands to watchlist pending queue with score 1 (priority)
     const pipeline = watchlistRedis.pipeline();
     const addedBrands = [];
 
@@ -516,7 +482,6 @@ async function moveWatchlistToPending(environment = 'production') {
         page_id: brand.page_id,
       };
 
-      // Add to watchlist pending sorted set with score 1 (priority)
       pipeline.zadd(
         REDIS_KEYS.WATCHLIST.PENDING_BRANDS,
         1,
@@ -542,7 +507,6 @@ async function moveWatchlistToPending(environment = 'production') {
   }
 }
 
-// NEW FUNCTION: Move individual watchlist failed brand to pending queue
 async function moveIndividualWatchlistFailedToPending(brandIdentifier, environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys(environment);
@@ -551,10 +515,8 @@ async function moveIndividualWatchlistFailedToPending(brandIdentifier, environme
       `Moving individual watchlist failed brand ${brandIdentifier} to watchlist pending queue [Environment: ${environment}]`
     );
 
-    // Get watchlist Redis instance
     const watchlistRedis = getQueueRedis("watchlist", environment);
 
-    // Get all failed brands from Redis
     const failedBrandsKey = REDIS_KEYS.WATCHLIST.FAILED_BRANDS;
     logger.info(`Using Redis key for watchlist failed brands: ${failedBrandsKey}`);
     
@@ -572,7 +534,6 @@ async function moveIndividualWatchlistFailedToPending(brandIdentifier, environme
     logger.info(`Found ${failedBrands.length} failed brands in watchlist failed queue for environment: ${environment}`);
     logger.info(`Looking for brand identifier: ${brandIdentifier} (type: ${typeof brandIdentifier})`);
     
-    // Log first few failed brands for debugging
     if (failedBrands.length > 0) {
       logger.info(`First few failed brands: ${failedBrands.slice(0, 3).map(b => JSON.parse(b)).map(b => ({id: b.id, brand_id: b.brand_id, page_id: b.page_id}))}`);
     }
@@ -580,17 +541,15 @@ async function moveIndividualWatchlistFailedToPending(brandIdentifier, environme
     let brandToMove = null;
     let brandIndex = -1;
 
-    // Find the specific brand to move
     for (let i = 0; i < failedBrands.length; i++) {
       try {
         const brandData = JSON.parse(failedBrands[i]);
         
-        // Convert brandIdentifier to both string and number for comparison
         const brandIdStr = brandIdentifier.toString();
         const brandIdNum = parseInt(brandIdentifier);
         
         if (
-          brandData.id == brandIdentifier || // Use == for loose comparison
+          brandData.id == brandIdentifier || 
           brandData.brand_id == brandIdentifier ||
           brandData.page_id == brandIdentifier ||
           brandData.id == brandIdNum ||
@@ -615,14 +574,12 @@ async function moveIndividualWatchlistFailedToPending(brandIdentifier, environme
       );
     }
 
-    // Remove from failed queue
     await watchlistRedis.lrem(
       REDIS_KEYS.WATCHLIST.FAILED_BRANDS,
       1,
       failedBrands[brandIndex]
     );
 
-    // Add to watchlist pending queue with default score 3
     const pendingBrandData = {
       id: brandToMove.id || brandToMove.brand_id || brandToMove.queue_id,
       page_id: brandToMove.page_id,
@@ -662,7 +619,6 @@ async function moveAllWatchlistPendingToFailed(environment = 'production') {
 
     const watchlistRedis = getQueueRedis("watchlist", environment);
 
-    // Get all pending brands from watchlist queue
     const watchlistPendingBrands = await watchlistRedis.zrange(
       REDIS_KEYS.WATCHLIST.PENDING_BRANDS,
       0,
@@ -682,7 +638,6 @@ async function moveAllWatchlistPendingToFailed(environment = 'production') {
     const movedBrands = [];
     const pipeline = watchlistRedis.pipeline();
 
-    // Process watchlist pending brands
     for (let i = 0; i < watchlistPendingBrands.length; i += 2) {
       try {
         const member = watchlistPendingBrands[i];
@@ -707,10 +662,8 @@ async function moveAllWatchlistPendingToFailed(environment = 'production') {
       }
     }
 
-    // Clear watchlist pending queue
     pipeline.del(REDIS_KEYS.WATCHLIST.PENDING_BRANDS);
 
-    // Execute pipeline
     await pipeline.exec();
 
     logger.info(
@@ -736,7 +689,6 @@ async function moveAllWatchlistFailedToPending(environment = 'production') {
 
     const watchlistRedis = getQueueRedis("watchlist", environment);
 
-    // Get all failed brands from watchlist queue
     const failedBrandsKey = REDIS_KEYS.WATCHLIST.FAILED_BRANDS;
     logger.info(`Using Redis key for watchlist failed brands: ${failedBrandsKey}`);
     
@@ -755,7 +707,6 @@ async function moveAllWatchlistFailedToPending(environment = 'production') {
 
     logger.info(`Found ${watchlistFailedBrands.length} failed brands to move from watchlist failed queue`);
     
-    // Debug: Log first few brands to see their structure
     if (watchlistFailedBrands.length > 0) {
       logger.info(`Sample failed brands (first 3):`);
       for (let i = 0; i < Math.min(3, watchlistFailedBrands.length); i++) {
@@ -769,11 +720,9 @@ async function moveAllWatchlistFailedToPending(environment = 'production') {
     let invalidBrands = 0;
     let skippedBrands = [];
 
-    // Process watchlist failed brands
     for (let i = 0; i < watchlistFailedBrands.length; i++) {
       const failedBrand = watchlistFailedBrands[i];
       try {
-        // Skip empty or null entries
         if (!failedBrand || failedBrand.trim() === '') {
           logger.warn(`Empty or null brand data at index ${i}, skipping`);
           invalidBrands++;
@@ -783,7 +732,6 @@ async function moveAllWatchlistFailedToPending(environment = 'production') {
 
         const brandData = JSON.parse(failedBrand);
 
-        // Validate that we have required fields - be more flexible
         const brandId = brandData.id || brandData.brand_id || brandData.queue_id || brandData.page_id;
         if (!brandId) {
           logger.warn(`Invalid brand data at index ${i}: missing all id fields`, brandData);
@@ -792,18 +740,15 @@ async function moveAllWatchlistFailedToPending(environment = 'production') {
           continue;
         }
 
-        // Create pending brand data with all available fields
         const pendingBrandData = {
           id: brandId,
           page_id: brandData.page_id || brandData.id || brandData.brand_id,
           brand_name: brandData.brand_name,
           brand_id: brandData.brand_id,
           queue_id: brandData.queue_id,
-          // Preserve any other relevant fields
           ...brandData
         };
 
-        // Add to pending sorted set with default score 3
         const defaultScore = 3;
         pipeline.zadd(
           REDIS_KEYS.WATCHLIST.PENDING_BRANDS,
@@ -822,13 +767,10 @@ async function moveAllWatchlistFailedToPending(environment = 'production') {
 
     logger.info(`Processing results: ${movedBrands.length} moved, ${parseErrors} parse errors, ${invalidBrands} invalid brands`);
 
-    // Clear watchlist failed queue completely since we've processed all valid entries
     pipeline.del(REDIS_KEYS.WATCHLIST.FAILED_BRANDS);
 
-    // Execute pipeline
     const pipelineResults = await pipeline.exec();
     
-    // Check for pipeline execution errors
     if (pipelineResults) {
       const failedOperations = pipelineResults.filter(result => result[0] !== null);
       if (failedOperations.length > 0) {
@@ -840,7 +782,6 @@ async function moveAllWatchlistFailedToPending(environment = 'production') {
       `Successfully moved ${movedBrands.length} watchlist brands from failed to pending queue (${parseErrors} parse errors, ${invalidBrands} invalid brands)`
     );
 
-    // Log detailed information about skipped brands
     if (skippedBrands.length > 0) {
       logger.warn(`Skipped ${skippedBrands.length} brands due to errors:`);
       skippedBrands.forEach((brand, index) => {
@@ -884,7 +825,6 @@ async function cleanupWatchlistFailedQueue(environment = 'production') {
     for (let i = 0; i < watchlistFailedBrands.length; i++) {
       const failedBrand = watchlistFailedBrands[i];
       try {
-        // Skip empty or null entries
         if (!failedBrand || failedBrand.trim() === '') {
           corruptedBrands.push({ index: i, reason: 'Empty data', data: failedBrand });
           continue;
@@ -892,7 +832,6 @@ async function cleanupWatchlistFailedQueue(environment = 'production') {
 
         const brandData = JSON.parse(failedBrand);
         
-        // Check if it has at least one ID field
         const brandId = brandData.id || brandData.brand_id || brandData.queue_id || brandData.page_id;
         if (!brandId) {
           corruptedBrands.push({ index: i, reason: 'Missing ID fields', data: brandData });
@@ -906,7 +845,6 @@ async function cleanupWatchlistFailedQueue(environment = 'production') {
       }
     }
 
-    // Replace the entire queue with only valid brands
     await watchlistRedis.del(failedBrandsKey);
     if (validBrands.length > 0) {
       await watchlistRedis.lpush(failedBrandsKey, ...validBrands);

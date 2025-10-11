@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 
 const usePipelineSorting = (defaultSortBy, defaultSortOrder) => {
   const storageKey = 'pipeline-sorting';
-  
-  // Initialize state directly from localStorage to prevent double API calls
+
   const getInitialSortState = () => {
     try {
       const savedState = localStorage.getItem(storageKey);

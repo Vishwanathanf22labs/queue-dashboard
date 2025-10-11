@@ -16,7 +16,6 @@ const Sidebar = () => {
     setIsMobileMenuOpen(false);
   };
 
-  // Prevent body scroll when mobile menu is open
   useEffect(() => {
     if (isMobileMenuOpen) {
       document.body.style.overflow = 'hidden';
@@ -24,41 +23,34 @@ const Sidebar = () => {
       document.body.style.overflow = 'unset';
     }
 
-    // Cleanup function to reset overflow when component unmounts
     return () => {
       document.body.style.overflow = 'unset';
     };
   }, [isMobileMenuOpen]);
 
-  // Prevent scroll bubbling from sidebar to main content
   const handleSidebarScroll = (e) => {
     const sidebar = e.currentTarget;
     const { scrollTop, scrollHeight, clientHeight } = sidebar;
 
-    // If at the top and trying to scroll up, prevent it
     if (scrollTop === 0 && e.deltaY < 0) {
       e.stopPropagation();
       return false;
     }
 
-    // If at the bottom and trying to scroll down, prevent it
     if (scrollTop + clientHeight >= scrollHeight - 1 && e.deltaY > 0) {
       e.stopPropagation();
       return false;
     }
   };
 
-  // Handle touch events to prevent scroll chaining
   const handleTouchMove = (e) => {
     const sidebar = e.currentTarget;
     const { scrollTop, scrollHeight, clientHeight } = sidebar;
 
-    // If at the top and trying to scroll up, prevent it
     if (scrollTop === 0) {
       e.preventDefault();
     }
 
-    // If at the bottom and trying to scroll down, prevent it
     if (scrollTop + clientHeight >= scrollHeight - 1) {
       e.preventDefault();
     }
@@ -100,26 +92,35 @@ const Sidebar = () => {
       )}
 
 
-      <div className={`fixed left-0 bottom-0 top-0 min-h-screen w-64 bg-gray-900 shadow-lg z-[9999] transform transition-transform duration-300 ease-in-out flex flex-col ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        }`}>
+      <div className={`fixed left-0 top-0 w-64 bg-gray-900 shadow-lg z-[9999] transform transition-transform duration-300 ease-in-out flex flex-col ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        }`}
+        style={{
+          height: '100vh',
+          bottom: 0,
+          maxHeight: '100vh'
+        }}
+      >
         <div className="flex items-center justify-center h-16 bg-gray-800 flex-shrink-0">
           <Link to="/" onClick={closeMobileMenu}>
-            <img 
-              src="./madAngleLogoUpdated.svg" 
-              alt="Madangles Dashboard" 
+            <img
+              src="./madAngleLogoUpdated.svg"
+              alt="Madangles Dashboard"
               className="h-10 w-auto cursor-pointer hover:opacity-80 transition-opacity mt-3"
             />
           </Link>
         </div>
 
         <div
-          className="flex-1 overflow-y-auto p-6 scrollbar-hide pb-8"
+          className="flex-1 overflow-y-auto scrollbar-hide"
           onWheel={handleSidebarScroll}
           onTouchMove={handleTouchMove}
-          style={{ overscrollBehavior: 'contain' }}
+          style={{
+            overscrollBehavior: 'contain',
+            maxHeight: 'calc(100vh - 64px)'
+          }}
         >
 
-          <nav className="space-y-2">
+          <nav className="space-y-2 p-6">
             {navItems.map((item) => {
               const Icon = item.icon;
               return (

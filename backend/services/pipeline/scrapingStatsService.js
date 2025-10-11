@@ -1,27 +1,26 @@
-// Models will be required dynamically
 const { Op } = require("sequelize");
 const { getCacheKey, getCachedData, setCachedData } = require("../utils/cacheUtils");
 
-/**
- * Get scraping statistics
- */
+
 async function getScrapingStats(date = null, environment = 'production') {
   try {
-    // Require models dynamically to get the latest version
     const { getModels } = require("../../models");
     const { Brand, BrandsDailyStatus } = getModels(environment);
-    
+
     const targetDate = date || new Date().toISOString().split("T")[0];
     const cacheKey = getCacheKey("stats", targetDate);
     const cached = await getCachedData(cacheKey, environment);
     if (cached) return cached;
 
+
     const totalBrands = await Brand.count({
       where: { status: { [Op.ne]: "Inactive" } },
     });
 
+
     const startDate = new Date(targetDate + "T00:00:00.000Z");
     const endDate = new Date(targetDate + "T23:59:59.999Z");
+
 
     const brandsWithStatus = await Brand.findAll({
       where: { status: { [Op.ne]: "Inactive" } },
@@ -41,10 +40,12 @@ async function getScrapingStats(date = null, environment = 'production') {
       ],
     });
 
+
     const completedScraping = brandsWithStatus.filter((brand) => {
       const latestStatus = brand.dailyStatuses?.[0];
       return latestStatus?.status === "Completed";
     }).length;
+
 
     const statusCounts = {
       Started: 0,
@@ -52,6 +53,7 @@ async function getScrapingStats(date = null, environment = 'production') {
       Blocked: 0,
       Unknown: 0,
     };
+
 
     const dbStoredCounts = {
       "Stored (has new ads)": 0,
@@ -64,6 +66,7 @@ async function getScrapingStats(date = null, environment = 'production') {
       "Not started": 0,
     };
 
+
     const typesenseCounts = {
       COMPLETED: 0,
       WAITING: 0,
@@ -71,6 +74,7 @@ async function getScrapingStats(date = null, environment = 'production') {
       NOT_PROCESSED: 0,
       ERROR: 0,
     };
+
 
     const fileUploadCounts = {
       COMPLETED: 0,
@@ -81,18 +85,21 @@ async function getScrapingStats(date = null, environment = 'production') {
       ERROR: 0,
     };
 
+
     let completedDbStored = 0;
     let completedTypesense = 0;
     let completedFileUpload = 0;
+
 
     brandsWithStatus.forEach((brand) => {
       const latestStatus = brand.dailyStatuses?.[0];
       const status = latestStatus?.status || "Unknown";
       statusCounts[status] = (statusCounts[status] || 0) + 1;
 
-      // Simplified logic for stats (avoid heavy computations)
+
       let dbStoredStatus = "Not started";
       let dbStoredCompleted = false;
+
 
       if (latestStatus) {
         const activeAds = latestStatus.active_ads;
@@ -120,23 +127,26 @@ async function getScrapingStats(date = null, environment = 'production') {
         }
       }
 
+
       dbStoredCounts[dbStoredStatus] =
         (dbStoredCounts[dbStoredStatus] || 0) + 1;
       if (dbStoredCompleted) {
         completedDbStored++;
       }
 
-      // Simplified status for performance
+
       typesenseCounts["NOT_PROCESSED"] =
         (typesenseCounts["NOT_PROCESSED"] || 0) + 1;
       fileUploadCounts["NOT_PROCESSED"] =
         (fileUploadCounts["NOT_PROCESSED"] || 0) + 1;
     });
 
+
     const brandsWithoutStatus = totalBrands - brandsWithStatus.length;
     dbStoredCounts["Not started"] += brandsWithoutStatus;
     typesenseCounts["NOT_PROCESSED"] += brandsWithoutStatus;
     fileUploadCounts["NOT_PROCESSED"] += brandsWithoutStatus;
+
 
     const result = {
       date: targetDate,
@@ -174,6 +184,7 @@ async function getScrapingStats(date = null, environment = 'production') {
       },
     };
 
+
     await setCachedData(cacheKey, result, 300, environment);
     return result;
   } catch (error) {
@@ -181,6 +192,7 @@ async function getScrapingStats(date = null, environment = 'production') {
     throw error;
   }
 }
+
 
 module.exports = {
   getScrapingStats,

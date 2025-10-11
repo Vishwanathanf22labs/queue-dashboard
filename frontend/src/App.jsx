@@ -5,7 +5,6 @@ import LoadingSpinner from './components/ui/LoadingSpinner';
 import useAdminStore from './stores/adminStore';
 import useScrollToTop from './hooks/useScrollToTop';
 
-// Dynamic imports for better code splitting
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const PendingQueue = lazy(() => import('./pages/PendingQueue'));
 const FailedQueue = lazy(() => import('./pages/FailedQueue'));
@@ -25,18 +24,14 @@ function App() {
   const location = useLocation();
 
   useEffect(() => {
-    // Define pages that don't need admin status check (pages without admin UI)
     const pagesWithoutAdminUI = ['/pending-queue', '/failed-queue', '/watchlist-queues', '/pipeline-status', '/scraped-brands'];
-    
-    // Check admin status for all pages except those without admin UI
-    // Dashboard needs admin status for login/logout buttons
     if (!pagesWithoutAdminUI.includes(location.pathname)) {
       checkAdminStatus();
     }
   }, [location.pathname, checkAdminStatus]);
 
   useScrollToTop();
-  
+
   return (
     <Layout>
       <Routes>

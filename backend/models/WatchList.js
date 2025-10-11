@@ -1,8 +1,8 @@
-const Sequelize = require('sequelize');
-const { getDatabaseConnection } = require('../config/database');
+const Sequelize = require("sequelize");
+const { getDatabaseConnection } = require("../config/database");
 
 const WatchList = getDatabaseConnection().define(
-  'watch_lists',
+  "watch_lists",
   {
     id: {
       type: Sequelize.INTEGER,
@@ -19,18 +19,18 @@ const WatchList = getDatabaseConnection().define(
     },
     createdAt: {
       type: Sequelize.DATE,
-      field: 'created_at',
+      field: "created_at",
     },
     updatedAt: {
       type: Sequelize.DATE,
-      field: 'updated_at',
+      field: "updated_at",
       allowNull: true,
     },
   },
-  { 
-    tableName: 'watch_lists', 
-    timestamps: false 
-  },
+  {
+    tableName: "watch_lists",
+    timestamps: false,
+  }
 );
 
 module.exports = WatchList;

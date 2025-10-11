@@ -12,38 +12,30 @@ import { openFacebookAdLibrary } from '../../utils/facebookAdLibrary';
 
 const WatchlistAdUpdateQueue = ({ watchlistAdUpdateQueue, loading, error, onPageChange, onSortChange, onSearch, searchTerm, onClearSearch, isSearching }) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  
-  // Get pagination and sorting state from URL params
+
   const currentPage = parseInt(searchParams.get('watchlistAdUpdatePage')) || 1;
   const sortBy = searchParams.get('watchlistAdUpdateSortBy') || 'normal';
   const sortOrder = searchParams.get('watchlistAdUpdateSortOrder') || 'desc';
-  
-  // Store original totals (for static display - don't change during search)
+
   const [originalTotals, setOriginalTotals] = useState({
     total_items: 0,
     total_ads: 0
   });
 
-  // Update original totals only when NOT searching
   useEffect(() => {
     if (watchlistAdUpdateQueue) {
       const isSearchActive = searchTerm && searchTerm.trim().length > 0;
-      
-    // Only update original totals when NOT searching
-    if (!isSearchActive) {
-      setOriginalTotals({
-        total_items: watchlistAdUpdateQueue.pagination?.total_items || 0,
-        total_ads: watchlistAdUpdateQueue.total_ads_watchlist || 0
-      });
-    }
+
+      if (!isSearchActive) {
+        setOriginalTotals({
+          total_items: watchlistAdUpdateQueue.pagination?.total_items || 0,
+          total_ads: watchlistAdUpdateQueue.total_ads_watchlist || 0
+        });
+      }
     }
   }, [watchlistAdUpdateQueue, searchTerm]);
 
-  // Don't make API calls on mount - let the parent Dashboard handle initial loading
-  // The parent will load data with the correct saved state from localStorage
-  // No useEffect needed here as Dashboard already handles the initial API calls
 
-  // Status indicator component - show colored dot for all statuses
   const StatusIndicator = ({ status }) => {
     const getStatusColor = (status) => {
       switch (status) {
@@ -84,7 +76,7 @@ const WatchlistAdUpdateQueue = ({ watchlistAdUpdateQueue, loading, error, onPage
     };
 
     return (
-      <Circle 
+      <Circle
         className={`h-2 w-2 ${getStatusColor(status)}`}
         fill="currentColor"
         title={getStatusTitle(status)}
@@ -118,23 +110,20 @@ const WatchlistAdUpdateQueue = ({ watchlistAdUpdateQueue, loading, error, onPage
     );
   }
 
-  // Use watchlist brands directly from the API (server-side sorted)
   const watchlistBrands = watchlistAdUpdateQueue.brands || [];
   const totalPages = watchlistAdUpdateQueue.pagination?.total_pages || 1;
   const totalItems = watchlistAdUpdateQueue.pagination?.total_items || 0;
   const itemsPerPage = watchlistAdUpdateQueue.pagination?.per_page || 10;
   const apiCurrentPage = watchlistAdUpdateQueue.pagination?.current_page || 1;
-  
 
 
 
-  // Calculate display range
+
   const startIndex = (apiCurrentPage - 1) * itemsPerPage;
   const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
 
 
 
-  // Sortable header component
   const SortableHeader = ({ field, label, currentSortBy, currentSortOrder, onSortChange }) => {
     const isActive = currentSortBy === field;
     const isAsc = isActive && currentSortOrder === 'asc';
@@ -144,16 +133,14 @@ const WatchlistAdUpdateQueue = ({ watchlistAdUpdateQueue, loading, error, onPage
       if (field === 'normal') {
         onSortChange('normal', 'desc');
       } else if (isActive) {
-        // Toggle between asc and desc
         onSortChange(field, isAsc ? 'desc' : 'asc');
       } else {
-        // Set to desc by default
         onSortChange(field, 'desc');
       }
     };
 
     return (
-      <th 
+      <th
         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-50 select-none relative group"
         onClick={handleClick}
         title={field === 'normal' ? 'Normal' : undefined}
@@ -161,11 +148,11 @@ const WatchlistAdUpdateQueue = ({ watchlistAdUpdateQueue, loading, error, onPage
         <div className="flex items-center space-x-1">
           <span>{label}</span>
           <div className="flex flex-col">
-            <ChevronUp 
-              className={`h-3 w-3 ${isAsc ? 'text-blue-600' : 'text-gray-300'}`} 
+            <ChevronUp
+              className={`h-3 w-3 ${isAsc ? 'text-blue-600' : 'text-gray-300'}`}
             />
-            <ChevronDown 
-              className={`h-3 w-3 -mt-1 ${isDesc ? 'text-blue-600' : 'text-gray-300'}`} 
+            <ChevronDown
+              className={`h-3 w-3 -mt-1 ${isDesc ? 'text-blue-600' : 'text-gray-300'}`}
             />
           </div>
         </div>
@@ -183,7 +170,7 @@ const WatchlistAdUpdateQueue = ({ watchlistAdUpdateQueue, loading, error, onPage
     {
       key: 'brand',
       label: 'Watchlist Brand',
-      sortable: false, // Brand name is not sortable
+      sortable: false,
       render: (value, brand) => (
         <div>
           <div className="flex items-center space-x-2">
@@ -206,7 +193,7 @@ const WatchlistAdUpdateQueue = ({ watchlistAdUpdateQueue, loading, error, onPage
           </div>
           {brand.page_category && (
             <div className="text-xs text-blue-600 max-w-[115px] sm:max-w-none truncate">
-              ⭐ Watchlist • {brand.page_category}
+              Watchlist • {brand.page_category}
             </div>
           )}
         </div>
@@ -236,7 +223,6 @@ const WatchlistAdUpdateQueue = ({ watchlistAdUpdateQueue, loading, error, onPage
     if (onPageChange) {
       onPageChange(newPage, sortBy, sortOrder);
     }
-    // Scroll to the table section when changing pages
     const tableSection = document.getElementById('watchlist-ad-update-table-section');
     if (tableSection) {
       tableSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -244,13 +230,12 @@ const WatchlistAdUpdateQueue = ({ watchlistAdUpdateQueue, loading, error, onPage
   };
 
   const handleSortChange = (field, order) => {
-    // Update URL params
     const newParams = new URLSearchParams(searchParams);
-    newParams.set('watchlistAdUpdatePage', '1'); // Reset to page 1 when sorting
+    newParams.set('watchlistAdUpdatePage', '1');
     newParams.set('watchlistAdUpdateSortBy', field);
     newParams.set('watchlistAdUpdateSortOrder', order);
     setSearchParams(newParams);
-    
+
     if (onSortChange) {
       onSortChange(field, order);
     }
@@ -262,7 +247,6 @@ const WatchlistAdUpdateQueue = ({ watchlistAdUpdateQueue, loading, error, onPage
         <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-blue-900">Watchlist Ad-Update Count</h2>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
         <Card>
           <div className="flex items-center">
@@ -305,7 +289,6 @@ const WatchlistAdUpdateQueue = ({ watchlistAdUpdateQueue, loading, error, onPage
         </Card>
       </div>
 
-      {/* Search Input */}
       <Card>
         <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 sm:gap-4">
           <div className="flex-1 max-w-md">
@@ -331,57 +314,51 @@ const WatchlistAdUpdateQueue = ({ watchlistAdUpdateQueue, loading, error, onPage
         <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between mb-3 sm:mb-4">
           <div>
             <h3 className="text-base sm:text-lg font-semibold text-blue-900">Watchlist Ad-Update in Queue</h3>
-            <div className="grid grid-cols-3 sm:flex sm:flex-wrap sm:items-center gap-1 sm:gap-3 mt-1">
-              {/* Active */}
-              <div className="flex items-center space-x-1 justify-center">
-                <Circle className="h-2.5 w-2.5 text-green-500" fill="currentColor" />
-                <span className="text-xs font-medium text-gray-700">Active:</span>
-                <span className="text-xs font-bold text-gray-900">
+            <div className="flex flex-wrap items-center gap-3 mt-1">
+              <div className="flex items-center space-x-1">
+                <Circle className="h-3 w-3 text-green-500" fill="currentColor" />
+                <span className="text-sm font-medium text-gray-700">Active:</span>
+                <span className="text-sm font-bold text-gray-900">
                   {watchlistAdUpdateQueue?.analytics?.pre_computed_counters?.active || 0}
                 </span>
               </div>
-              
-              {/* Waiting */}
-              <div className="flex items-center space-x-1 justify-center">
-                <Circle className="h-2.5 w-2.5 text-yellow-500" fill="currentColor" />
-                <span className="text-xs font-medium text-gray-700">Waiting:</span>
-                <span className="text-xs font-bold text-gray-900">
+
+              <div className="flex items-center space-x-1">
+                <Circle className="h-3 w-3 text-yellow-500" fill="currentColor" />
+                <span className="text-sm font-medium text-gray-700">Waiting:</span>
+                <span className="text-sm font-bold text-gray-900">
                   {watchlistAdUpdateQueue?.analytics?.pre_computed_counters?.waiting || 0}
                 </span>
               </div>
-              
-              {/* Delayed */}
-              <div className="flex items-center space-x-1 justify-center">
-                <Circle className="h-2.5 w-2.5 text-orange-500" fill="currentColor" />
-                <span className="text-xs font-medium text-gray-700">Delayed:</span>
-                <span className="text-xs font-bold text-gray-900">
+
+              <div className="flex items-center space-x-1">
+                <Circle className="h-3 w-3 text-orange-500" fill="currentColor" />
+                <span className="text-sm font-medium text-gray-700">Delayed:</span>
+                <span className="text-sm font-bold text-gray-900">
                   {watchlistAdUpdateQueue?.analytics?.pre_computed_counters?.delayed || 0}
                 </span>
               </div>
-              
-              {/* Completed */}
-              <div className="flex items-center space-x-1 justify-center">
-                <Circle className="h-2.5 w-2.5 text-blue-500" fill="currentColor" />
-                <span className="text-xs font-medium text-gray-700">Completed:</span>
-                <span className="text-xs font-bold text-gray-900">
+
+              <div className="flex items-center space-x-1">
+                <Circle className="h-3 w-3 text-blue-500" fill="currentColor" />
+                <span className="text-sm font-medium text-gray-700">Completed:</span>
+                <span className="text-sm font-bold text-gray-900">
                   {watchlistAdUpdateQueue?.analytics?.pre_computed_counters?.completed || 0}
                 </span>
               </div>
-              
-              {/* Failed */}
-              <div className="flex items-center space-x-1 justify-center">
-                <Circle className="h-2.5 w-2.5 text-red-500" fill="currentColor" />
-                <span className="text-xs font-medium text-gray-700">Failed:</span>
-                <span className="text-xs font-bold text-gray-900">
+
+              <div className="flex items-center space-x-1">
+                <Circle className="h-3 w-3 text-red-500" fill="currentColor" />
+                <span className="text-sm font-medium text-gray-700">Failed:</span>
+                <span className="text-sm font-bold text-gray-900">
                   {watchlistAdUpdateQueue?.analytics?.pre_computed_counters?.failed || 0}
                 </span>
               </div>
-              
-              {/* Prioritized */}
-              <div className="flex items-center space-x-1 justify-center">
-                <Circle className="h-2.5 w-2.5 text-purple-500" fill="currentColor" />
-                <span className="text-xs font-medium text-gray-700">Prioritized:</span>
-                <span className="text-xs font-bold text-gray-900">
+
+              <div className="flex items-center space-x-1">
+                <Circle className="h-3 w-3 text-purple-500" fill="currentColor" />
+                <span className="text-sm font-medium text-gray-700">Prioritized:</span>
+                <span className="text-sm font-bold text-gray-900">
                   {watchlistAdUpdateQueue?.analytics?.pre_computed_counters?.prioritized || 0}
                 </span>
               </div>
@@ -410,44 +387,40 @@ const WatchlistAdUpdateQueue = ({ watchlistAdUpdateQueue, loading, error, onPage
           <LoadingSpinner />
         ) : !loading && watchlistBrands && watchlistBrands.length > 0 ? (
           <>
-            {/* Mobile Sorting Controls */}
             <div className="md:hidden mb-4">
               <div className="flex flex-nowrap gap-1 overflow-x-auto">
                 <span className="text-xs font-medium text-gray-700 self-center flex-shrink-0 mr-1">Sort by:</span>
                 <div className="flex gap-0.5 flex-nowrap min-w-0">
                   <button
                     onClick={() => handleSortChange('normal', sortBy === 'normal' && sortOrder === 'desc' ? 'asc' : 'desc')}
-                    className={`flex items-center space-x-0.5 px-1.5 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
-                      sortBy === 'normal' 
-                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                    }`}
+                    className={`flex items-center space-x-0.5 px-1.5 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap flex-shrink-0 ${sortBy === 'normal'
+                      ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
                   >
                     <ChevronUp className={`h-2 w-2 ${sortBy === 'normal' && sortOrder === 'asc' ? 'text-blue-600' : 'text-gray-400'}`} />
                     <ChevronDown className={`h-2 w-2 -mt-1 ${sortBy === 'normal' && sortOrder === 'desc' ? 'text-blue-600' : 'text-gray-400'}`} />
                     <span>Normal</span>
                   </button>
-                  
+
                   <button
                     onClick={() => handleSortChange('total_ads', sortBy === 'total_ads' && sortOrder === 'desc' ? 'asc' : 'desc')}
-                    className={`flex items-center space-x-0.5 px-1.5 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
-                      sortBy === 'total_ads' 
-                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                    }`}
+                    className={`flex items-center space-x-0.5 px-1.5 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap flex-shrink-0 ${sortBy === 'total_ads'
+                      ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
                   >
                     <ChevronUp className={`h-2 w-2 ${sortBy === 'total_ads' && sortOrder === 'asc' ? 'text-blue-600' : 'text-gray-400'}`} />
                     <ChevronDown className={`h-2 w-2 -mt-1 ${sortBy === 'total_ads' && sortOrder === 'desc' ? 'text-blue-600' : 'text-gray-400'}`} />
                     <span>Ads Count</span>
                   </button>
-                  
+
                   <button
                     onClick={() => handleSortChange('created_at', sortBy === 'created_at' && sortOrder === 'desc' ? 'asc' : 'desc')}
-                    className={`flex items-center space-x-0.5 px-1.5 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
-                      sortBy === 'created_at' 
-                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                    }`}
+                    className={`flex items-center space-x-0.5 px-1.5 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap flex-shrink-0 ${sortBy === 'created_at'
+                      ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
                   >
                     <ChevronUp className={`h-2 w-2 ${sortBy === 'created_at' && sortOrder === 'asc' ? 'text-blue-600' : 'text-gray-400'}`} />
                     <ChevronDown className={`h-2 w-2 -mt-1 ${sortBy === 'created_at' && sortOrder === 'desc' ? 'text-blue-600' : 'text-gray-400'}`} />
@@ -457,7 +430,6 @@ const WatchlistAdUpdateQueue = ({ watchlistAdUpdateQueue, loading, error, onPage
               </div>
             </div>
 
-            {/* Desktop Table View */}
             <div className="hidden md:block">
               <div className="overflow-hidden shadow-md rounded-lg">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -505,12 +477,10 @@ const WatchlistAdUpdateQueue = ({ watchlistAdUpdateQueue, loading, error, onPage
               </div>
             </div>
 
-            {/* Mobile Cards View */}
             <div className="md:hidden space-y-3">
               {watchlistBrands.map((brand, index) => (
                 <Card key={`${brand.brand_id}-${index}`} className="p-4 relative pb-12">
                   <div className="space-y-3">
-                    {/* Header with Brand Name */}
                     <div className="flex items-start justify-between">
                       <div className="flex-1 pr-3">
                         <div className="flex items-center space-x-2 mb-1">
@@ -535,7 +505,6 @@ const WatchlistAdUpdateQueue = ({ watchlistAdUpdateQueue, loading, error, onPage
                       </div>
                     </div>
 
-                    {/* Details Grid */}
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="text-gray-500">Brand ID:</span>
@@ -547,7 +516,6 @@ const WatchlistAdUpdateQueue = ({ watchlistAdUpdateQueue, loading, error, onPage
                       </div>
                     </div>
 
-                    {/* Created Date */}
                     <div className="text-sm">
                       <span className="text-gray-500">Created:</span>
                       <span className="ml-2 text-gray-900">
@@ -555,10 +523,9 @@ const WatchlistAdUpdateQueue = ({ watchlistAdUpdateQueue, loading, error, onPage
                       </span>
                     </div>
 
-                    {/* Category with Watchlist Badge */}
                     {brand.page_category && (
                       <div className="text-xs text-blue-600 font-medium">
-                        ⭐ Watchlist • {brand.page_category}
+                        Watchlist • {brand.page_category}
                       </div>
                     )}
                   </div>

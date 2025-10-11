@@ -1,11 +1,4 @@
-/**
- * Client-side validation for settings form
- * Mirrors backend validation for immediate feedback
- */
-
-// Validation patterns (same as backend)
 const VALIDATION_PATTERNS = {
-  // Processing and holding timing
   MAX_CONCURRENCY: /^\d+$/,
   BRAND_PROCESSING_CONCURRENCY: /^\d+$/,
   TYPESENSE_PROCESS_CONCURRENCY: /^\d+$/,
@@ -13,14 +6,12 @@ const VALIDATION_PATTERNS = {
   SCRAPER_HOLD_SCHEDULE: /^([^\s]+\s+){4}[^\s]+$/,
   SCRAPER_PAUSE_DURATION_MINUTES: /^\d+$/,
   USAGE_PROXY: /^(true|false)$/,
-  
-  // Scroll duration (multiplication expressions)
+
   ONE_HOUR_MS: /^\d+\s*\*\s*60\s*\*\s*1000$/,
   FIFTY_MINUTES_MS: /^\d+\s*\*\s*60\s*\*\s*1000$/,
   THIRTY_MINUTES_MS: /^\d+\s*\*\s*60\s*\*\s*1000$/,
   TWENTY_MINUTES_MS: /^\d+\s*\*\s*60\s*\*\s*1000$/,
-  
-  // Scroller details
+
   UP_SCROLL_PROBABILITY: /^(0(\.\d+)?|1(\.0+)?)$/,
   MOUSE_MOVEMENT_PROBABILITY: /^(0(\.\d+)?|1(\.0+)?)$/,
   MOUSE_MOVE_STEPS_MIN: /^\d+$/,
@@ -30,8 +21,7 @@ const VALIDATION_PATTERNS = {
   LONG_PAUSE_PROBABILITY: /^(0(\.\d+)?|1(\.0+)?)$/,
   LONG_PAUSE_MIN_MS: /^\d+$/,
   LONG_PAUSE_MAX_MS: /^\d+$/,
-  
-  // Scroll behavior configs
+
   SCROLL_STEP_MIN_MULTIPLIER: /^\d+(\.\d+)?$/,
   SCROLL_STEP_MAX_MULTIPLIER: /^\d+(\.\d+)?$/,
   UP_SCROLL_TIME_THRESHOLD_MS: /^\d+$/,
@@ -42,7 +32,6 @@ const VALIDATION_PATTERNS = {
   SCROLL_DELAY_MAX_MS: /^\d+$/
 };
 
-// Error messages (same as backend)
 const ERROR_MESSAGES = {
   MAX_CONCURRENCY: 'Must be a positive integer (e.g., "2")',
   BRAND_PROCESSING_CONCURRENCY: 'Must be a positive integer (e.g., "2")',
@@ -51,12 +40,12 @@ const ERROR_MESSAGES = {
   SCRAPER_HOLD_SCHEDULE: 'Must be a valid 5-part cron expression (e.g., "0 */5 * * *")',
   SCRAPER_PAUSE_DURATION_MINUTES: 'Must be a positive integer (e.g., "30")',
   USAGE_PROXY: 'Must be "true" or "false"',
-  
+
   ONE_HOUR_MS: 'Must be multiplication expression (e.g., "60 * 60 * 1000")',
   FIFTY_MINUTES_MS: 'Must be multiplication expression (e.g., "50 * 60 * 1000")',
   THIRTY_MINUTES_MS: 'Must be multiplication expression (e.g., "30 * 60 * 1000")',
   TWENTY_MINUTES_MS: 'Must be multiplication expression (e.g., "20 * 60 * 1000")',
-  
+
   UP_SCROLL_PROBABILITY: 'Must be a decimal between 0 and 1 (e.g., "0.15")',
   MOUSE_MOVEMENT_PROBABILITY: 'Must be a decimal between 0 and 1 (e.g., "0.45")',
   MOUSE_MOVE_STEPS_MIN: 'Must be a positive integer (e.g., "12")',
@@ -66,7 +55,7 @@ const ERROR_MESSAGES = {
   LONG_PAUSE_PROBABILITY: 'Must be a decimal between 0 and 1 (e.g., "0.18")',
   LONG_PAUSE_MIN_MS: 'Must be a positive integer (e.g., "6000")',
   LONG_PAUSE_MAX_MS: 'Must be a positive integer (e.g., "15000")',
-  
+
   SCROLL_STEP_MIN_MULTIPLIER: 'Must be a positive number (e.g., "0.6")',
   SCROLL_STEP_MAX_MULTIPLIER: 'Must be a positive number (e.g., "0.55")',
   UP_SCROLL_TIME_THRESHOLD_MS: 'Must be a positive integer (e.g., "18000")',
@@ -77,45 +66,34 @@ const ERROR_MESSAGES = {
   SCROLL_DELAY_MAX_MS: 'Must be a positive integer (e.g., "600")'
 };
 
-/**
- * Validate a single field value
- * @param {string} key - Field key
- * @param {string} value - Field value
- * @returns {Object} Validation result
- */
 export function validateField(key, value) {
   const pattern = VALIDATION_PATTERNS[key];
   const errorMessage = ERROR_MESSAGES[key];
-  
+
   if (!pattern) {
     return {
       valid: false,
       error: `Unknown field: ${key}`
     };
   }
-  
+
   if (!pattern.test(value)) {
     return {
       valid: false,
       error: errorMessage
     };
   }
-  
+
   return {
     valid: true,
     error: null
   };
 }
 
-/**
- * Validate all fields in a form
- * @param {Object} formData - Form data object
- * @returns {Object} Validation result with errors
- */
 export function validateForm(formData) {
   const errors = {};
   let hasErrors = false;
-  
+
   for (const [key, value] of Object.entries(formData)) {
     const result = validateField(key, value);
     if (!result.valid) {
@@ -123,43 +101,33 @@ export function validateForm(formData) {
       hasErrors = true;
     }
   }
-  
+
   return {
     valid: !hasErrors,
     errors
   };
 }
 
-/**
- * Get field type for input rendering
- * @param {string} key - Field key
- * @returns {string} Input type
- */
 export function getFieldType(key) {
   if (key === 'USAGE_PROXY') {
     return 'select';
   }
-  
+
   if (key.includes('_MS') && key !== 'SCRAPER_PAUSE_DURATION_MINUTES') {
-    return 'text'; // Multiplication expressions
+    return 'text';
   }
-  
+
   if (key === 'SCRAPER_HOLD_SCHEDULE') {
-    return 'text'; // Cron expression
+    return 'text';
   }
-  
+
   if (key.includes('PROBABILITY') || key.includes('MULTIPLIER') || key === 'IP_COOLDOWN_DURATION_HOURS') {
-    return 'number'; // Decimal numbers
+    return 'number';
   }
-  
-  return 'number'; // Default to number for integers
+
+  return 'number';
 }
 
-/**
- * Get field placeholder
- * @param {string} key - Field key
- * @returns {string} Placeholder text
- */
 export function getFieldPlaceholder(key) {
   const placeholders = {
     MAX_CONCURRENCY: '2',
@@ -190,15 +158,10 @@ export function getFieldPlaceholder(key) {
     SCROLL_DELAY_MIN_MS: '350',
     SCROLL_DELAY_MAX_MS: '600'
   };
-  
+
   return placeholders[key] || '';
 }
 
-/**
- * Get field step for number inputs
- * @param {string} key - Field key
- * @returns {string|number} Step value
- */
 export function getFieldStep(key) {
   if (key.includes('PROBABILITY') || key.includes('MULTIPLIER') || key === 'IP_COOLDOWN_DURATION_HOURS') {
     return '0.01';

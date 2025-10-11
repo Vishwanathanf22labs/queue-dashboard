@@ -2,23 +2,19 @@ const { getQueueRedis, getGlobalRedis } = require("../utils/redisSelector");
 const logger = require("../utils/logger");
 const { QUEUES, PAGINATION } = require("../config/constants");
 
-// Function to get dynamic Redis keys
 function getRedisKeys(environment = null) {
   const { getRedisKeys } = require("../config/constants");
   return getRedisKeys(environment);
 }
 
 async function enrichBrandsWithDBInfo(brandItems, isSortedSet = false, environment = 'production') {
-  // Get Brand model for the specified environment
   const { getModels } = require("../models");
   const { Brand } = getModels(environment);
   
   const results = [];
   const pageIds = [];
 
-  // First pass: collect all page IDs and parse Redis data
   if (isSortedSet) {
-    // For sorted sets with WITHSCORES, items come as [member1, score1, member2, score2, ...]
     for (let i = 0; i < brandItems.length; i += 2) {
       try {
         const member = brandItems[i];
@@ -34,7 +30,6 @@ async function enrichBrandsWithDBInfo(brandItems, isSortedSet = false, environme
       }
     }
   } else {
-    // For lists, items are just the members
     for (const item of brandItems) {
       try {
         const brandData = JSON.parse(item);
@@ -48,17 +43,15 @@ async function enrichBrandsWithDBInfo(brandItems, isSortedSet = false, environme
     }
   }
 
-  // Batch fetch all brand data from database in one query
   let brandMap = new Map();
   if (pageIds.length > 0) {
     try {
       const brands = await Brand.findAll({
         where: { page_id: pageIds },
-        attributes: ["name", "actual_name", "status", "category", "page_id"],
+        attributes: ["name", "actual_name", "status", "category", "page_id", "actual_ads_count"],
         raw: true,
       });
       
-      // Create a map for fast lookup
       brands.forEach(brand => {
         brandMap.set(brand.page_id, brand);
       });
@@ -67,7 +60,6 @@ async function enrichBrandsWithDBInfo(brandItems, isSortedSet = false, environme
     }
   }
 
-  // Second pass: build results with batched data
   if (isSortedSet) {
     for (let i = 0; i < brandItems.length; i += 2) {
       try {
@@ -79,7 +71,6 @@ async function enrichBrandsWithDBInfo(brandItems, isSortedSet = false, environme
         const brandData = JSON.parse(member);
         const pageId = brandData.page_id;
 
-        // Handle page category from Redis data
         let pageCategory = brandData.page_category;
         if (!pageCategory && brandData.page_categories) {
           pageCategory = Array.isArray(brandData.page_categories) 
@@ -98,13 +89,11 @@ async function enrichBrandsWithDBInfo(brandItems, isSortedSet = false, environme
           score: score
         };
 
-        // Use batched data
         const brand = brandMap.get(pageId);
         if (brand) {
           brandInfo.brand_name = brand.actual_name || brand.name || "Unknown";
           brandInfo.status = brand.status || "Unknown";
           
-          // If no page category from Redis data, use database category as fallback
           if (!pageCategory && brand.category) {
             pageCategory = brand.category;
             brandInfo.page_category = pageCategory;
@@ -117,13 +106,11 @@ async function enrichBrandsWithDBInfo(brandItems, isSortedSet = false, environme
       }
     }
   } else {
-    // For lists, items are just the members
     for (const item of brandItems) {
       try {
         const brandData = JSON.parse(item);
         const pageId = brandData.page_id;
 
-        // Handle page category from Redis data
         let pageCategory = brandData.page_category;
         if (!pageCategory && brandData.page_categories) {
           pageCategory = Array.isArray(brandData.page_categories) 
@@ -141,13 +128,11 @@ async function enrichBrandsWithDBInfo(brandItems, isSortedSet = false, environme
           error_message: brandData.reason || "Unknown error"
         };
 
-        // Use batched data
         const brand = brandMap.get(pageId);
         if (brand) {
           brandInfo.brand_name = brand.actual_name || brand.name || "Unknown";
           brandInfo.status = brand.status || "Unknown";
           
-          // If no page category from Redis data, use database category as fallback
           if (!pageCategory && brand.category) {
             pageCategory = brand.category;
             brandInfo.page_category = pageCategory;
@@ -168,7 +153,7 @@ async function getPendingBrands(
   page = PAGINATION.DEFAULT_PAGE,
   limit = PAGINATION.DEFAULT_LIMIT,
   search = null,
-  queueType = 'regular', // 'regular' or 'watchlist'
+  queueType = 'regular', 
   environment = 'production'
 ) {
   try {
@@ -179,21 +164,17 @@ async function getPendingBrands(
       PAGINATION.MAX_LIMIT
     );
 
-    // Get the appropriate Redis instance
     const redis = getQueueRedis(queueType, environment);
     const queueKey = REDIS_KEYS[queueType.toUpperCase()].PENDING_BRANDS;
 
-    // If searching, we need to get ALL brands first to search through them
     if (search && search.trim()) {
       const searchTerm = search.toLowerCase().trim();
       
-      // Get ALL brands from the sorted set for searching
       const queueRedis = getQueueRedis(queueType, environment);
       const allBrandItems = await queueRedis.zrange(queueKey, 0, -1, 'WITHSCORES');
       logger.info(`Raw Redis data for ${queueType} pending brands: ${JSON.stringify(allBrandItems)}`);
       const allEnrichedBrands = await enrichBrandsWithDBInfo(allBrandItems, true, environment);
       
-      // Filter brands based on search term (flexible search)
       const normalizedSearchTerm = searchTerm.replace(/\s+/g, '');
       
       const matchingBrands = allEnrichedBrands.filter(brand => {
@@ -201,17 +182,13 @@ async function getPendingBrands(
         const normalizedBrandName = brandName.replace(/\s+/g, '');
         
         return (
-          // Original search (with spaces)
           brandName.includes(searchTerm) ||
-          // Space-insensitive search
           normalizedBrandName.includes(normalizedSearchTerm) ||
-          // ID searches
           brand.queue_id?.toString().includes(searchTerm) ||
           brand.page_id?.toString().includes(searchTerm)
         );
       });
       
-      // Apply pagination to search results
       const totalCount = matchingBrands.length;
       const startIndex = (validPage - 1) * validLimit;
       const endIndex = startIndex + validLimit;
@@ -229,7 +206,6 @@ async function getPendingBrands(
       };
     }
 
-    // Normal pagination without search
     const queueRedis = getQueueRedis(queueType, environment);
     const totalCount = await queueRedis.zcard(queueKey);
     const startIndex = (validPage - 1) * validLimit;
@@ -248,7 +224,6 @@ async function getPendingBrands(
       };
     }
 
-    // Get brands from sorted set
     const brandItems = await queueRedis.zrange(
       queueKey,
       startIndex,
@@ -279,7 +254,7 @@ async function getFailedBrands(
   page = PAGINATION.DEFAULT_PAGE,
   limit = PAGINATION.DEFAULT_LIMIT,
   search = null,
-  queueType = 'regular', // 'regular' or 'watchlist'
+  queueType = 'regular', 
   environment = 'production'
 ) {
   try {
@@ -290,20 +265,16 @@ async function getFailedBrands(
       PAGINATION.MAX_LIMIT
     );
 
-    // Get the appropriate Redis instance
     const redis = getQueueRedis(queueType, environment);
     const queueKey = REDIS_KEYS[queueType.toUpperCase()].FAILED_BRANDS;
 
-    // If searching, we need to get ALL brands first to search through them
     if (search && search.trim()) {
       const searchTerm = search.toLowerCase().trim();
       
-      // Get ALL brands from the queue for searching
       const queueRedis = getQueueRedis(queueType, environment);
       const allBrandItems = await queueRedis.lrange(queueKey, 0, -1);
       const allEnrichedBrands = await enrichBrandsWithDBInfo(allBrandItems, false, environment);
       
-      // Filter brands based on search term (flexible search)
       const normalizedSearchTerm = searchTerm.replace(/\s+/g, '');
       
       const matchingBrands = allEnrichedBrands.filter(brand => {
@@ -311,17 +282,13 @@ async function getFailedBrands(
         const normalizedBrandName = brandName.replace(/\s+/g, '');
         
         return (
-          // Original search (with spaces)
           brandName.includes(searchTerm) ||
-          // Space-insensitive search
           normalizedBrandName.includes(normalizedSearchTerm) ||
-          // ID searches
           brand.queue_id?.toString().includes(searchTerm) ||
           brand.page_id?.toString().includes(searchTerm)
         );
       });
       
-      // Apply pagination to search results
       const totalCount = matchingBrands.length;
       const startIndex = (validPage - 1) * validLimit;
       const endIndex = startIndex + validLimit;
@@ -339,7 +306,6 @@ async function getFailedBrands(
       };
     }
 
-    // Normal pagination without search
     const queueRedis = getQueueRedis(queueType, environment);
     const totalCount = await queueRedis.llen(queueKey);
     const startIndex = (validPage - 1) * validLimit;
@@ -390,7 +356,6 @@ async function getWatchlistBrands(
   userId = null
 ) {
   try {
-    // Get models for the specified environment
     const { getModels } = require("../models");
     const { Brand, WatchList } = getModels(environment);
     const { getDatabaseConnection } = require("../config/database");
@@ -399,8 +364,6 @@ async function getWatchlistBrands(
     const validPage = Math.max(1, parseInt(page));
     const validLimit = Math.max(1, parseInt(limit));
 
-    // Get all watchlist brands from database (without duplicates)
-    // First, get unique brand_ids from WatchList table
     const uniqueWatchlistBrandIds = await WatchList.findAll({
       attributes: [
         [db.fn('DISTINCT', db.col('brand_id')), 'brand_id'],
@@ -424,7 +387,6 @@ async function getWatchlistBrands(
       };
     }
 
-    // Extract brand IDs and get brand details
     const brandIds = uniqueWatchlistBrandIds.map(item => item.brand_id);
     const watchlistBrands = await Brand.findAll({
       where: { id: brandIds },
@@ -434,14 +396,12 @@ async function getWatchlistBrands(
 
     logger.info(`Found ${watchlistBrands.length} brands with details`);
 
-    // Get all brands from watchlist_pending_brands queue with scores
     const REDIS_KEYS = getRedisKeys(environment);
     const watchlistRedis = getQueueRedis('watchlist', environment);
     const allPendingItems = await watchlistRedis.zrange(REDIS_KEYS.WATCHLIST.PENDING_BRANDS, 0, -1, 'WITHSCORES');
     const pendingPageIds = new Set();
-    const pendingBrandsMap = new Map(); // page_id -> brand data
+    const pendingBrandsMap = new Map(); 
 
-    // Process pending brands
     for (let i = 0; i < allPendingItems.length; i += 2) {
       const member = allPendingItems[i];
       const score = allPendingItems[i + 1];
@@ -459,7 +419,6 @@ async function getWatchlistBrands(
       }
     }
 
-    // Get all failed brands from watchlist_failed_brands queue
     const allFailedItems = await watchlistRedis.lrange(REDIS_KEYS.WATCHLIST.FAILED_BRANDS, 0, -1);
     const failedPageIds = new Set();
     
@@ -475,27 +434,19 @@ async function getWatchlistBrands(
     logger.info(`Pending page_ids: ${Array.from(pendingPageIds).join(', ')}`);
     logger.info(`Failed page_ids: ${Array.from(failedPageIds).join(', ')}`);
 
-    // Process each watchlist brand and determine status
     let processedBrands = [];
     
     for (const brand of watchlistBrands) {
       const pageId = brand.page_id;
       
-      // Determine scraper status based on your logic:
-      // 1. In watchlist_pending_brands_prod = waiting
-      // 2. Not in watchlist_pending_brands_prod but in watchlist_failed_brands_prod = failed  
-      // 3. Not in watchlist_pending_brands_prod and not in watchlist_failed_brands_prod = completed
       
       let scraperStatus;
       
       if (pendingPageIds.has(pageId)) {
-        // Brand is in watchlist_pending_brands_prod queue = waiting
         scraperStatus = 'waiting';
       } else if (failedPageIds.has(pageId)) {
-        // Brand is NOT in watchlist_pending_brands_prod but IS in watchlist_failed_brands_prod = failed
         scraperStatus = 'failed';
       } else {
-        // Brand is NOT in watchlist_pending_brands_prod and NOT in watchlist_failed_brands_prod = completed
         scraperStatus = 'completed';
       }
 
@@ -507,13 +458,12 @@ async function getWatchlistBrands(
         status: brand.status || "Unknown",
         is_watchlist: true,
         scraper_status: scraperStatus,
-        added_at: new Date() // Since we don't have watchlist creation time anymore
+        added_at: new Date() 
       };
 
       processedBrands.push(brandInfo);
     }
 
-    // Apply search filter if provided
     if (search && search.trim()) {
       const searchTerm = search.toLowerCase().trim();
       processedBrands = processedBrands.filter(brand => 
@@ -537,7 +487,6 @@ async function getWatchlistBrands(
       };
     }
 
-    // Apply pagination
     const startIndex = (validPage - 1) * validLimit;
     const endIndex = startIndex + validLimit;
     const paginatedBrands = processedBrands.slice(startIndex, endIndex);
@@ -568,14 +517,11 @@ async function getWatchlistPendingBrands(
     const validPage = Math.max(1, parseInt(page));
     const validLimit = Math.max(1, parseInt(limit));
 
-    // Get all brands from watchlist_pending_brands queue
     const watchlistRedis = getQueueRedis('watchlist', environment);
     const allPendingItems = await watchlistRedis.zrange(REDIS_KEYS.WATCHLIST.PENDING_BRANDS, 0, -1, 'WITHSCORES');
     
-    // Use the same enrichment function as regular pending brands
     const pendingBrands = await enrichBrandsWithDBInfo(allPendingItems, true, environment);
     
-    // Add score and other watchlist-specific fields
     for (let i = 0; i < allPendingItems.length; i += 2) {
       const member = allPendingItems[i];
       const score = allPendingItems[i + 1];
@@ -593,12 +539,10 @@ async function getWatchlistPendingBrands(
       }
     }
 
-    // Apply search filter if provided
     let filteredBrands = pendingBrands;
     if (search && search.trim()) {
       const searchTerm = search.toLowerCase().trim();
       
-      // Filter brands based on search term (flexible search)
       const normalizedSearchTerm = searchTerm.replace(/\s+/g, '');
       
       filteredBrands = pendingBrands.filter(brand => {
@@ -606,11 +550,8 @@ async function getWatchlistPendingBrands(
         const normalizedBrandName = brandName.replace(/\s+/g, '');
         
         return (
-          // Original search (with spaces)
           brandName.includes(searchTerm) ||
-          // Space-insensitive search
           normalizedBrandName.includes(normalizedSearchTerm) ||
-          // ID searches
           brand.queue_id?.toString().includes(searchTerm) ||
           brand.page_id?.toString().includes(searchTerm)
         );
@@ -631,7 +572,6 @@ async function getWatchlistPendingBrands(
       };
     }
 
-    // Apply pagination
     const startIndex = (validPage - 1) * validLimit;
     const endIndex = startIndex + validLimit;
     const paginatedBrands = filteredBrands.slice(startIndex, endIndex);
@@ -662,14 +602,11 @@ async function getWatchlistFailedBrands(
     const validPage = Math.max(1, parseInt(page));
     const validLimit = Math.max(1, parseInt(limit));
 
-    // Get all brands from watchlist_failed_brands queue
     const watchlistRedis = getQueueRedis('watchlist', environment);
     const allFailedItems = await watchlistRedis.lrange(REDIS_KEYS.WATCHLIST.FAILED_BRANDS, 0, -1);
     
-    // Use the same enrichment function as regular failed brands
     const failedBrands = await enrichBrandsWithDBInfo(allFailedItems, false, environment);
     
-    // Add watchlist-specific fields
     for (let i = 0; i < allFailedItems.length; i++) {
       try {
         const failedData = JSON.parse(allFailedItems[i]);
@@ -682,12 +619,10 @@ async function getWatchlistFailedBrands(
       }
     }
 
-    // Apply search filter if provided
     let filteredBrands = failedBrands;
     if (search && search.trim()) {
       const searchTerm = search.toLowerCase().trim();
       
-      // Filter brands based on search term (flexible search)
       const normalizedSearchTerm = searchTerm.replace(/\s+/g, '');
       
       filteredBrands = failedBrands.filter(brand => {
@@ -695,11 +630,8 @@ async function getWatchlistFailedBrands(
         const normalizedBrandName = brandName.replace(/\s+/g, '');
         
         return (
-          // Original search (with spaces)
           brandName.includes(searchTerm) ||
-          // Space-insensitive search
           normalizedBrandName.includes(normalizedSearchTerm) ||
-          // ID searches
           brand.queue_id?.toString().includes(searchTerm) ||
           brand.page_id?.toString().includes(searchTerm)
         );
@@ -720,7 +652,6 @@ async function getWatchlistFailedBrands(
       };
     }
 
-    // Apply pagination
     const startIndex = (validPage - 1) * validLimit;
     const endIndex = startIndex + validLimit;
     const paginatedBrands = filteredBrands.slice(startIndex, endIndex);
@@ -743,19 +674,14 @@ async function getWatchlistFailedBrands(
 async function getNextBrand(queueType = 'regular', environment = 'production') {
   try {
     const REDIS_KEYS = getRedisKeys(environment);
-    // Priority Queue Logic: Score 1 = Priority, Score 0 = Regular
-    // Return next 4 brands in order of processing
     
-    // Get the appropriate Redis instance
     const redis = getQueueRedis(queueType, environment);
     const pendingQueueKey = REDIS_KEYS[queueType.toUpperCase()].PENDING_BRANDS;
     const failedQueueKey = REDIS_KEYS[queueType.toUpperCase()].FAILED_BRANDS;
     
-    // Get ALL brands from pending queue to find the next ones in correct order
     const queueRedis = getQueueRedis(queueType, environment);
     const allPendingItems = await queueRedis.zrange(pendingQueueKey, 0, -1, 'WITHSCORES');
     
-    // Separate priority and regular brands
     const priorityBrands = [];
     const regularBrands = [];
     
@@ -773,7 +699,6 @@ async function getNextBrand(queueType = 'regular', environment = 'production') {
     const nextBrands = [];
     let position = 1;
     
-    // First: Add priority brands (score = 1) - these are scraped first in FIFO order
     for (let i = 0; i < Math.min(4, priorityBrands.length); i++) {
       const priorityBrand = priorityBrands[i];
       const enrichedBrand = await enrichBrandsWithDBInfo([priorityBrand.member, priorityBrand.score], true, environment);
@@ -789,7 +714,6 @@ async function getNextBrand(queueType = 'regular', environment = 'production') {
       position++;
     }
     
-    // If we need more brands and have regular brands, add them
     if (nextBrands.length < 4 && regularBrands.length > 0) {
       const remainingSlots = 4 - nextBrands.length;
       for (let i = 0; i < Math.min(remainingSlots, regularBrands.length); i++) {
@@ -808,7 +732,6 @@ async function getNextBrand(queueType = 'regular', environment = 'production') {
       }
     }
     
-    // If we still need more brands and no pending brands, check failed queue
     if (nextBrands.length < 4 && priorityBrands.length === 0 && regularBrands.length === 0) {
       const remainingSlots = 4 - nextBrands.length;
       const failedItems = await queueRedis.lrange(failedQueueKey, 0, remainingSlots - 1);
@@ -837,7 +760,6 @@ async function getNextBrand(queueType = 'regular', environment = 'production') {
 
 async function getNextWatchlistBrand(environment = 'production') {
   try {
-    // Use the new getNextBrand function with watchlist queue type
     return await getNextBrand('watchlist', environment);
   } catch (error) {
     logger.error("Error in getNextWatchlistBrand:", error);

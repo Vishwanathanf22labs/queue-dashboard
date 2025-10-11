@@ -18,7 +18,6 @@ const ScrapedBrands = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { sortBy, sortOrder, updateSorting } = useScrapedBrandsSorting('normal', 'desc');
 
-  // Get date from URL params or default to today
   const getInitialDate = () => {
     const urlDate = searchParams.get('date');
     if (urlDate && /^\d{4}-\d{2}-\d{2}$/.test(urlDate)) {
@@ -50,7 +49,6 @@ const ScrapedBrands = () => {
 
   const loadScrapedBrands = useCallback(async (page = 1, date = null, sortByParam = null, sortOrderParam = null) => {
     try {
-      // Only set main loading if no data exists, otherwise use pageLoading
       if (!dataState.brands.length) {
         setIsLoading(true);
       } else {
@@ -79,7 +77,7 @@ const ScrapedBrands = () => {
       toast.error('Failed to load scraped brands');
     } finally {
       setIsLoading(false);
-      setPageLoading(false);  // Reset page loading
+      setPageLoading(false);
     }
   }, [updateDataState, sortBy, sortOrder, dataState.brands.length]);
 
@@ -95,12 +93,10 @@ const ScrapedBrands = () => {
     }
   }, [updateDataState]);
 
-  // 🚀 Fixed search with request ID to prevent stale results
   const searchAbortRef = useRef(null);
   const currentSearchRef = useRef('');
 
   const searchBrands = useCallback(async (query) => {
-    // Cancel previous search request if still pending
     if (searchAbortRef.current) {
       searchAbortRef.current.abort();
     }
@@ -116,17 +112,14 @@ const ScrapedBrands = () => {
     try {
       setIsSearching(true);
 
-      // Store current search query
       currentSearchRef.current = query;
 
-      // Create new AbortController for this request
       searchAbortRef.current = new AbortController();
 
       const response = await scrapedBrandsAPI.searchScrapedBrands(query, dataState.selectedDate, {
         signal: searchAbortRef.current.signal
       });
 
-      // 🔥 CRITICAL: Only update UI if this response matches current search term
       if (!searchAbortRef.current.signal.aborted && currentSearchRef.current === query) {
         if (response.data.success) {
           setSearchResults(response.data.data.brands || []);
@@ -138,18 +131,15 @@ const ScrapedBrands = () => {
         }
       }
     } catch (error) {
-      // Ignore cancelled requests
       if (error.name !== 'AbortError' && error.name !== 'CanceledError') {
         console.error('Error searching brands:', error);
         toast.error('Search failed');
-        // Only clear if this was the current search
         if (currentSearchRef.current === query) {
           setSearchResults([]);
           setShowSearchResults(false);
         }
       }
     } finally {
-      // Only reset loading if this was the current search
       if (currentSearchRef.current === query) {
         setIsSearching(false);
       }
@@ -160,48 +150,39 @@ const ScrapedBrands = () => {
     setDateInputValue(e.target.value);
   }, []);
 
-  // Add this useEffect for debounced date changes
   useEffect(() => {
-    // Validate date format (YYYY-MM-DD) before making API call
     const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(dateInputValue);
 
     if (!isValidDate) return;
 
-    // Only update if the date actually changed
     if (dateInputValue === dataState.selectedDate) return;
 
     const timer = setTimeout(() => {
       setPageLoading(true);
 
-      // Update URL params to persist the selected date and reset page to 1
       const newSearchParams = new URLSearchParams(searchParams);
       newSearchParams.set('date', dateInputValue);
       newSearchParams.set('page', '1');
       setSearchParams(newSearchParams);
 
       updateDataState({ selectedDate: dateInputValue, currentPage: 1 });
-    }, 700); // 700ms debounce
+    }, 700);
 
     return () => clearTimeout(timer);
   }, [dateInputValue, dataState.selectedDate, setSearchParams, searchParams, updateDataState]);
 
-  // 🚀 Fixed search handler with debouncing and minimum chars
   const debounceTimerRef = useRef(null);
 
   const handleSearch = useCallback((query) => {
     setSearchTerm(query);
 
-    // Auto-add leading zeros for numeric searches (1-2 digits)
     let processedQuery = query;
     if (query && /^\d{1,2}$/.test(query.trim())) {
-      // If it's 1-2 digits, add leading zeros to make it 3 digits
       processedQuery = query.trim().padStart(3, '0');
     }
 
-    // Update current search reference immediately
     currentSearchRef.current = processedQuery;
 
-    // Update URL parameters to persist search
     const newSearchParams = new URLSearchParams(searchParams);
     if (processedQuery && processedQuery.trim().length >= 3) {
       newSearchParams.set('search', processedQuery);
@@ -210,14 +191,12 @@ const ScrapedBrands = () => {
     }
     setSearchParams(newSearchParams, { replace: true });
 
-    // Clear results immediately if empty or too short
     if (!processedQuery.trim() || processedQuery.trim().length < 3) {
       setShowSearchResults(false);
       setSearchResults([]);
       setIsSearching(false);
       currentSearchRef.current = '';
 
-      // Cancel any pending search
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
@@ -227,13 +206,11 @@ const ScrapedBrands = () => {
       return;
     }
 
-    // Debounce the actual search
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      // Double-check current search term before making API call
       if (currentSearchRef.current === processedQuery) {
         searchBrands(processedQuery);
       }
@@ -247,7 +224,6 @@ const ScrapedBrands = () => {
     setIsSearching(false);
     currentSearchRef.current = '';
 
-    // Cancel any pending search
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
@@ -255,13 +231,11 @@ const ScrapedBrands = () => {
       searchAbortRef.current.abort();
     }
 
-    // Remove search parameter from URL
     const newSearchParams = new URLSearchParams(searchParams);
     newSearchParams.delete('search');
     setSearchParams(newSearchParams, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (debounceTimerRef.current) {
@@ -273,7 +247,6 @@ const ScrapedBrands = () => {
     };
   }, []);
 
-  // Read search parameter from URL on component mount and restore search
   useEffect(() => {
     const urlSearchTerm = searchParams.get('search');
     if (urlSearchTerm && urlSearchTerm.trim().length >= 3) {
@@ -281,13 +254,12 @@ const ScrapedBrands = () => {
       currentSearchRef.current = urlSearchTerm;
       searchBrands(urlSearchTerm);
     }
-  }, []); // Only run on mount
+  }, []);
 
   const handlePageChange = (page) => {
-    setPageLoading(true);  // Add loading for pagination
+    setPageLoading(true);
     updateDataState({ currentPage: page });
 
-    // Update URL parameters to persist page number
     const newSearchParams = new URLSearchParams(searchParams);
     newSearchParams.set('page', page.toString());
     if (dataState.selectedDate) {
@@ -298,21 +270,16 @@ const ScrapedBrands = () => {
 
   const handleSortChange = (field, order) => {
     updateSorting(field, order);
-    // Reset to page 1 when sorting changes
     updateDataState({ currentPage: 1 });
 
-    // Update URL parameters to reset page to 1
     const newSearchParams = new URLSearchParams(searchParams);
     newSearchParams.set('page', '1');
     if (dataState.selectedDate) {
       newSearchParams.set('date', dataState.selectedDate);
     }
     setSearchParams(newSearchParams);
-
-    // Don't call loadScrapedBrands here - let useEffect handle it
   };
 
-  // Auto-refresh hook
   const refreshFn = useCallback(async () => {
     try {
       await Promise.all([
@@ -332,7 +299,6 @@ const ScrapedBrands = () => {
 
   const handleRefresh = async () => {
     await manualRefresh();
-    // Toast is now handled in refreshFn
   };
 
   const getComparativeStatusIcon = (status) => {
@@ -369,7 +335,6 @@ const ScrapedBrands = () => {
     });
   };
 
-  // Sync URL params with component state
   useEffect(() => {
     const urlDate = searchParams.get('date');
     if (urlDate && urlDate !== dataState.selectedDate) {
@@ -377,16 +342,12 @@ const ScrapedBrands = () => {
     }
   }, [searchParams, dataState.selectedDate, updateDataState]);
 
-  // Load scraped brands data when page/date/sorting changes
   useEffect(() => {
     loadScrapedBrands(dataState.currentPage, dataState.selectedDate, sortBy, sortOrder);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataState.currentPage, dataState.selectedDate, sortBy, sortOrder]);
 
-  // Load stats only when date changes
   useEffect(() => {
     loadStats(dataState.selectedDate);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataState.selectedDate]);
 
   if (isLoading && !dataState.brands.length) {
@@ -401,7 +362,6 @@ const ScrapedBrands = () => {
 
   const displayBrands = showSearchResults ? searchResults : dataState.brands;
 
-  // FIXED: Properly centered loading for page loading
   if (pageLoading) {
     return (
       <div className="min-h-screen bg-gray-50 p-4 md:p-6">
@@ -415,7 +375,6 @@ const ScrapedBrands = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
             <div>
@@ -426,7 +385,7 @@ const ScrapedBrands = () => {
                 View scraped brands data for the selected date
               </p>
             </div>
-            
+
             <RefreshControl
               isRefreshing={isRefreshing}
               refreshInterval={refreshInterval}
@@ -436,7 +395,6 @@ const ScrapedBrands = () => {
           </div>
         </div>
 
-        {/* Stats Cards */}
         {dataState.stats && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <Card className="p-4">
@@ -489,9 +447,7 @@ const ScrapedBrands = () => {
           </div>
         )}
 
-        {/* Controls */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          {/* Date Picker */}
           <div className="flex items-center space-x-2">
             <Calendar className="h-5 w-5 text-gray-500 sm:hidden" />
             <div className="relative w-full sm:w-auto min-w-0">
@@ -513,7 +469,6 @@ const ScrapedBrands = () => {
             </div>
           </div>
 
-          {/* Search */}
           <div className="flex-1 max-w-md">
             <SearchInput
               value={searchTerm}
@@ -525,7 +480,6 @@ const ScrapedBrands = () => {
           </div>
         </div>
 
-        {/* Sorting Buttons */}
         {!showSearchResults && (
           <div className="mb-6 flex flex-nowrap gap-1 overflow-x-auto">
             <span className="text-xs font-medium text-gray-700 self-center flex-shrink-0 mr-1">Sort by:</span>
@@ -558,7 +512,6 @@ const ScrapedBrands = () => {
           </div>
         )}
 
-        {/* Results */}
         {isSearching ? (
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
@@ -577,12 +530,10 @@ const ScrapedBrands = () => {
           </Card>
         ) : (
           <>
-            {/* Brands Grid */}
             <div className="relative">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
                 {displayBrands.map((brand) => (
                   <Card key={`${brand.brand_id}-${brand.started_at}`} className="p-4 hover:shadow-md transition-shadow relative">
-                    {/* Watchlist Badge - Top Left Corner */}
                     {brand.isWatchlist && (
                       <div className="absolute top-3 left-3 z-10">
                         <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">
@@ -592,7 +543,6 @@ const ScrapedBrands = () => {
                     )}
 
                     <div className="space-y-3" style={{ paddingTop: brand.isWatchlist ? '32px' : '0' }}>
-                      {/* Brand Name */}
                       <div>
                         <h3 className="font-semibold text-gray-900 truncate" title={brand.brand_name}>
                           {brand.brand_name}
@@ -600,7 +550,14 @@ const ScrapedBrands = () => {
                         <p className="text-sm text-gray-500">ID: {brand.brand_id}</p>
                       </div>
 
-                      {/* Ads Counts */}
+                      {brand.actual_ads_count && (
+                        <div className="flex justify-center">
+                          <Badge variant="info" className="text-xs">
+                            actual_ads_count: {brand.actual_ads_count}
+                          </Badge>
+                        </div>
+                      )}
+
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div className="text-center p-2 bg-green-50 rounded">
                           <p className="text-green-600 font-medium">
@@ -616,7 +573,6 @@ const ScrapedBrands = () => {
                         </div>
                       </div>
 
-                      {/* Stopped Ads */}
                       {brand.stopped_ads && (
                         <div className="text-center p-2 bg-gray-50 rounded">
                           <p className="text-gray-600 font-medium">
@@ -626,7 +582,6 @@ const ScrapedBrands = () => {
                         </div>
                       )}
 
-                      {/* Comparative Status */}
                       {brand.comparative_status && (
                         <div className="flex items-center justify-center">
                           <Badge
@@ -638,13 +593,11 @@ const ScrapedBrands = () => {
                         </div>
                       )}
 
-                      {/* Started At */}
                       <div className="text-xs text-gray-500 text-center">
                         {formatDate(brand.started_at)}
                       </div>
                     </div>
 
-                    {/* External Link Icon - Bottom Right */}
                     {brand.page_id && (
                       <button
                         onClick={() => {
@@ -662,7 +615,6 @@ const ScrapedBrands = () => {
               </div>
             </div>
 
-            {/* Pagination */}
             {!showSearchResults && dataState.totalPages > 1 && (
               <div className="flex justify-center">
                 <Pagination
@@ -676,7 +628,6 @@ const ScrapedBrands = () => {
               </div>
             )}
 
-            {/* Search Results Info */}
             {showSearchResults && (
               <div className="text-center text-sm text-gray-600 mb-4">
                 Showing {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for "{searchTerm}"

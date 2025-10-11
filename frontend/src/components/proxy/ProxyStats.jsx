@@ -7,9 +7,7 @@ const ProxyStats = ({ stats, managementStats }) => {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* First Row - 4 Cards (2 on mobile, 4 on desktop) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-        {/* 1. Total Proxies */}
         <Card padding="p-3 sm:p-4 lg:p-6">
           <div className="text-center">
             <div className="flex justify-center mb-2 sm:mb-3">
@@ -24,7 +22,6 @@ const ProxyStats = ({ stats, managementStats }) => {
           </div>
         </Card>
 
-        {/* 2. Working Proxies */}
         <Card padding="p-3 sm:p-4 lg:p-6">
           <div className="text-center">
             <div className="flex justify-center mb-2 sm:mb-3">
@@ -39,7 +36,6 @@ const ProxyStats = ({ stats, managementStats }) => {
           </div>
         </Card>
 
-        {/* 3. Failed Proxies */}
         <Card padding="p-3 sm:p-4 lg:p-6">
           <div className="text-center">
             <div className="flex justify-center mb-2 sm:mb-3">
@@ -56,7 +52,6 @@ const ProxyStats = ({ stats, managementStats }) => {
           </div>
         </Card>
 
-        {/* 4. Total Usage */}
         <Card padding="p-3 sm:p-4 lg:p-6">
           <div className="text-center">
             <div className="flex justify-center mb-2 sm:mb-3">
@@ -72,9 +67,7 @@ const ProxyStats = ({ stats, managementStats }) => {
         </Card>
       </div>
 
-      {/* Second Row - 4 Cards (2 on mobile, 4 on desktop) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-        {/* 5. Total Success Count */}
         <Card padding="p-3 sm:p-4 lg:p-6">
           <div className="text-center">
             <div className="flex justify-center mb-2 sm:mb-3">
@@ -89,7 +82,6 @@ const ProxyStats = ({ stats, managementStats }) => {
           </div>
         </Card>
 
-        {/* 6. Total Failed Count */}
         <Card padding="p-3 sm:p-4 lg:p-6">
           <div className="text-center">
             <div className="flex justify-center mb-2 sm:mb-3">
@@ -104,7 +96,6 @@ const ProxyStats = ({ stats, managementStats }) => {
           </div>
         </Card>
 
-        {/* 7. Locked Proxies */}
         <Card padding="p-3 sm:p-4 lg:p-6">
           <div className="text-center">
             <div className="flex justify-center mb-2 sm:mb-3">
@@ -119,7 +110,6 @@ const ProxyStats = ({ stats, managementStats }) => {
           </div>
         </Card>
 
-        {/* 8. Total Added */}
         {managementStats && (
           <Card padding="p-3 sm:p-4 lg:p-6">
             <div className="text-center">
@@ -137,10 +127,8 @@ const ProxyStats = ({ stats, managementStats }) => {
         )}
       </div>
 
-      {/* Third Row - 2 Cards (2 on mobile, 2 on desktop) */}
       {managementStats && (
         <div className="grid grid-cols-2 lg:grid-cols-2 gap-2 sm:gap-4">
-          {/* 9. Total Removed */}
           <Card padding="p-3 sm:p-4 lg:p-6">
             <div className="text-center">
               <div className="flex justify-center mb-2 sm:mb-3">
@@ -155,7 +143,6 @@ const ProxyStats = ({ stats, managementStats }) => {
             </div>
           </Card>
 
-          {/* 10. Last Updated */}
           <Card padding="p-3 sm:p-4 lg:p-6">
             <div className="text-center">
               <div className="flex justify-center mb-2 sm:mb-3">

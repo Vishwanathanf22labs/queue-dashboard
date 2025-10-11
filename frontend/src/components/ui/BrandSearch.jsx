@@ -42,7 +42,6 @@ const BrandSearch = forwardRef(({ onBrandSelect, selectedBrand = null, disabled 
       error: null
     });
 
-    // Update URL parameters
     const newParams = new URLSearchParams(searchParams);
     newParams.delete('search');
     setSearchParams(newParams);
@@ -87,7 +86,6 @@ const BrandSearch = forwardRef(({ onBrandSelect, selectedBrand = null, disabled 
       error: null
     });
 
-    // Update URL parameters
     const newParams = new URLSearchParams(searchParams);
     if (newQuery && newQuery.trim()) {
       newParams.set('search', newQuery);
@@ -157,7 +155,6 @@ const BrandSearch = forwardRef(({ onBrandSelect, selectedBrand = null, disabled 
     }
   };
 
-  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (searchTimeoutRef.current) {
@@ -166,7 +163,6 @@ const BrandSearch = forwardRef(({ onBrandSelect, selectedBrand = null, disabled 
     };
   }, []);
 
-  // Handle click outside to close dropdown
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target) &&
@@ -181,7 +177,6 @@ const BrandSearch = forwardRef(({ onBrandSelect, selectedBrand = null, disabled 
     };
   }, []);
 
-  // Handle selectedBrand changes WITHOUT clearing search
   useEffect(() => {
     if (selectedBrand && selectedBrand.brand_name) {
       setSearchState(prev => ({
@@ -195,12 +190,10 @@ const BrandSearch = forwardRef(({ onBrandSelect, selectedBrand = null, disabled 
     }
   }, [selectedBrand]);
 
-  // Handle URL parameter changes - improved to prevent duplicate searches
   useEffect(() => {
     const urlSearchTerm = searchParams.get('search') || '';
 
     if (urlSearchTerm && urlSearchTerm.trim().length >= 3) {
-      // Only trigger search if query is different OR if we have no results (page refresh case)
       const shouldSearch = urlSearchTerm !== query || (urlSearchTerm === query && results.length === 0);
 
       if (shouldSearch) {
@@ -209,18 +202,15 @@ const BrandSearch = forwardRef(({ onBrandSelect, selectedBrand = null, disabled 
           error: null
         });
 
-        // Clear any existing timeout to prevent duplicate calls
         if (searchTimeoutRef.current) {
           clearTimeout(searchTimeoutRef.current);
         }
 
-        // Trigger search for URL parameter
         searchTimeoutRef.current = setTimeout(() => {
           performSearch(urlSearchTerm);
         }, 300);
       }
     } else if (!urlSearchTerm && query) {
-      // Only clear if URL is empty AND query exists
       updateSearchState({
         query: '',
         results: [],

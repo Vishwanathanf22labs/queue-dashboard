@@ -6,20 +6,15 @@ const router = express.Router();
 
 router.use(adminAuth);
 
-// Clear all queues (both pending and failed)
 router.delete("/clear-all", queueManagementController.clearAllQueues);
 
-// Clear only pending queue
 router.delete("/pending/clear", queueManagementController.clearPendingQueue);
 
-// Clear only failed queue
 router.delete("/failed/clear", queueManagementController.clearFailedQueue);
 
-// Individual brand removal
 router.delete("/pending/:id", queueManagementController.removePendingBrand);
 router.delete("/failed/:id", queueManagementController.removeFailedBrand);
 
-// Move operations - PUT methods
 router.put(
   "/pending/:id/move-to-failed",
   queueManagementController.movePendingToFailed
@@ -29,7 +24,6 @@ router.put(
   queueManagementController.moveFailedToPending
 );
 
-// Bulk move operations
 router.put(
   "/pending/move-all-to-failed",
   queueManagementController.moveAllPendingToFailed
@@ -39,7 +33,6 @@ router.put(
   queueManagementController.moveAllFailedToPending
 );
 
-// Watchlist specific operations
 router.put(
   "/watchlist/move-failed-to-pending",
   queueManagementController.moveWatchlistFailedToPending
@@ -55,7 +48,6 @@ router.put(
   queueManagementController.moveIndividualWatchlistFailedToPending
 );
 
-// Watchlist specific clear operations
 router.delete(
   "/watchlist/pending/clear",
   queueManagementController.clearWatchlistPendingQueue
@@ -66,7 +58,6 @@ router.delete(
   queueManagementController.clearWatchlistFailedQueue
 );
 
-// Watchlist specific bulk move operations
 router.put(
   "/watchlist/pending/move-all-to-failed",
   queueManagementController.moveAllWatchlistPendingToFailed
@@ -77,13 +68,11 @@ router.put(
   queueManagementController.moveAllWatchlistFailedToPending
 );
 
-// Cleanup watchlist failed queue (remove corrupted entries)
 router.post(
   "/watchlist/failed/cleanup",
   queueManagementController.cleanupWatchlistFailedQueue
 );
 
-// Get queue management statistics
 router.get("/stats", queueManagementController.getQueueManagementStats);
 
 module.exports = router;

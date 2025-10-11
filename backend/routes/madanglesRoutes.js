@@ -1,19 +1,18 @@
-const express = require('express');
-const multer = require('multer');
-const adminAuth = require('../middleware/adminAuth');
-const { 
-  uploadCsvToMadangles, 
-  checkScrapingStatus, 
-  addScrapedBrandsToQueue 
-} = require('../controllers/madanglesCsvController');
+const express = require("express");
+const multer = require("multer");
+const adminAuth = require("../middleware/adminAuth");
+const {
+  uploadCsvToMadangles,
+  checkScrapingStatus,
+  addScrapedBrandsToQueue,
+} = require("../controllers/madanglesCsvController");
 
 const router = express.Router();
 
-// Configure multer for CSV file uploads (same as existing CSV upload)
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
+    fileSize: 5 * 1024 * 1024,
   },
   fileFilter: (req, file, cb) => {
     if (file.mimetype === "text/csv" || file.originalname.endsWith(".csv")) {
@@ -24,25 +23,15 @@ const upload = multer({
   },
 });
 
-/**
- * POST /api/madangles/upload-csv
- * Upload CSV file to madangles-scraper endpoint
- * Requires admin authentication
- */
-router.post('/upload-csv', adminAuth, upload.single('file'), uploadCsvToMadangles);
+router.post(
+  "/upload-csv",
+  adminAuth,
+  upload.single("file"),
+  uploadCsvToMadangles
+);
 
-/**
- * POST /api/madangles/check-scraping-status
- * Check if scraped brands exist in database
- * Requires admin authentication
- */
-router.post('/check-scraping-status', adminAuth, checkScrapingStatus);
+router.post("/check-scraping-status", adminAuth, checkScrapingStatus);
 
-/**
- * POST /api/madangles/add-to-queue
- * Add scraped brands to regular or watchlist pending queue
- * Requires admin authentication
- */
-router.post('/add-to-queue', adminAuth, addScrapedBrandsToQueue);
+router.post("/add-to-queue", adminAuth, addScrapedBrandsToQueue);
 
 module.exports = router;

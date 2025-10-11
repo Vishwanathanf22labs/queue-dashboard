@@ -7,10 +7,10 @@ import useEnvironmentStore from '../../stores/environmentStore';
 import useAdminStore from '../../stores/adminStore';
 import { useAdminLogin } from '../../contexts/AdminLoginContext';
 
-const DashboardHeader = ({ 
-  refreshInterval, 
-  isRefreshing, 
-  onManualRefresh, 
+const DashboardHeader = ({
+  refreshInterval,
+  isRefreshing,
+  onManualRefresh,
   onIntervalChange,
   scraperStatus,
   scraperStatusData
@@ -48,7 +48,6 @@ const DashboardHeader = ({
         </div>
 
         <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-3">
-          {/* Current Environment Display */}
           <button
             onClick={() => navigate('/settings')}
             className="flex items-center space-x-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg shadow-sm h-10 transition-colors cursor-pointer"
@@ -60,7 +59,6 @@ const DashboardHeader = ({
             </span>
           </button>
 
-          {/* Admin Login/Logout Button */}
           {isAdmin ? (
             <button
               onClick={logout}
